@@ -53,7 +53,7 @@
               <tr>
                 <td class="file-cell cell--mono">{{ item.fileName || "Unknown" }}</td>
                 <td>{{ item.options?.model || "base" }}</td>
-                <td><span class="status-text status-text--{{ getStatusVariant(item.status) }}">{{ item.status }}</span></td>
+                <td><span class="status-text status-text--{{ getStatusVariant(item.status) }}">@if (item.status === "completed") { <i class="ph-bold ph-check-circle" aria-hidden="true"></i> } @else { <i class="ph-bold ph-info" aria-hidden="true"></i> }{{ item.status }}</span></td>
                 <td class="cell--mono">{{ formatDuration(item.audioDuration) }}</td>
                 <td class="cell--mono">{{ formatTime(item.transcriptionTime) }}</td>
                 <td>{{ formatTimestamp(item.startedAt) }}</td>

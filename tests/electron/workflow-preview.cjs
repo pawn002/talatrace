@@ -68,6 +68,39 @@ app.whenReady().then(async () => {
       const blend = (front, back) => front.slice(0, 3).map((v, i) => v * front[3] / 255 + back[i] * (1 - front[3] / 255));
       const luminance = rgb => rgb.map(v => v / 255).map(v => v <= .04045 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4)).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
       const contrasts = {};
+      const smallText = [...document.querySelectorAll('body *')].filter(el => {
+        if (el.matches('i, svg, svg *, script, style')) return false;
+        if (![...el.childNodes].some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim())) return false;
+        const style = getComputedStyle(el);
+        return el.getClientRects().length && style.visibility !== 'hidden' && parseFloat(style.fontSize) < 14;
+      }).map(el => ({ text: el.textContent.trim().slice(0, 80), size: getComputedStyle(el).fontSize }));
+      if (smallText.length) throw new Error('Readable text below 14px: ' + JSON.stringify(smallText));
+      const colourPairs = [];
+      for (const selector of ['.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
+        for (const el of document.querySelectorAll(selector)) {
+          if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
+          const style = getComputedStyle(el);
+          let background = 'white';
+          for (let parent = el; parent; parent = parent.parentElement) {
+            const fill = getComputedStyle(parent).backgroundColor;
+            if (rgba(fill)[3] === 255) { background = fill; break; }
+          }
+          colourPairs.push({ selector, foreground: style.color, background, size: parseFloat(style.fontSize), weight: parseInt(style.fontWeight), text: el.textContent.trim().slice(0, 80) });
+        }
+      }
+      for (const selector of ['.input', '.button:focus-visible', '.status-text i', '.local-badge--recording i']) {
+        for (const el of document.querySelectorAll(selector)) {
+          if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
+          const style = getComputedStyle(el);
+          let parent = el.parentElement;
+          let background = 'white';
+          for (; parent; parent = parent.parentElement) {
+            const fill = getComputedStyle(parent).backgroundColor;
+            if (rgba(fill)[3] === 255) { background = fill; break; }
+          }
+          colourPairs.push({ selector, foreground: el.matches('i') ? style.color : el.matches(':focus-visible') ? style.outlineColor : style.borderTopColor, background, nonText: true });
+        }
+      }
       for (const selector of ['.workflow-status h3', '#workflow-help', '.segment__time', '.segment__text', '.workflow-controls .button--primary']) {
         const el = document.querySelector(selector); if (!el) continue;
         const chain = []; for (let parent = el; parent; parent = parent.parentElement) chain.unshift(parent);
@@ -78,7 +111,7 @@ app.whenReady().then(async () => {
       }
       return { name: ${JSON.stringify(name)}, width: innerWidth, height: innerHeight,
         horizontalOverflow: panel.scrollWidth > panel.clientWidth + 1,
-        contrasts,
+        contrasts, colourPairs, smallText,
         controls: controls.map(el => ({ label: el.textContent.trim(), disabled: el.disabled,
           x: Math.round(el.getBoundingClientRect().x), y: Math.round(el.getBoundingClientRect().y),
           width: Math.round(el.getBoundingClientRect().width), height: Math.round(el.getBoundingClientRect().height) })) };
@@ -145,6 +178,9 @@ app.whenReady().then(async () => {
     win.setSize(1100, 820);
     await win.webContents.executeJavaScript("document.querySelector('.settings-details').open = true");
     await capture('settings');
+    await win.webContents.executeJavaScript("document.querySelector('#model-select').classList.add('input--error'); document.querySelector('#model-select').focus()");
+    await capture('input-error-focus');
+    await win.webContents.executeJavaScript("document.querySelector('#model-select').classList.remove('input--error')");
     win.setSize(360, 780);
     await win.webContents.executeJavaScript("document.querySelector('.settings-details').scrollIntoView({ block: 'end' })");
     await capture('settings-small');
@@ -164,7 +200,10 @@ app.whenReady().then(async () => {
     await click('#record-audio-tab');
     await click('[data-action="transcribe"]'); await wait(1100);
     nativeTheme.themeSource = 'light'; await wait(200); await capture('result-light');
-    nativeTheme.themeSource = 'dark';
+    await win.webContents.executeJavaScript("document.querySelector('.settings-details').open = true; document.querySelector('#model-select').classList.add('input--error'); document.querySelector('#model-select').focus(); document.querySelector('#model-select').scrollIntoView({ block: 'center' })");
+    await capture('input-error-focus-light');
+    await win.webContents.executeJavaScript("document.querySelector('#model-select').classList.remove('input--error'); document.querySelector('.settings-details').open = false; document.querySelector('.app-container').scrollTop = 0");
+    nativeTheme.themeSource = 'dark'; await wait(350);
     win.webContents.setZoomFactor(2); await wait(200); await capture('result-zoom');
     win.webContents.setZoomFactor(1);
     await win.webContents.executeJavaScript(`(() => {
@@ -176,10 +215,14 @@ app.whenReady().then(async () => {
       if (document.activeElement !== first) throw new Error('Main navigation Home failed');
     })()`);
     await click('#app-tab-models'); await capture('models');
+    nativeTheme.themeSource = 'light'; await wait(350); await capture('models-light');
+    nativeTheme.themeSource = 'dark'; await wait(350);
     win.setSize(360, 780); await capture('models-small'); win.setSize(1100, 820);
     await click('#app-tab-history'); await capture('history');
     history = [{ id: 'fixture', status: 'completed', fileName: 'Recorded answer', options: { model: 'base' }, audioDuration: 38.6, transcriptionTime: 1450, startedAt: '2026-10-24T21:30:00.000Z', result: fixture }];
     await click('#app-panel-history [aria-label="Refresh history"]'); await wait(100); await capture('history-populated');
+    nativeTheme.themeSource = 'light'; await wait(350); await capture('history-light');
+    nativeTheme.themeSource = 'dark'; await wait(350);
     win.setSize(360, 780); await capture('history-small');
     await fs.writeFile(path.join(output, 'metrics.json'), JSON.stringify(metrics, null, 2));
     console.log('Visual review:', output);

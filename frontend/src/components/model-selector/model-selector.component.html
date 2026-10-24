@@ -59,7 +59,7 @@
                 </td>
                 <td>
                   @if (model.installed) {
-                    <span class="status-text status-text--installed">Installed</span>
+                    <span class="status-text status-text--installed"><i class="ph-bold ph-check-circle" aria-hidden="true"></i>Installed</span>
                   }
                   @if (!model.installed && !model.downloading) {
                     <span class="status-text">Not Installed</span>

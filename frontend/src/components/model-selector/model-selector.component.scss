@@ -5,13 +5,13 @@
   box-shadow: none;
   overflow: visible;
 }
-.models-card .card__header { border: 0; padding: 0 0 24px; }
-.models-card h2 { font-size: 26px; letter-spacing: -.025em; }
-.models-card .card-subtitle { font-size: 14px; font-weight: 400; margin-top: 7px; }
-.models-card .card__body { padding: 20px; border: 1px solid var(--color-border-default); border-radius: 14px; background: var(--color-bg-elevated); }
-.models-card table { font-size: 14px; }
+.models-card .card__header { border: 0; padding: 0 0 var(--spacing-md); }
+.models-card h2 { font-size: var(--font-size-xl); letter-spacing: -.025em; }
+.models-card .card-subtitle { font-size: var(--font-size-md); font-weight: 400; margin-top: var(--spacing-xs); }
+.models-card .card__body { padding: var(--spacing-md); border: 1px solid var(--color-border-default); border-radius: 14px; background: var(--color-bg-elevated); }
+.models-card table { font-size: var(--font-size-sm); }
 .models-card .cell--mono { white-space: nowrap; }
-.models-card .button { min-height: 40px; padding: 8px 14px; font-size: 13px; }
+.models-card .button { min-height: var(--hit-target-aaa); padding: var(--spacing-xs) var(--spacing-sm); font-size: var(--font-size-sm); }
 
 .loading-container {
   display: flex;
@@ -20,8 +20,8 @@
   padding: var(--spacing-xl) var(--spacing-md);
   text-align: center;
   font-family: var(--font-family-accessible);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-subtle);
+  font-size: var(--font-size-md);
+  color: var(--color-text-default);
 }
 
 .info-alert {
@@ -29,8 +29,8 @@
 
   .alert__message {
     font-family: var(--font-family-base);
-    font-size: 14px;
-    line-height: 1.6;
+    font-size: var(--font-size-md);
+    line-height: var(--line-height-normal);
   }
 }
 
@@ -39,14 +39,18 @@
 }
 
 .status-text {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-subtle);
+  font-size: var(--font-size-md);
+  color: var(--color-text-default);
 
-  &--installed { color: var(--color-status-success); }
+  &--installed { color: var(--color-text-default); }
   &--downloading { color: var(--color-text-subtle); }
 }
 
 .download-progress {
   width: 120px;
 }
-@media (max-width: 640px) { .models-card .card__body { padding: 14px; } }
+@media (max-width: 640px) { .models-card .card__body { padding: var(--spacing-sm); } }
+
+.status-text { display: inline-flex; align-items: center; gap: var(--spacing-xs); color: var(--color-text-default); }
+.status-text i { color: var(--color-status-success); }
+.status-text--error i { color: var(--color-status-error); }

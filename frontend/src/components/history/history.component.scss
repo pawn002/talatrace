@@ -5,12 +5,12 @@
   box-shadow: none;
   overflow: visible;
 }
-.history-card .card__header { border: 0; padding: 0 0 24px; }
-.history-card h2 { font-size: 26px; letter-spacing: -.025em; }
-.history-card .card-subtitle { font-size: 14px; font-weight: 400; margin-top: 7px; }
-.history-card .card__body { padding: 20px; border: 1px solid var(--color-border-default); border-radius: 14px; background: var(--color-bg-elevated); }
-.history-card table { font-size: 14px; }
-.history-card .button { min-width: 40px; min-height: 40px; }
+.history-card .card__header { border: 0; padding: 0 0 var(--spacing-md); }
+.history-card h2 { font-size: var(--font-size-xl); letter-spacing: -.025em; }
+.history-card .card-subtitle { font-size: var(--font-size-md); font-weight: 400; margin-top: var(--spacing-xs); }
+.history-card .card__body { padding: var(--spacing-md); border: 1px solid var(--color-border-default); border-radius: 14px; background: var(--color-bg-elevated); }
+.history-card table { font-size: var(--font-size-sm); }
+.history-card .button { min-width: var(--hit-target-aaa); min-height: var(--hit-target-aaa); }
 
 .card-header-row {
   display: flex;
@@ -28,8 +28,8 @@
   padding: var(--spacing-xl) var(--spacing-md);
   text-align: center;
   font-family: var(--font-family-accessible);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-subtle);
+  font-size: var(--font-size-md);
+  color: var(--color-text-default);
   letter-spacing: 0.02em;
 
   i {
@@ -49,7 +49,7 @@
     color: var(--color-text-subtle);
   }
 }
-@media (max-width: 640px) { .history-card .card__body { padding: 14px; } }
+@media (max-width: 640px) { .history-card .card__body { padding: var(--spacing-sm); } }
 
 .table-container {
   width: 100%;
@@ -69,6 +69,10 @@
   text-transform: capitalize;
   color: var(--color-text-subtle);
 
-  &--success { color: var(--color-status-success); }
-  &--error   { color: var(--color-status-error); }
+  &--success { color: var(--color-text-default); }
+  &--error   { color: var(--color-text-default); }
 }
+
+.status-text { display: inline-flex; align-items: center; gap: var(--spacing-xs); color: var(--color-text-default); }
+.status-text i { color: var(--color-status-success); }
+.status-text--error i { color: var(--color-status-error); }

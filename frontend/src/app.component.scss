@@ -1,20 +1,20 @@
-.app-header { height: 56px; display: flex; align-items: center; gap: 10px; padding: 0 28px; border-bottom: 1px solid var(--color-border-default); background: var(--color-bg-elevated); color: var(--color-text-default); }
+.app-header { height: 56px; display: flex; align-items: center; gap: var(--spacing-xs); padding: 0 var(--spacing-lg); border-bottom: 1px solid var(--color-border-default); background: var(--color-bg-elevated); color: var(--color-text-default); }
 .app-logo { width: 23px; height: 23px; }
-.app-title { font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
-.local-badge { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-text-subtle); padding: 6px 10px; border: 1px solid var(--color-border-default); border-radius: 20px; }
-.local-badge--recording { border-color: #ef7777; color: var(--color-text-default); }
-.local-badge--recording i { color: #ef7777; }
+.app-title { font-size: var(--font-size-md); font-weight: 600; letter-spacing: -.02em; }
+.local-badge { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-sm); color: var(--color-text-default); padding: 6px var(--spacing-xs); border: 1px solid var(--color-border-default); border-radius: 20px; }
+.local-badge--recording { border-color: var(--color-status-error-text); color: var(--color-text-default); }
+.local-badge--recording i { color: var(--color-status-error-text); }
 .tabs__tab:disabled { opacity: .55; cursor: not-allowed; }
 .app-container { height: calc(100vh - 57px); overflow: auto; scrollbar-gutter: stable; }
-.tabs__list { padding: 0 max(24px, calc((100% - 1040px) / 2)); height: 44px; background: var(--color-bg-elevated); }
-.tabs__tab { padding: 0 20px; font-size: 13px; }
-.tabs__panels { padding: 28px 24px 48px; }
-.toast-container { position: fixed; top: 72px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 2000; width: min(360px, calc(100vw - 32px)); pointer-events: none; }
-.toast-container .toast { pointer-events: auto; font-size: 13px; }
+.tabs__list { padding: 0 max(var(--spacing-md), calc((100% - 1040px) / 2)); height: 44px; background: var(--color-bg-elevated); }
+.tabs__tab { padding: 0 var(--spacing-md); font-size: var(--font-size-sm); }
+.tabs__panels { padding: var(--spacing-lg) var(--spacing-md) var(--spacing-xl); }
+.toast-container { position: fixed; top: 72px; right: 20px; display: flex; flex-direction: column; gap: var(--spacing-xs); z-index: 2000; width: min(360px, calc(100vw - 32px)); pointer-events: none; }
+.toast-container .toast { pointer-events: auto; font-size: var(--font-size-sm); }
 @media (max-width: 640px) {
-  .app-header { padding: 0 16px; }
-  .app-title { font-size: 14px; }
-  .tabs__list { padding: 0 12px; }
-  .tabs__panels { padding: 20px 14px 32px; }
-  .local-badge { padding: 5px 7px; }
+  .app-header { padding: 0 var(--spacing-sm); }
+  .app-title { font-size: var(--font-size-sm); }
+  .tabs__list { padding: 0 var(--spacing-sm); }
+  .tabs__panels { padding: var(--spacing-md) var(--spacing-sm) var(--spacing-lg); }
+  .local-badge { padding: 5px var(--spacing-xs); }
 }
