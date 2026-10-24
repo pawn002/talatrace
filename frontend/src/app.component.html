@@ -1,14 +1,19 @@
 <header class="app-header">
   <img src="favicon.svg" class="app-logo" alt="" aria-hidden="true" width="28" height="28">
   <span class="app-title">{{ title }}</span>
+  <span class="local-badge" [class.local-badge--recording]="!!transcription?.isRecording" title="Audio is transcribed on this device"><i class="ph-fill" [class.ph-record]="!!transcription?.isRecording" [class.ph-shield-check]="!transcription?.isRecording" aria-hidden="true"></i> {{ transcription?.isRecording ? 'Recording' : transcription?.isTranscribing ? 'Transcribing' : 'On device' }}</span>
 </header>
 
 <div class="app-container">
   <div class="tabs">
-    <div class="tabs__list" role="tablist">
+    <div class="tabs__list" role="tablist" aria-label="Main navigation">
       <button
         class="tabs__tab"
         role="tab"
+        id="app-tab-transcription"
+        aria-controls="app-panel-transcription"
+        [attr.tabindex]="activeTab === 0 ? 0 : -1"
+        (keydown)="onAppTabKeydown($event)"
         [attr.aria-selected]="activeTab === 0"
         (click)="activeTab = 0"
         >
@@ -17,6 +22,12 @@
       <button
         class="tabs__tab"
         role="tab"
+        id="app-tab-models"
+        [disabled]="!!transcription?.busy"
+        [title]="transcription?.busy ? 'Finish the current recording or transcription first' : 'Manage speech models'"
+        aria-controls="app-panel-models"
+        [attr.tabindex]="activeTab === 1 ? 0 : -1"
+        (keydown)="onAppTabKeydown($event)"
         [attr.aria-selected]="activeTab === 1"
         (click)="activeTab = 1"
         >
@@ -25,6 +36,12 @@
       <button
         class="tabs__tab"
         role="tab"
+        id="app-tab-history"
+        [disabled]="!!transcription?.busy"
+        [title]="transcription?.busy ? 'Finish the current recording or transcription first' : 'Recent transcripts'"
+        aria-controls="app-panel-history"
+        [attr.tabindex]="activeTab === 2 ? 0 : -1"
+        (keydown)="onAppTabKeydown($event)"
         [attr.aria-selected]="activeTab === 2"
         (click)="activeTab = 2"
         >
@@ -32,26 +49,18 @@
       </button>
     </div>
     <div class="tabs__panels">
-      <div role="tabpanel" [hidden]="activeTab !== 0">
-        <app-transcription></app-transcription>
+      <div id="app-panel-transcription" role="tabpanel" aria-labelledby="app-tab-transcription" [hidden]="activeTab !== 0">
+        <app-transcription (manageModels)="activeTab = 1"></app-transcription>
       </div>
-      <div role="tabpanel" [hidden]="activeTab !== 1">
+      <div id="app-panel-models" role="tabpanel" aria-labelledby="app-tab-models" [hidden]="activeTab !== 1">
         <app-model-selector></app-model-selector>
       </div>
-      <div role="tabpanel" [hidden]="activeTab !== 2">
+      <div id="app-panel-history" role="tabpanel" aria-labelledby="app-tab-history" [hidden]="activeTab !== 2">
         <app-history></app-history>
       </div>
     </div>
   </div>
 </div>
-
-@if (systemInfo) {
-  <div class="status-bar">
-    <span>Platform: {{ systemInfo.platform }}</span>
-    <span>•</span>
-    <span>Version: {{ systemInfo.version }}</span>
-  </div>
-}
 
 <div class="toast-container" aria-live="polite" aria-atomic="false">
   @for (toast of toastService.toasts$ | async; track toast) {

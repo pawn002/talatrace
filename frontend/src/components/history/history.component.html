@@ -2,8 +2,8 @@
   <div class="card__header">
     <div class="card-header-row">
       <div>
-        <h2>Transcription History</h2>
-        <p class="card-subtitle">View your past transcriptions</p>
+        <h2>Recent transcripts</h2>
+        <p class="card-subtitle">Completed transcriptions from this session.</p>
       </div>
       <button
         class="button button--ghost button--small"
@@ -27,8 +27,8 @@
     @if (!isLoading && history.length === 0) {
       <div class="empty-state">
         <i class="ph-fill ph-clock-counter-clockwise" aria-hidden="true"></i>
-        <p>No transcription history yet</p>
-        <p class="hint">Your completed transcriptions will appear here</p>
+        <p>No transcripts yet</p>
+        <p class="hint">Completed recordings and files will appear here during this session.</p>
       </div>
     }
 

@@ -1,7 +1,16 @@
 .history-card {
-  max-width: 1200px;
+  max-width: 1040px;
   margin: 0 auto;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
 }
+.history-card .card__header { border: 0; padding: 0 0 24px; }
+.history-card h2 { font-size: 26px; letter-spacing: -.025em; }
+.history-card .card-subtitle { font-size: 14px; font-weight: 400; margin-top: 7px; }
+.history-card .card__body { padding: 20px; border: 1px solid var(--color-border-default); border-radius: 14px; background: var(--color-bg-elevated); }
+.history-card table { font-size: 14px; }
+.history-card .button { min-width: 40px; min-height: 40px; }
 
 .card-header-row {
   display: flex;
@@ -24,7 +33,7 @@
   letter-spacing: 0.02em;
 
   i {
-    font-size: 64px;
+    font-size: 42px;
     line-height: 1;
     margin-bottom: var(--spacing-sm);
     color: var(--color-text-subtle);
@@ -32,7 +41,7 @@
 
   p {
     margin: var(--spacing-xs) 0;
-    font-family: var(--font-family-serif);
+    font-family: var(--font-family-base);
   }
 
   .hint {
@@ -40,6 +49,7 @@
     color: var(--color-text-subtle);
   }
 }
+@media (max-width: 640px) { .history-card .card__body { padding: 14px; } }
 
 .table-container {
   width: 100%;

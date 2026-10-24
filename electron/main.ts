@@ -4,6 +4,8 @@ import isDev from 'electron-is-dev';
 import * as fs from 'fs/promises';
 import { TranscriptionService } from './services/transcription.service';
 import { WhisperService } from './services/whisper.service';
+import { storeRecording, removeStaleRecordings } from './services/recording-storage';
+import { pathToFileURL } from 'url';
 
 // Import package.json for app version
 const packageJson = require(path.join(__dirname, '../../package.json'));
@@ -124,6 +126,22 @@ function createWindow() {
     backgroundColor: '#303030',
   });
 
+  // Grant only app-origin microphone capture and the existing Copy action.
+  const appUrl = isDev ? 'http://localhost:4200' : pathToFileURL(path.join(__dirname, '../../frontend/dist/index.html')).href;
+  const isAppUrl = (url: string) => isDev
+    ? (() => { try { return new URL(url).origin === appUrl; } catch { return false; } })()
+    : url.split(/[?#]/)[0] === appUrl;
+  const appSession = mainWindow.webContents.session;
+  appSession.setPermissionCheckHandler((contents, permission, origin, details) => {
+    if (contents !== mainWindow?.webContents || !isAppUrl(details.requestingUrl || origin)) return false;
+    return permission === 'clipboard-sanitized-write' || (permission === 'media' && details.mediaType === 'audio');
+  });
+  appSession.setPermissionRequestHandler((contents, permission, callback, details) => {
+    const trusted = contents === mainWindow?.webContents && isAppUrl(details.requestingUrl);
+    callback(trusted && (permission === 'clipboard-sanitized-write' ||
+      (permission === 'media' && 'mediaTypes' in details && details.mediaTypes?.length === 1 && details.mediaTypes[0] === 'audio')));
+  });
+
   // Initialize services immediately
   transcriptionService = new TranscriptionService(mainWindow);
   whisperService = new WhisperService();
@@ -150,6 +168,7 @@ function createWindow() {
 
 // App lifecycle - Simplified, no backend to start!
 app.whenReady().then(() => {
+  void removeStaleRecordings(path.join(app.getPath('temp'), 'whisper-interview-recordings')).catch(console.error);
   createWindow();  // Create window immediately!
 });
 
@@ -238,6 +257,27 @@ ipcMain.handle(
   }
 );
 
+ipcMain.handle('transcribe-recording', async (event, bytes: unknown, options: any) => {
+  let recording: Awaited<ReturnType<typeof storeRecording>> | undefined;
+  try {
+    if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) {
+      throw new Error('Recording request must come from the app window.');
+    }
+    if (!transcriptionService) throw new Error('Service not initialized');
+    recording = await storeRecording(bytes, path.join(app.getPath('temp'), 'whisper-interview-recordings'));
+    const job = await transcriptionService.processAudio(recording.audioPath, {
+      model: options?.model || 'base', language: options?.language,
+      timestamps: true, threads: 4, outputFormat: 'json',
+      detectQuietIntervals: true,
+      alignTimestamps: true,
+    }, recording.cleanup);
+    return { success: true, data: { id: job.id, status: job.status } };
+  } catch (error: any) {
+    await recording?.cleanup().catch(() => {});
+    return { success: false, error: error.message || 'Failed to transcribe recording' };
+  }
+});
+
 ipcMain.handle('save-transcript', async (event, resultData: any) => {
   const saveResult = await dialog.showSaveDialog({
     defaultPath: `transcript.txt`,
@@ -267,7 +307,9 @@ ipcMain.handle('save-transcript', async (event, resultData: any) => {
 
     } else if (ext === '.txt') {
       // Plain text without timestamps
-      if (hasSegments) {
+      if (typeof resultData?.timestampedText === 'string') {
+        content = resultData.timestampedText;
+      } else if (hasSegments) {
         content = segments.map((seg: any) => seg.text).join(' ');
       } else {
         content = resultData?.text || JSON.stringify(resultData);

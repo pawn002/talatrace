@@ -3,7 +3,10 @@
   "compilerOptions": {
     "outDir": "./out-tsc/spec",
     "types": ["jest"],
-    "module": "CommonJS"
+    "module": "CommonJS",
+    "paths": {
+      "@angular/core/testing": ["./node_modules/@angular/core/types/testing.d.ts"]
+    }
   },
   "include": ["src/**/*.spec.ts", "src/**/*.d.ts", "setup-jest.ts"]
 }

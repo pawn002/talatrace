@@ -6,6 +6,8 @@ export interface TranscriptionOptions {
   processors?: number;
   outputFormat?: 'txt' | 'srt' | 'vtt' | 'json';
   timestamps?: boolean;
+  detectQuietIntervals?: boolean;
+  alignTimestamps?: boolean;
 }
 
 export interface TranscriptionResult {
@@ -17,6 +19,14 @@ export interface TranscriptionResult {
   }>;
   language?: string;
   duration?: number;
+  quietIntervals?: Array<{ start: number; end: number }>;
+  originalSegments?: Array<{ start: number; end: number; text: string }>;
+  timingMethod?: 'whisper-segments' | 'whisper-dtw';
+  alignmentWarning?: string;
+  speechIntervals?: Array<{ start: number; end: number }>;
+  noSpeechIntervals?: Array<{ start: number; end: number }>;
+  speechDetectionMethod?: 'silero-v5.1.2';
+  speechDetectionWarning?: string;
 }
 
 export interface TranscriptionJob {

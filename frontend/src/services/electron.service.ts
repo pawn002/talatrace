@@ -18,6 +18,10 @@ export class ElectronService {
     return await this.electron.transcribeAudio(audioPath, options);
   }
 
+  async transcribeRecording(bytes: Uint8Array, options: any): Promise<any> {
+    return await this.electron.transcribeRecording(bytes, options);
+  }
+
   async saveTranscript(resultData: any): Promise<string | null> {
     return await this.electron.saveTranscript(resultData);
   }

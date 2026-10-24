@@ -1,7 +1,8 @@
-import { Component, OnInit, OnDestroy, NgZone } from '@angular/core';
+import { Component, OnInit, OnDestroy, NgZone, EventEmitter, Output, ViewChild, ElementRef } from '@angular/core';
 import { ElectronService } from '../../services/electron.service';
 import { ToastService } from '../../services/toast.service';
-import { Subject } from 'rxjs';
+import { AudioRecorderService, MAX_RECORDING_SECONDS } from '../../services/audio-recorder.service';
+import { buildTranscriptTimeline, groupQuietIntervals, TimelineEntry } from '../../utils/transcript-timeline';
 
 @Component({
   selector: 'app-transcription',
@@ -10,14 +11,39 @@ import { Subject } from 'rxjs';
   standalone: false,
 })
 export class TranscriptionComponent implements OnInit, OnDestroy {
+  @Output() manageModels = new EventEmitter<void>();
+  @ViewChild('recordTab') recordTab?: ElementRef<HTMLButtonElement>;
+  @ViewChild('fileTab') fileTab?: ElementRef<HTMLButtonElement>;
+  inputMode: 'record' | 'file' = 'record';
+  private workflowSnapshots: Partial<Record<'record' | 'file', {
+    selectedFilePath: string | null; selectedFileSize: number | null;
+    transcriptionResult: any; recordedAudio: Blob | null;
+    recordedDurationMs: number | null; elapsedSeconds: number;
+    recordingError: string; copyError: string; copied: boolean; includeTimestamps: boolean;
+  }>> = {};
   selectedFilePath: string | null = null;
   selectedFileSize: number | null = null;
   isTranscribing = false;
+  isSelectingFile = false;
   transcriptionProgress = 0;
   progressMessage = '';
   transcriptionResult: any = null;
   selectedModel = 'base';
   selectedLanguage = 'auto';
+  isRecording = false;
+  isStartingRecording = false;
+  isStoppingRecording = false;
+  copied = false;
+  copyError = '';
+  elapsedSeconds = 0;
+  recordedDurationMs: number | null = null;
+  private recordingStartedAt?: number;
+  recordingError = '';
+  includeTimestamps = true;
+  recordedAudio: Blob | null = null;
+  private recordingTimer?: ReturnType<typeof setInterval>;
+  private modelsTimer?: ReturnType<typeof setInterval>;
+  private destroyed = false;
 
   availableModels = [
     { id: 'tiny', name: 'Tiny (39 MB)', installed: false },
@@ -41,12 +67,12 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
     { code: 'zh', name: 'Chinese' },
   ];
 
-  private destroy$ = new Subject<void>();
 
   constructor(
     private electronService: ElectronService,
     private toastService: ToastService,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private audioRecorder: AudioRecorderService
   ) {}
 
   ngOnInit() {
@@ -54,8 +80,10 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
 
     // Set up event listeners
     this.electronService.onTranscriptionProgress((data) => {
-      this.transcriptionProgress = data.progress || 0;
-      this.progressMessage = data.message || '';
+      this.ngZone.run(() => {
+        this.transcriptionProgress = data.progress || 0;
+        this.progressMessage = data.message || '';
+      });
     });
 
     // Listen for transcription completion
@@ -64,7 +92,9 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
         this.transcriptionResult = result;
         this.isTranscribing = false;
         this.transcriptionProgress = 100;
-        this.toastService.show('Transcription completed!', 'success', 3000);
+        this.recordedAudio = null;
+        this.copied = false;
+        this.copyError = '';
       });
     });
 
@@ -73,19 +103,25 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
       this.ngZone.run(() => {
         this.isTranscribing = false;
         this.transcriptionProgress = 0;
-        this.toastService.show(error || 'Transcription failed', 'error', 5000);
+        this.recordingError = this.recordedAudio
+          ? `${error || 'Transcription failed'}. Your recording is available to retry.`
+          : error || 'Transcription failed. Try transcribing this file again.';
       });
     });
 
     // Refresh models periodically to catch newly downloaded models
-    setInterval(() => {
+    this.modelsTimer = setInterval(() => {
       this.loadAvailableModels();
     }, 5000); // Check every 5 seconds
   }
 
   ngOnDestroy() {
-    this.destroy$.next();
-    this.destroy$.complete();
+    this.destroyed = true;
+    this.audioRecorder.discard();
+    clearInterval(this.recordingTimer);
+    clearInterval(this.modelsTimer);
+    ['transcription-progress', 'transcription-completed', 'transcription-error'].forEach(channel =>
+      this.electronService.removeAllListeners?.(channel));
   }
 
   async loadAvailableModels() {
@@ -114,9 +150,15 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
   }
 
   async selectAudioFile() {
+    if (this.busy) return;
+    this.switchWorkflow('file');
+    this.isSelectingFile = true;
     try {
       const fileData = await this.electronService.selectAudioFile();
+      if (this.destroyed) return;
       if (fileData) {
+        this.recordedAudio = null;
+        this.recordedDurationMs = null;
         this.resetUI();
         // Handle both old string format and new object format for backwards compatibility
         if (typeof fileData === 'string') {
@@ -130,20 +172,20 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
           this.selectedFilePath = (fileData as any).path;
           this.selectedFileSize = (fileData as any).size;
         }
-        if (this.selectedFilePath) {
-          const fileName = this.selectedFilePath.split(/[\\/]/).pop();
-          const sizeInfo = this.selectedFileSize
-            ? ` (${this.formatFileSize(this.selectedFileSize)})`
-            : '';
-          this.toastService.show(`Selected: ${fileName}${sizeInfo}`, 'info', 3000);
-        }
       }
     } catch (error) {
       this.toastService.show('Failed to select file', 'error', 3000);
+    } finally {
+      this.isSelectingFile = false;
     }
   }
 
   async startTranscription() {
+    if (this.busy) return;
+    if (this.recordedAudio) {
+      await this.transcribeRecording();
+      return;
+    }
     if (!this.selectedFilePath) {
       this.toastService.show('Please select an audio file', 'info', 3000);
       return;
@@ -152,6 +194,10 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
     this.isTranscribing = true;
     this.transcriptionProgress = 0;
     this.transcriptionResult = null;
+    this.recordingError = '';
+    this.progressMessage = '';
+    this.copied = false;
+    this.copyError = '';
 
     try {
       const options = {
@@ -186,7 +232,10 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
 
     try {
       const savedPath = await this.electronService.saveTranscript(
-        this.transcriptionResult
+        {
+          ...this.transcriptionResult, timestampedText: this.getTranscriptText(),
+          pauseRegions: groupQuietIntervals(this.transcriptionResult.quietIntervals || []),
+        }
       );
       if (savedPath) {
         this.toastService.show(`Saved to: ${savedPath}`, 'success', 5000);
@@ -196,10 +245,187 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
     }
   }
 
-  cancelTranscription() {
-    this.isTranscribing = false;
+  get busy(): boolean {
+    return this.isRecording || this.isStartingRecording || this.isStoppingRecording || this.isTranscribing || this.isSelectingFile;
+  }
+
+  switchWorkflow(mode: 'record' | 'file'): void {
+    if (this.busy || mode === this.inputMode) return;
+    this.workflowSnapshots[this.inputMode] = {
+      selectedFilePath: this.selectedFilePath, selectedFileSize: this.selectedFileSize,
+      transcriptionResult: this.transcriptionResult, recordedAudio: this.recordedAudio,
+      recordedDurationMs: this.recordedDurationMs, elapsedSeconds: this.elapsedSeconds,
+      recordingError: this.recordingError, copyError: this.copyError,
+      copied: this.copied, includeTimestamps: this.includeTimestamps,
+    };
+    this.inputMode = mode;
+    Object.assign(this, this.workflowSnapshots[mode] || {
+      selectedFilePath: null, selectedFileSize: null, transcriptionResult: null,
+      recordedAudio: null, recordedDurationMs: null, elapsedSeconds: 0,
+      recordingError: '', copyError: '', copied: false, includeTimestamps: true,
+    });
+    delete this.workflowSnapshots[mode];
+    this.progressMessage = '';
     this.transcriptionProgress = 0;
-    // Implement cancellation logic
+  }
+
+  onWorkflowTabKeydown(event: KeyboardEvent): void {
+    if (this.busy || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const mode = event.key === 'Home' ? 'record' : event.key === 'End' ? 'file'
+      : this.inputMode === 'record' ? 'file' : 'record';
+    this.switchWorkflow(mode);
+    (mode === 'record' ? this.recordTab : this.fileTab)?.nativeElement.focus();
+  }
+
+  get hasInstalledModel(): boolean {
+    return this.availableModels.some(model => model.id === this.selectedModel && model.installed);
+  }
+
+  get hasTiming(): boolean {
+    const result = this.transcriptionResult;
+    return Boolean(result?.segments?.length || result?.quietIntervals?.length || result?.noSpeechIntervals?.length);
+  }
+
+  get workflowTitle(): string {
+    if (this.isSelectingFile) return 'Choosing an audio file';
+    if (this.isTranscribing) return this.inputMode === 'record' ? 'Transcribing · microphone off' : 'Transcribing your audio file';
+    if (this.isStoppingRecording) return 'Finishing recording · microphone off';
+    if (this.isStartingRecording) return 'Starting your microphone';
+    if (this.isRecording) return 'Recording · microphone on';
+    if (this.transcriptionResult) return this.copied ? 'Copied — ready to paste' : 'Your transcript is ready';
+    if (!this.hasInstalledModel) return 'Set up local transcription';
+    if (this.recordedAudio) return 'Your recording is ready to retry';
+    if (this.selectedFilePath) return 'Ready to transcribe your file';
+    return this.inputMode === 'record' ? 'Ready to record' : 'Choose an audio file';
+  }
+
+  get workflowStep(): string {
+    return `Step ${this.currentStep} of 3 · ${this.currentStep === 3 ? 'Copy' : this.currentStep === 2 ? 'Transcribe' : this.inputMode === 'record' ? 'Record' : 'Choose audio'}`;
+  }
+
+  get currentStep(): number {
+    if (this.transcriptionResult && !this.busy) return 3;
+    if (this.isRecording || this.isTranscribing || this.isStoppingRecording || this.recordedAudio || (this.inputMode === 'file' && this.selectedFilePath)) return 2;
+    return 1;
+  }
+
+  get workflowHint(): string {
+    if (this.isSelectingFile) return 'Choose a file in the dialog, or cancel to return here.';
+    if (this.isRecording) return 'Speak at your own pace. Stop when you’re finished; your microphone will turn off.';
+    if (this.isTranscribing || this.isStoppingRecording) return `${this.progressMessage || 'Processing audio on this device…'} Copy will be available when it’s ready.`;
+    if (this.isStartingRecording) return 'Allow microphone access if prompted. Recording will begin automatically.';
+    if (this.transcriptionResult) return this.copied
+      ? `Copied ${this.includeTimestamps && this.hasTiming ? 'with timing and pauses' : 'as plain text'}. Paste into your chat or terminal.`
+      : `Ready to copy ${this.includeTimestamps && this.hasTiming ? 'with timing and pauses' : 'as plain text'}.`;
+    if (!this.hasInstalledModel) return 'Download a speech model once to enable local recording and transcription.';
+    if (this.recordedAudio) return 'Your recording is retained. Choose Retry transcription, or Discard recording to start over.';
+    if (this.selectedFilePath) return 'Your file is ready. Adjust the model or language below if needed, then transcribe.';
+    return this.inputMode === 'record'
+      ? 'Record up to 30 minutes. Stop to transcribe automatically.'
+      : 'WAV, MP3, M4A and more. Choose a local recording to begin.';
+  }
+
+  async startRecording(): Promise<void> {
+    if (this.busy) return;
+    this.switchWorkflow('record');
+    if (!this.hasInstalledModel) {
+      this.recordingError = 'Download a model in the Models tab before recording.';
+      return;
+    }
+    this.recordingError = '';
+    this.isStartingRecording = true;
+    try {
+      await this.audioRecorder.start(
+        () => this.ngZone.run(() => { void this.stopRecording(); }),
+        message => this.ngZone.run(() => {
+          this.isRecording = false;
+          this.isStartingRecording = false;
+          this.recordingStartedAt = undefined;
+          this.recordedDurationMs = null;
+          clearInterval(this.recordingTimer);
+          this.recordingError = message;
+        })
+      );
+      if (this.destroyed) return;
+      this.resetUI();
+      this.recordedAudio = null;
+      this.selectedFilePath = null;
+      this.elapsedSeconds = 0;
+      this.recordedDurationMs = null;
+      this.isRecording = true;
+      this.recordingStartedAt = performance.now();
+      this.recordingTimer = setInterval(() => {
+        this.elapsedSeconds = Math.floor((performance.now() - this.recordingStartedAt!) / 1000);
+        if (this.elapsedSeconds >= MAX_RECORDING_SECONDS) void this.stopRecording();
+      }, 250);
+    } catch (error: any) {
+      if (!this.destroyed) this.recordingError = error.message;
+    } finally {
+      this.isStartingRecording = false;
+    }
+  }
+
+  async stopRecording(): Promise<void> {
+    if (!this.isRecording) return;
+    // Snapshot at Stop, before finalizing the Blob or running transcription.
+    this.recordedDurationMs = Math.max(0, Math.round(this.recordingStartedAt === undefined
+      ? this.elapsedSeconds * 1000 : performance.now() - this.recordingStartedAt));
+    this.recordingStartedAt = undefined;
+    this.isRecording = false;
+    this.isStoppingRecording = true;
+    clearInterval(this.recordingTimer);
+    try {
+      this.recordedAudio = await this.audioRecorder.stop();
+      if (!this.destroyed) await this.transcribeRecording();
+    } catch (error: any) {
+      if (!this.destroyed) this.recordingError = error.message;
+    } finally {
+      this.isStoppingRecording = false;
+    }
+  }
+
+  discardRecording(): void {
+    if (this.isTranscribing || this.isStoppingRecording) return;
+    this.audioRecorder.discard();
+    clearInterval(this.recordingTimer);
+    this.isRecording = false;
+    this.recordedAudio = null;
+    this.recordingError = '';
+    this.elapsedSeconds = 0;
+    this.recordedDurationMs = null;
+    this.recordingStartedAt = undefined;
+  }
+
+  private async transcribeRecording(): Promise<void> {
+    if (!this.recordedAudio || this.isTranscribing) return;
+    this.isTranscribing = true;
+    this.transcriptionResult = null;
+    this.transcriptionProgress = 0;
+    this.recordingError = '';
+    this.progressMessage = '';
+    this.copied = false;
+    this.copyError = '';
+    try {
+      const bytes = new Uint8Array(await this.recordedAudio.arrayBuffer());
+      if (this.destroyed) return;
+      const result = await this.electronService.transcribeRecording(bytes, {
+        model: this.selectedModel,
+        language: this.selectedLanguage === 'auto' ? undefined : this.selectedLanguage,
+      });
+      if (!result.success) throw new Error(result.error || 'Failed to start transcription');
+    } catch (error: any) {
+      this.isTranscribing = false;
+      this.recordingError = `${error.message}. Your recording is available to retry.`;
+    }
+  }
+
+  get recordingDuration(): string {
+    const milliseconds = this.isRecording ? this.elapsedSeconds * 1000 : this.recordedDurationMs;
+    if (milliseconds === null) return '—';
+    const minutes = Math.floor(milliseconds / 60000).toString().padStart(2, '0');
+    const seconds = Math.floor(milliseconds % 60000 / 1000).toString().padStart(2, '0');
+    return `${minutes}:${seconds}${this.isRecording ? '' : '.' + (milliseconds % 1000).toString().padStart(3, '0')}`;
   }
 
   private resetUI() {
@@ -208,12 +434,15 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
     this.progressMessage = '';
     this.isTranscribing = false;
     this.selectedFileSize = null;
+    this.recordingError = '';
+    this.copied = false;
+    this.copyError = '';
   }
 
   private handleError(error: any) {
     this.isTranscribing = false;
     this.transcriptionProgress = 0;
-    this.toastService.show(error.message || 'Transcription failed', 'error', 5000);
+    this.recordingError = error.message || 'Transcription failed. Try again.';
     console.error('Transcription error:', error);
   }
 
@@ -237,9 +466,10 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
   }
 
   private formatTimestamp(seconds: number): string {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+    const milliseconds = Math.round(Math.max(0, seconds) * 1000);
+    const hours = Math.floor(milliseconds / 3600000);
+    const minutes = Math.floor((milliseconds % 3600000) / 60000);
+    const secs = (milliseconds % 60000) / 1000;
 
     const hh = hours.toString().padStart(2, '0');
     const mm = minutes.toString().padStart(2, '0');
@@ -248,28 +478,66 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
     return `${hh}:${mm}:${ss}`;
   }
 
-  copyToClipboard(): void {
+  async copyToClipboard(): Promise<void> {
     if (!this.transcriptionResult) {
       return;
     }
 
-    const content =
-      typeof this.transcriptionResult === 'string'
-        ? this.transcriptionResult
-        : this.transcriptionResult.text;
+    const content = this.getTranscriptText();
 
-    navigator.clipboard
-      .writeText(content)
-      .then(() => {
-        this.toastService.show('Copied to clipboard', 'success', 2000);
-      })
-      .catch((error) => {
-        this.toastService.show('Failed to copy to clipboard', 'error', 3000);
+    this.copyError = '';
+    try {
+      await navigator.clipboard.writeText(content);
+      this.ngZone.run(() => {
+        this.copied = true;
+      });
+    } catch (error) {
+      this.ngZone.run(() => {
+        this.copied = false;
+        this.copyError = 'Could not copy. Try again or save the transcript to a file.';
         console.error('Clipboard error:', error);
       });
+    }
   }
 
   exportTranscript(): void {
     this.saveTranscript();
+  }
+
+  getTranscriptText(): string {
+    const result = this.transcriptionResult;
+    if (!result) return '';
+    if (typeof result === 'string') return result;
+    if (this.includeTimestamps && (result.segments?.length || result.quietIntervals?.length || result.noSpeechIntervals?.length)) {
+      const timeline = this.timelineEntries;
+      const text = timeline.map(entry =>
+        `${this.formatTimestampRange(entry.start, entry.end)} ${entry.text}`
+      ).join('\n');
+      const hasPauses = timeline.some(entry => entry.kind !== 'speech');
+      const timing = result.timingMethod === 'whisper-dtw'
+        ? 'Speech ranges use audio-aligned token locations: estimates, not exact word boundaries.'
+        : 'Speech times are approximate and may overlap pause regions.';
+      const pauses = hasPauses || result.noSpeechIntervals !== undefined ? ` ${this.pauseDescription}` : '';
+      const warnings = [result.alignmentWarning, result.speechDetectionWarning].filter(Boolean).join(' ');
+      return hasPauses || result.noSpeechIntervals !== undefined || result.timingMethod === 'whisper-dtw' || warnings
+        ? `Timeline ordered by start time. ${timing}${pauses}${warnings ? ' ' + warnings : ''}\n\n${text}` : text;
+    }
+    return result.text || '';
+  }
+
+  get timelineEntries(): TimelineEntry[] {
+    return buildTranscriptTimeline(this.transcriptionResult || {});
+  }
+
+  get timingDescription(): string {
+    return this.transcriptionResult?.timingMethod === 'whisper-dtw'
+      ? 'Speech ranges use audio-aligned token locations. They are estimates, not exact word boundaries.'
+      : 'Speech times are approximate and may overlap pause regions.';
+  }
+
+  get pauseDescription(): string {
+    return this.transcriptionResult?.noSpeechIntervals !== undefined
+      ? 'No speech detected marks gaps of at least 1.5 s estimated by a local speech detector. Background sounds may remain; faint or brief speech can be missed. Recognition text is preserved even where the detectors disagree. These gaps do not establish thinking time.'
+      : 'Pause regions group low-level audio across interruptions of up to 1.5 s; interruptions may include sounds or brief speech. They do not establish thinking time.';
   }
 }

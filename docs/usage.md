@@ -6,6 +6,7 @@ Complete guide to using the Whisper Electron App for audio transcription.
 
 - [Quick Start](#quick-start)
 - [Transcription Workflow](#transcription-workflow)
+- [Recording Interview Answers](#recording-interview-answers)
 - [Model Management](#model-management)
 - [History Management](#history-management)
 - [Export Options](#export-options)
@@ -26,6 +27,42 @@ npm run dev
 - **Linux**: Run `./whisper-transcription`
 
 The application starts instantly with no delay - all processing is handled natively by Electron services.
+
+## Recording Interview Answers
+
+1. Open **Transcription → Record audio**. Defaults are ready to use; expand **Transcription settings** to change the model or language. If no model is installed, **Download a model** opens Models.
+2. Click **Record answer** and allow microphone access when your operating system asks. The persistent status shows **Recording · microphone on**, with a whole-second timer.
+3. Click **Stop & transcribe**. The microphone is released immediately and the status switches to **Transcribing · microphone off**. The final duration remains visible to milliseconds (for example, `00:30.527`), measured when Stop was pressed; processing time is excluded. FFmpeg/Whisper process the recording locally.
+4. When **Your transcript is ready** appears, **Copy transcript** becomes available in its usual position. **Copied — ready to paste** confirms success; paste into your AI chat or TUI. Uncheck **Include timing and pauses** for plain text. **Save transcript…** offers TXT, SRT, VTT and JSON; TXT saves the same readable text as Copy.
+5. Click **Record answer** again to start the next recording. If transcription fails, **Retry transcription** uses the retained recording; **Discard recording** lets you start over.
+
+Record, Stop and Copy remain visible in stable positions throughout the recording workflow. Unavailable actions are disabled, and nearby guidance explains the next step. To use an existing recording, open **Transcription → Audio file**, choose **Choose audio file…**, then **Transcribe file**. Each subtab retains its own input and transcript when switching. Switching is disabled during recording, file selection, or transcription. Use Left/Right arrows, Home or End when focused on a subtab to navigate. Timing explanations and original measurements remain under **About timing and pause detection** below each preview.
+
+Example copied answer:
+
+```text
+Timeline ordered by start time. Speech ranges use audio-aligned token locations: estimates, not exact word boundaries. No speech detected marks gaps of at least 1.5 s estimated by a local speech detector. Background sounds may remain; faint or brief speech can be missed. Recognition text is preserved even where the detectors disagree. These gaps do not establish thinking time.
+
+[00:00:03.200 → 00:00:08.700] I initially thought we could meet the deadline.
+[00:00:08.900 → 00:00:12.900] No speech detected (4.0 s)
+[00:00:13.100 → 00:00:19.400] Then we discovered the requirements were incomplete.
+```
+
+Speech timestamps are estimates relative to the beginning of the recording. For microphone recordings, the bundled Whisper VAD helper runs the [Silero v5.1.2 model](https://huggingface.co/ggml-org/whisper-vad) locally, independently of transcription. Gaps between detected speech lasting at least 1.5 seconds appear as **No speech detected**, including leading and trailing gaps. Detected speech interruptions split these gaps; they are not merged across speech. Background sounds can remain, and faint or brief speech may be missed. Recognition text is retained even when it overlaps a detector gap. The detector never cuts or retimes the recording.
+
+FFmpeg also measures audio below -35 dB for at least 1.5 seconds. Expand **Original quiet measurements** to compare these volume measurements against speech detection. JSON exports retain `speechIntervals`, `noSpeechIntervals`, `speechDetectionMethod`, the raw `quietIntervals`, and volume-based grouped `pauseRegions`. Copy/TXT use the speech gaps when detection succeeds. Plain-text copy is available by unchecking timestamps.
+
+`npm run setup` downloads the small VAD model into `models/ggml-silero-v5.1.2.bin`; release builds bundle it and the `whisper-vad-speech-segments` helper beside Whisper's native libraries. No model downloads or audio uploads occur during speech detection. If the helper/model is missing or fails, transcription still completes with a visible warning and falls back to volume-based pause regions. These group quiet measurements separated by up to 1.5 seconds and can include brief sounds or speech. `npm run test:speech-activity` checks the Windows native detector using sample speech with steady background noise and a speech interruption.
+
+For new microphone recordings using Tiny, Base, Small, or Medium, Whisper's local DTW pass aligns the recognized tokens back to the audio. The displayed speech ranges run from the first to the last aligned token location in each phrase, splitting at long token gaps or sentence boundaries. These are audio-based estimates, not exact word-onset/offset measurements. Timing locations come from model attention to the original audio; speech is not simply moved to the end of a detected pause. **Original recognition timestamps** remain expandable, and JSON exports retain `originalSegments` alongside the aligned `segments` and `timingMethod`.
+
+DTW needs attention weights, so this path disables flash attention and may take longer or use more memory. It uses the selected local model without downloading an additional alignment model. The unversioned Large model alias does not identify a compatible alignment-head preset and currently retains original timing. If alignment fails or its locations are missing, non-monotonic, or inconsistent with the recognized text, the app keeps the original transcript and displays a timing warning. File-import transcription currently retains the existing segment timing path.
+
+Quiet intervals can reflect pauses, low microphone volume, or other recording conditions; they do not establish why a person paused. This is timing context, not a psychological assessment.
+
+Use **Discard** to stop without transcription. Recording is limited to 30 minutes / 64 MB. If transcription fails, the captured audio stays in memory for **Retry transcription**; switching input, discarding, or closing the app clears that copy. Electron deletes temporary recording files after success or failure. A crash can leave temporary files; app recording folders older than 24 hours are removed at the next launch. Transcription history remains limited to the current session.
+
+Recording and transcription do not upload voice data. Model downloads require an initial network connection. On macOS the packaged app includes a microphone usage description; permissions and device availability still need platform-specific testing.
 
 ## Transcription Workflow
 

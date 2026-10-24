@@ -195,6 +195,11 @@ async function setupWhisper() {
 
   const models = [
     {
+      name: "silero-v5.1.2",
+      size: "0.9 MB",
+      url: "https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin",
+    },
+    {
       name: "tiny",
       size: "39 MB",
       url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",

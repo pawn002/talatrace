@@ -2,6 +2,8 @@
 
 Offline speech-to-text Electron app using OpenAI's Whisper via whisper.cpp. Angular frontend, Electron main process — no backend server, no internet required after setup.
 
+Record interview answers directly in the app: **Record answer → Stop & transcribe → Copy transcript**. Controls stay in stable positions, with a persistent recording status and final duration. Readable timestamped text and locally detected gaps in speech preserve pacing context for use in AI chats and TUIs. Original quiet-level measurements remain available for comparison. Existing audio-file transcription and TXT/SRT/VTT/JSON export remain available.
+
 ## Quick Start
 
 **Prerequisites:** Node.js v20+, npm v10+, Git, and platform build tools (Visual Studio Build Tools on Windows, Xcode CLI on macOS, build-essential on Linux). See [Installation Guide](docs/installation.md) for details.

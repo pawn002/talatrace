@@ -1,7 +1,17 @@
 .models-card {
-  max-width: 1200px;
+  max-width: 1040px;
   margin: 0 auto;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
 }
+.models-card .card__header { border: 0; padding: 0 0 24px; }
+.models-card h2 { font-size: 26px; letter-spacing: -.025em; }
+.models-card .card-subtitle { font-size: 14px; font-weight: 400; margin-top: 7px; }
+.models-card .card__body { padding: 20px; border: 1px solid var(--color-border-default); border-radius: 14px; background: var(--color-bg-elevated); }
+.models-card table { font-size: 14px; }
+.models-card .cell--mono { white-space: nowrap; }
+.models-card .button { min-height: 40px; padding: 8px 14px; font-size: 13px; }
 
 .loading-container {
   display: flex;
@@ -18,7 +28,9 @@
   margin-bottom: var(--spacing-md);
 
   .alert__message {
-    font-family: var(--font-family-serif);
+    font-family: var(--font-family-base);
+    font-size: 14px;
+    line-height: 1.6;
   }
 }
 
@@ -37,3 +49,4 @@
 .download-progress {
   width: 120px;
 }
+@media (max-width: 640px) { .models-card .card__body { padding: 14px; } }

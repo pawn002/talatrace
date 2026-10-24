@@ -3,6 +3,9 @@ import * as fs from 'fs/promises';
 import { spawn } from 'child_process';
 import * as https from 'https';
 import { createWriteStream } from 'fs';
+import { parseQuietIntervals, QuietInterval } from './quiet-intervals';
+import { alignmentPreset, parseWhisperTranscript } from './speech-alignment';
+import { parseSpeechActivity } from './speech-activity';
 import { app } from 'electron';
 import { TranscriptionOptions, TranscriptionResult } from './types';
 
@@ -15,6 +18,7 @@ export class WhisperService {
   private whisperBinDir: string;
   private modelsPath: string;
   private ffmpegPath: string;
+  private vadModelPath: string;
   private initialized: boolean = false;
   private ffmpegAvailable: boolean = false;
   private availableModels = [
@@ -36,6 +40,7 @@ export class WhisperService {
     // Determine base path based on environment
     const isDev = !app.isPackaged;
     const basePath = isDev ? app.getAppPath() : process.resourcesPath;
+    this.vadModelPath = path.join(basePath, 'models', 'ggml-silero-v5.1.2.bin');
 
     console.log('[WhisperService] Environment:', isDev ? 'development' : 'production');
     console.log('[WhisperService] Base path:', basePath);
@@ -200,7 +205,8 @@ export class WhisperService {
       const files = await fs.readdir(this.modelsPath);
       return files
         .filter((file) => file.startsWith('ggml-') && file.endsWith('.bin'))
-        .map((file) => file.replace('ggml-', '').replace('.bin', ''));
+        .map((file) => file.replace('ggml-', '').replace('.bin', ''))
+        .filter(name => this.isValidModelName(name));
     } catch {
       return [];
     }
@@ -348,7 +354,7 @@ export class WhisperService {
     }
 
     if (options.outputFormat === 'json') {
-      args.push('-oj');
+      args.push(options.alignTimestamps && alignmentPreset(modelName) ? '-ojf' : '-oj');
     } else if (options.outputFormat === 'srt') {
       args.push('-osrt');
     } else if (options.outputFormat === 'vtt') {
@@ -358,12 +364,18 @@ export class WhisperService {
     if (!options.timestamps) {
       args.push('-nt');
     }
+    const preset = options.alignTimestamps ? alignmentPreset(modelName) : undefined;
+    if (preset) {
+      // DTW requires cross-attention weights; flash attention would silently disable it.
+      args.push('-dtw', preset, '-nfa');
+    }
 
     // Log the command being executed
     console.log('[WhisperService] Executing whisper command:', this.whisperPath);
     console.log('[WhisperService] Arguments:', args);
 
-    return new Promise((resolve, reject) => {
+    try {
+    return await new Promise<TranscriptionResult>((resolve, reject) => {
       let whisperProcess;
 
       try {
@@ -371,6 +383,7 @@ export class WhisperService {
           env: { ...process.env, PATH: `${this.whisperBinDir}${path.delimiter}${process.env.PATH}` },
         });
       } catch (spawnError: any) {
+        if (needsCleanup) void fs.rm(path.dirname(processedAudioPath), { recursive: true, force: true }).catch(() => {});
         console.error('[WhisperService] Failed to spawn whisper process:', spawnError);
         reject(new Error(`Failed to start whisper: ${spawnError.message}`));
         return;
@@ -418,16 +431,6 @@ export class WhisperService {
       whisperProcess.on('close', async (code) => {
         console.log(`[WhisperService] Whisper process closed with code: ${code}`);
 
-        // Clean up converted WAV file if we created one
-        if (needsCleanup) {
-          try {
-            await fs.unlink(processedAudioPath);
-            console.log(`[WhisperService] Cleaned up converted file: ${processedAudioPath}`);
-          } catch (cleanupError) {
-            console.error('[WhisperService] Failed to cleanup converted file:', cleanupError);
-          }
-        }
-
         if (code === 0) {
           // Parse the output based on format
           if (options.outputFormat === 'json') {
@@ -437,21 +440,16 @@ export class WhisperService {
               const jsonRaw = await fs.readFile(jsonFilePath, 'utf8');
               await fs.unlink(jsonFilePath).catch(() => {});
               const jsonResult = JSON.parse(jsonRaw);
-              const rawSegments: any[] = jsonResult.transcription || jsonResult.segments || [];
-              const segments = rawSegments.map((s: any) => ({
-                start: s.offsets ? s.offsets.from / 1000 : s.start,
-                end:   s.offsets ? s.offsets.to   / 1000 : s.end,
-                text:  s.text,
-              }));
+              const transcript = parseWhisperTranscript(jsonResult, Boolean(preset));
               resolve({
-                text: segments.map(s => s.text).join('') || output,
-                segments,
+                ...transcript,
+                ...(options.alignTimestamps && !preset ? { alignmentWarning: 'Audio alignment is not available for this model variant. Original approximate speech times are shown.' } : {}),
                 language: jsonResult.result?.language || jsonResult.language,
                 duration: jsonResult.duration,
               });
             } catch (e) {
               console.error('[WhisperService] Failed to read/parse JSON output file:', e);
-              resolve({ text: output });
+              reject(new Error('Could not read the timestamped transcript. Please retry transcription.'));
             }
           } else {
             resolve({ text: output });
@@ -461,6 +459,9 @@ export class WhisperService {
           console.error(`[WhisperService] ${errorMsg}`);
           reject(new Error(errorMsg));
         }
+        if (needsCleanup) {
+          await fs.rm(path.dirname(processedAudioPath), { recursive: true, force: true }).catch(() => {});
+        }
       });
 
       whisperProcess.on('error', async (err) => {
@@ -469,7 +470,7 @@ export class WhisperService {
         // Clean up converted WAV file if we created one
         if (needsCleanup) {
           try {
-            await fs.unlink(processedAudioPath);
+            await fs.rm(path.dirname(processedAudioPath), { recursive: true, force: true });
           } catch (cleanupError) {
             console.error('[WhisperService] Failed to cleanup converted file:', cleanupError);
           }
@@ -478,6 +479,12 @@ export class WhisperService {
         reject(new Error(`Whisper process error: ${err.message}`));
       });
     });
+    } catch (error) {
+      if (!preset) throw error;
+      // Unsupported hardware/builds must not lose a successfully captured answer.
+      const fallback = await this.transcribe(audioPath, { ...options, alignTimestamps: false }, progressCallback);
+      return { ...fallback, originalSegments: fallback.segments, alignmentWarning: 'Audio alignment could not run on this model or device. Original approximate speech times are shown.' };
+    }
   }
 
   async getAudioDuration(audioPath: string): Promise<number | undefined> {
@@ -530,6 +537,48 @@ export class WhisperService {
     });
   }
 
+  async detectQuietIntervals(audioPath: string): Promise<QuietInterval[]> {
+    if (!this.initialized) await this.initialize();
+    return new Promise((resolve, reject) => {
+      const process = spawn(this.ffmpegPath, [
+        '-i', path.resolve(audioPath), '-af', 'silencedetect=noise=-35dB:d=1.5', '-f', 'null', '-',
+      ]);
+      let output = '';
+      process.stderr.on('data', chunk => { output += chunk.toString(); });
+      process.on('error', reject);
+      process.on('close', code => code === 0
+        ? resolve(parseQuietIntervals(output))
+        : reject(new Error('Could not analyze recording timing. Please retry.')));
+    });
+  }
+
+  async detectSpeechActivity(audioPath: string): Promise<Pick<TranscriptionResult, 'speechIntervals' | 'noSpeechIntervals' | 'speechDetectionMethod'>> {
+    if (!this.initialized) await this.initialize();
+    const binary = path.join(this.whisperBinDir, process.platform === 'win32' ? 'whisper-vad-speech-segments.exe' : 'whisper-vad-speech-segments');
+    await fs.access(binary);
+    await fs.access(this.vadModelPath);
+    // Decode independently; VAD must never remove samples from Whisper's timeline.
+    const wav = await this.convertAudioToWav(audioPath);
+    try {
+      const duration = await this.getAudioDuration(wav);
+      if (!duration) throw new Error('Could not measure recording duration');
+      const output = await new Promise<string>((resolve, reject) => {
+        const child = spawn(binary, ['-vm', this.vadModelPath, '-f', wav, '-np'], {
+          env: { ...process.env, PATH: `${this.whisperBinDir}${path.delimiter}${process.env.PATH}` },
+        });
+        let stdout = '';
+        child.stdout.on('data', chunk => { stdout += chunk.toString(); });
+        // Drain native backend diagnostics without retaining audio-derived logs.
+        child.stderr.on('data', () => {});
+        child.on('error', reject);
+        child.on('close', code => code === 0 ? resolve(stdout) : reject(new Error('Speech detection failed')));
+      });
+      return { ...parseSpeechActivity(output, duration), speechDetectionMethod: 'silero-v5.1.2' };
+    } finally {
+      await fs.rm(path.dirname(wav), { recursive: true, force: true }).catch(() => {});
+    }
+  }
+
   async convertAudioToWav(inputPath: string): Promise<string> {
     if (!this.ffmpegAvailable) {
       throw new Error(
@@ -540,11 +589,11 @@ export class WhisperService {
     // Canonicalize input path to prevent path traversal
     const resolvedInputPath = path.resolve(inputPath);
 
-    // Construct output path safely using path.join
-    const outputPath = path.join(
-      path.dirname(resolvedInputPath),
-      path.basename(resolvedInputPath, path.extname(resolvedInputPath)) + '.wav'
-    );
+    // Never overwrite an existing WAV beside the user's imported recording.
+    const conversionRoot = path.join(app.getPath('temp'), 'whisper-interview-recordings');
+    await fs.mkdir(conversionRoot, { recursive: true });
+    const conversionWorkspace = await fs.mkdtemp(path.join(conversionRoot, 'recording-conversion-'));
+    const outputPath = path.join(conversionWorkspace, 'audio.wav');
 
     console.log(
       `[WhisperService] Converting ${resolvedInputPath} to WAV format using bundled ffmpeg...`
@@ -575,6 +624,7 @@ export class WhisperService {
           console.log(`[WhisperService] Audio converted successfully to: ${outputPath}`);
           resolve(outputPath);
         } else {
+          void fs.rm(conversionWorkspace, { recursive: true, force: true }).catch(() => {});
           console.error('[WhisperService] ffmpeg conversion failed:', errorOutput);
           reject(
             new Error(
@@ -585,6 +635,7 @@ export class WhisperService {
       });
 
       ffmpegProcess.on('error', (err) => {
+        void fs.rm(conversionWorkspace, { recursive: true, force: true }).catch(() => {});
         console.error('[WhisperService] ffmpeg process error:', err);
         reject(
           new Error(

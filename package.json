@@ -4,6 +4,11 @@
   "description": "Offline Speech-to-Text Electron App with Whisper.cpp",
   "main": "dist/electron/main.js",
   "scripts": {
+    "test": "npm --prefix frontend test -- --runInBand && npm run test:electron",
+    "test:electron": "npm run build:electron && node --test tests/electron/*.test.cjs",
+    "test:speech-activity": "npm run build:electron && node tests/electron/speech-activity-native.cjs",
+    "test:interview-smoke": "npm run build && electron tests/electron/interview-smoke.cjs",
+    "preview:workflow": "npm run build && electron tests/electron/workflow-preview.cjs",
     "start": "npm run build && electron .",
     "build": "npm run build:frontend && npm run build:electron",
     "build:frontend": "cd frontend && npm run build",
@@ -77,6 +82,7 @@
         "to": "whisper.cpp/build-vulkan/bin",
         "filter": [
           "whisper-cli.exe",
+          "whisper-vad-speech-segments.exe",
           "whisper.dll",
           "ggml.dll",
           "ggml-base.dll",
@@ -89,6 +95,7 @@
         "to": "whisper.cpp/build/bin/Release",
         "filter": [
           "whisper-cli.exe",
+          "whisper-vad-speech-segments.exe",
           "whisper.dll",
           "ggml.dll",
           "ggml-base.dll",
@@ -112,6 +119,9 @@
     ],
     "icon": "build/icon.png",
     "mac": {
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Record interview answers for private, on-device transcription."
+      },
       "category": "public.app-category.productivity",
       "target": [
         "dmg",
