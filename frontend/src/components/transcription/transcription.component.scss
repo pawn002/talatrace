@@ -36,7 +36,10 @@
 .disclosure { padding: 0 var(--spacing-sm); border-radius: var(--radius-md); }
 .disclosure > summary { cursor: pointer; padding: var(--spacing-sm) 0; font-size: var(--font-size-md); line-height: var(--line-height-normal); font-optical-sizing: auto; }
 .disclosure--default { border: 1px solid var(--color-border-default); background: var(--color-bg-surface); }
+.settings-details.disclosure--default { background: var(--color-bg-page); }
 .disclosure--default > summary { color: var(--color-text-default); font-weight: var(--font-weight-bold); }
+.transcript-output > .disclosure--inline { margin-top: 0; padding-inline: 0; border-top: 1px solid var(--color-border-default); border-radius: 0; }
+.disclosure--inline > summary { font-weight: var(--font-weight-bold); }
 .disclosure--subtle { margin-left: var(--spacing-sm); background: var(--color-bg-page); }
 .disclosure--subtle > summary { color: var(--color-text-subtle); font-weight: var(--font-weight-regular); }
 .disclosure[open] { padding-bottom: var(--spacing-sm); }
@@ -48,7 +51,8 @@
 .result-heading { display: flex; justify-content: space-between; align-items: baseline; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm); }
 .result-heading h3 { margin: 0; font-size: var(--font-size-lg); }
 .result-heading span { }
-.transcript-view { border: 1px solid var(--color-border-default); border-radius: var(--radius-md); padding: var(--spacing-2xs) var(--spacing-md); background: var(--color-bg-page); max-height: 360px; overflow: auto; }
+.transcript-output { border: 1px solid var(--color-border-default); border-radius: var(--radius-md); padding: var(--spacing-2xs) var(--spacing-md); background: var(--color-bg-page); }
+.transcript-view { max-height: 360px; overflow: auto; }
 .transcript-segment { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: baseline; gap: var(--spacing-sm); margin: 0; padding: var(--spacing-sm) 0; border-bottom: 1px solid color-mix(in srgb, var(--color-border-default) 55%, transparent); line-height: 1.65; }
 .transcript-segment:last-child { border: 0; }
 .segment__time { font: var(--font-size-sm)/1.7 var(--font-family-mono); white-space: nowrap; }

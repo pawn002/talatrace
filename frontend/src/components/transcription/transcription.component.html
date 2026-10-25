@@ -63,6 +63,7 @@
         @if (transcriptionResult?.alignmentWarning) { <p role="status" class="record-hint">{{ transcriptionResult.alignmentWarning }}</p> }
         @if (transcriptionResult?.speechDetectionWarning) { <p role="status" class="record-hint">{{ transcriptionResult.speechDetectionWarning }}</p> }
         @if (!transcriptionResult?.segments?.length) { <p role="status">No timed speech segments were returned.</p> }
+        <div class="transcript-output">
         <div class="transcript-view" tabindex="0" aria-label="Transcript with timing and pauses">
           @if (timelineEntries.length) {
             @for (entry of timelineEntries; track $index) {
@@ -73,7 +74,7 @@
             }
           } @else { <p class="transcript-segment"><span class="segment__text">{{ transcriptionResult?.text }}</span></p> }
         </div>
-        <details class="quiet-details disclosure disclosure--default">
+        <details class="quiet-details disclosure disclosure--inline">
           <summary>About timing and pause detection</summary>
           <p class="record-hint">{{ timingDescription }} {{ pauseDescription }}</p>
           @if (transcriptionResult?.originalSegments?.length) {
@@ -94,6 +95,7 @@
             </details>
           }
         </details>
+        </div>
       </section>
     }
     @if (!busy && hasInstalledModel) {

@@ -193,6 +193,12 @@ app.whenReady().then(async () => {
     win.setSize(480, 820); await capture('result-narrow');
     win.setSize(360, 780); await capture('result-small');
     win.setSize(1100, 820);
+    await win.webContents.executeJavaScript("document.querySelector('.disclosure--inline > summary').focus(); document.querySelector('.disclosure--inline').scrollIntoView({ block: 'center' })");
+    await capture('timing-disclosure-focus');
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+    if (!await win.webContents.executeJavaScript("document.querySelector('.disclosure--inline').open")) throw new Error('Timing disclosure keyboard toggle failed');
+    await capture('timing-disclosure-open');
     await win.webContents.executeJavaScript("document.querySelectorAll('.quiet-details').forEach(el => el.open = true); document.querySelector('.quiet-details').scrollIntoView({ block: 'start' })");
     await capture('nested-diagnostics');
     win.setSize(360, 780);
