@@ -49,11 +49,11 @@ export class AppComponent implements OnInit {
   async openFile() {
     const filePath = await this.electronService.selectAudioFile();
     if (filePath) {
-      this.toastService.show(`Selected file: ${filePath}`, "info", 3000);
+      this.toastService.show(`Selected file: ${filePath}`, "info");
     }
   }
 
   async saveTranscript() {
-    this.toastService.show("Save transcript functionality", "info", 3000);
+    this.toastService.show("Save transcript functionality", "info");
   }
 }

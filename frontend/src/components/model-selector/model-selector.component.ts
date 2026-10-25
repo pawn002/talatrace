@@ -1,3 +1,4 @@
+import { TableScrollDirective } from '../../directives/table-scroll.directive';
 import { Component, OnInit } from "@angular/core";
 
 import { ElectronService } from "../../services/electron.service";
@@ -17,7 +18,7 @@ interface WhisperModel {
 @Component({
   selector: "app-model-selector",
   standalone: true,
-  imports: [],
+  imports: [TableScrollDirective],
   templateUrl: "./model-selector.component.html",
   styleUrls: ["./model-selector.component.scss"],
 })
@@ -90,7 +91,7 @@ export class ModelSelectorComponent implements OnInit {
       });
     } catch (error) {
       console.error("Failed to load models:", error);
-      this.toastService.show("Failed to load models", "error", 3000);
+      this.toastService.show("Failed to load models", "error");
     } finally {
       this.isLoading = false;
     }
@@ -103,7 +104,7 @@ export class ModelSelectorComponent implements OnInit {
     model.downloadProgress = 0;
 
     try {
-      this.toastService.show(`Downloading ${model.name} model...`, "info", 3000);
+      this.toastService.show(`Downloading ${model.name} model...`, "info");
 
       const result = await this.electronService.downloadModel(model.name);
 
@@ -114,7 +115,6 @@ export class ModelSelectorComponent implements OnInit {
         this.toastService.show(
           `${model.name} model downloaded successfully! You can now use it for transcription.`,
           "success",
-          5000,
         );
         await this.loadModels();
       } else {
@@ -127,7 +127,6 @@ export class ModelSelectorComponent implements OnInit {
       this.toastService.show(
         `Failed to download ${model.name}: ${error.message}`,
         "error",
-        5000,
       );
     }
   }

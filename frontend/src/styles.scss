@@ -60,7 +60,7 @@ i.ph-fill {
   &--medium {
     font-size: var(--font-size-md);
     padding: var(--spacing-button-padding-y) var(--spacing-button-padding-x);
-    min-height: 2.5rem;
+    min-height: var(--hit-target-aaa);
   }
   &--large {
     font-size: var(--font-size-lg);
@@ -91,7 +91,7 @@ i.ph-fill {
     background-color: transparent;
     color: var(--color-text-default);
     &:hover:not(:disabled) { background-color: var(--color-bg-hover); color: var(--color-text-default); }
-    &:active:not(:disabled) { background-color: var(--color-bg-hover); }
+    &:active:not(:disabled) { background-color: oklch(from var(--color-bg-hover) calc(l - 0.04) c h); }
   }
   &--destructive {
     background-color: var(--color-action-destructive);
@@ -170,16 +170,16 @@ i.ph-fill {
     padding: var(--spacing-xs) var(--spacing-sm);
     font-family: var(--font-family-base);
     font-size: var(--font-size-base);
-    font-weight: var(--font-weight-bold);
-    color: var(--color-text-default);
-    border-bottom: 2px solid transparent;
+    font-weight: var(--font-weight-regular);
+    color: var(--color-text-subtle);
+    border-bottom: var(--border-width-medium) solid transparent;
     margin-bottom: -1px;
     transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
 
     &[aria-selected='true'] {
       color: var(--color-action-primary);
       border-bottom-color: var(--color-action-primary);
-      font-weight: var(--font-weight-bold);
+      font-weight: var(--font-weight-semibold);
     }
     &:hover { color: var(--color-text-default); }
     &:focus-visible {
@@ -219,7 +219,7 @@ i.ph-fill {
   background-color: var(--color-bg-page);
   color: var(--color-text-default);
   transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-  min-height: 2.5rem;
+  min-height: var(--hit-target-aaa);
   width: 100%;
   box-sizing: border-box;
 
@@ -267,7 +267,7 @@ i.ph-fill {
 }
 
 select.input {
-  appearance: auto;
+  appearance: none;
   background-repeat: no-repeat;
   background-position: right 0.625rem center;
   padding-right: 2.25rem;
@@ -287,7 +287,7 @@ select.input {
   line-height: var(--line-height-tight);
 
   &--sm { font-size: var(--font-size-sm); padding: 0.2rem 0.5rem; }
-  &--md { font-size: var(--font-size-sm); padding: 0.25rem 0.65rem; }
+  &--md { font-size: var(--font-size-md); font-weight: var(--font-weight-regular); padding: 0.25rem 0.65rem; }
 
   &--default { background-color: var(--color-bg-muted); color: var(--color-text-default); }
   &--primary { background-color: var(--color-action-primary); color: var(--color-text-on-action); }
@@ -397,7 +397,7 @@ select.input {
     th { font-weight: var(--font-weight-bold); }
 
     thead th {
-      color: var(--color-text-default);
+      color: var(--color-text-subtle-on-surface);
       font-weight: var(--font-weight-bold);
       border-bottom: var(--border-width-medium) solid var(--color-border-strong);
     }
@@ -500,7 +500,7 @@ select.input {
 
   &--info {
     background-color: var(--color-bg-surface);
-    border-color: var(--color-border-strong);
+    border-color: var(--color-border-default);
     .alert__icon { color: var(--color-text-subtle); }
   }
   &--success {
@@ -531,10 +531,10 @@ select.input {
   &__title {
     font-weight: var(--font-weight-semibold);
     color: var(--color-text-default);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-md);
     line-height: var(--line-height-tight);
     margin-bottom: 0.25rem;
-    letter-spacing: var(--letter-spacing-wide);
+    letter-spacing: var(--letter-spacing-body);
     text-transform: none;
   }
   &__message {
@@ -560,65 +560,19 @@ select.input {
   }
 }
 
-// ─── Toast ───────────────────────────────────────────────────────────────────
-.toast {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius-md);
-  border: var(--border-width-thin) solid var(--color-border-default);
-  background-color: var(--color-bg-surface);
-  font-family: var(--font-family-base);
-  box-shadow: var(--shadow-md);
-
-  &--info    { background-color: var(--color-bg-surface); border-color: var(--color-border-default); }
-  &--success { .toast__icon { color: var(--color-status-success); } }
-  &--warning { .toast__icon { color: var(--color-status-warning); } }
-  &--error { .toast__icon { color: var(--color-status-error); } }
-
-  &__icon {
-    flex-shrink: 0;
-    width: 1.25rem;
-    height: 1.25rem;
-    margin-top: 0.125rem;
-  }
-  &__content { flex: 1; min-width: 0; }
-  &__title {
-    font-weight: var(--font-weight-semibold);
-    font-size: var(--font-size-base);
-    color: var(--color-text-default);
-    line-height: var(--line-height-tight);
-    margin-bottom: 0.125rem;
-  }
-  &__message {
-    color: var(--color-text-default);
-    font-family: var(--font-family-accessible);
-    font-size: var(--font-size-md);
-    letter-spacing: var(--letter-spacing-body);
-    line-height: var(--line-height-normal);
-    margin: 0;
-  }
-  &__dismiss {
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.5rem;
-    height: 1.5rem;
-    padding: 0;
-    border: none;
-    background: none;
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    color: var(--color-text-subtle);
-    transition: color 0.15s ease, background-color 0.15s ease;
-
-    i { font-size: 1rem; line-height: 1; }
-    &:hover { color: var(--color-text-default); background-color: var(--color-bg-hover); }
-    &:focus-visible {
-      outline: var(--focus-ring-width) solid var(--color-focus);
-      outline-offset: var(--focus-ring-offset);
-    }
-  }
-}
+// Native widget constructions aligned with Candor 6 story files.
+.button--icon { width: var(--hit-target-aaa); height: var(--hit-target-aaa); padding: var(--spacing-2xs); color: var(--color-text-subtle); }
+.button--icon i { font-size: 1.75rem; line-height: 1; }
+.input-label { letter-spacing: var(--letter-spacing-relaxed); }
+.select-control { position: relative; display: flex; align-items: center; }
+.select-caret { position: absolute; right: var(--spacing-input-padding-x); pointer-events: none; color: var(--color-text-subtle); font-size: var(--font-size-md); }
+.select-control:focus-within .select-caret { color: var(--color-action-primary); }
+.checkbox-input { position: absolute; opacity: 0; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.checkbox-box { width: 20px; height: 20px; border: var(--border-width-medium) solid var(--color-border-control); border-radius: var(--radius-sm); background: var(--color-bg-page); position: relative; flex-shrink: 0; }
+.checkbox-input:checked + .checkbox-box { background: var(--color-action-primary); border-color: var(--color-action-primary); }
+.checkbox-input:checked + .checkbox-box::after { content: ''; position: absolute; left: 6px; top: 2px; width: 6px; height: 12px; border: solid var(--color-text-on-action); border-width: 0 var(--border-width-medium) var(--border-width-medium) 0; transform: rotate(45deg); }
+.checkbox-input:focus-visible + .checkbox-box, .table-container:focus-visible { outline: var(--focus-ring-width) solid var(--color-focus); outline-offset: var(--focus-ring-offset); }
+.table-host caption { font-size: var(--font-size-sm); color: var(--color-text-default); text-align: center; padding-bottom: var(--spacing-xs); }
+.table-host :is(th, td).cell--numeric { font-family: var(--font-family-mono); text-align: right; font-variant-numeric: tabular-nums; }
+.table-host :is(th, td).cell--mono { font-family: var(--font-family-mono); font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .progress-bar__fill--indeterminate, .spinner, .spinner__arc { animation: none; } }

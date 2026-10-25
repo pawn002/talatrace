@@ -8,7 +8,7 @@
 .models-card .card__header { border: 0; padding: 0 0 var(--spacing-md); }
 .models-card h2 { font-size: var(--font-size-xl); letter-spacing: -.025em; }
 .models-card .card-subtitle { font-size: var(--font-size-md); font-weight: 400; margin-top: var(--spacing-xs); }
-.models-card .card__body { padding: var(--spacing-md); border: 1px solid var(--color-border-default); border-radius: 14px; background: var(--color-bg-elevated); }
+.models-card .card__body { padding: var(--spacing-md); border: 1px solid var(--color-border-default); border-radius: var(--radius-md); background: var(--color-bg-page); }
 .models-card table { font-size: var(--font-size-sm); }
 .models-card .cell--mono { white-space: nowrap; }
 .models-card .button { min-height: var(--hit-target-aaa); padding: var(--spacing-xs) var(--spacing-sm); font-size: var(--font-size-sm); }
@@ -24,15 +24,7 @@
   color: var(--color-text-default);
 }
 
-.info-alert {
-  margin-bottom: var(--spacing-md);
-
-  .alert__message {
-    font-family: var(--font-family-base);
-    font-size: var(--font-size-md);
-    line-height: var(--line-height-normal);
-  }
-}
+.info-alert { margin-bottom: var(--spacing-md); }
 
 .table-container {
   overflow-x: auto;

@@ -119,7 +119,7 @@ describe('TranscriptionComponent', () => {
 
     await component.startTranscription();
 
-    expect(toastStub.show).toHaveBeenCalledWith('Please select an audio file', 'info', 3000);
+    expect(toastStub.show).toHaveBeenCalledWith('Please select an audio file', 'info');
     expect(component.isTranscribing).toBe(false);
   });
 
@@ -456,7 +456,7 @@ describe('TranscriptionComponent', () => {
       await component.saveTranscript();
 
       expect(electronStub.saveTranscript).not.toHaveBeenCalled();
-      expect(toastStub.show).toHaveBeenCalledWith('No transcript to save', 'info', 3000);
+      expect(toastStub.show).toHaveBeenCalledWith('No transcript to save', 'info');
     });
 
     it('shows success toast with the saved path on success', async () => {
@@ -468,7 +468,6 @@ describe('TranscriptionComponent', () => {
       expect(toastStub.show).toHaveBeenCalledWith(
         expect.stringContaining('/output/transcript.txt'),
         'success',
-        5000,
       );
     });
 
@@ -478,7 +477,7 @@ describe('TranscriptionComponent', () => {
 
       await component.saveTranscript();
 
-      expect(toastStub.show).toHaveBeenCalledWith('Failed to save transcript', 'error', 3000);
+      expect(toastStub.show).toHaveBeenCalledWith('Failed to save transcript', 'error');
     });
   });
 
@@ -559,7 +558,7 @@ describe('TranscriptionComponent', () => {
       it('announces completion in the persistent status without an overlapping toast', () => {
         completedCallback({ text: 'done' });
         expect(component.workflowTitle).toBe('Your transcript is ready');
-        expect(toastStub.show).not.toHaveBeenCalledWith('Transcription completed!', 'success', 3000);
+        expect(toastStub.show).not.toHaveBeenCalledWith('Transcription completed!', 'success');
       });
     });
 
@@ -581,7 +580,7 @@ describe('TranscriptionComponent', () => {
       it('keeps the error inline rather than duplicating it in a toast', () => {
         errorCallback('Whisper binary not found');
         expect(component.recordingError).toBe('Whisper binary not found');
-        expect(toastStub.show).not.toHaveBeenCalledWith('Whisper binary not found', 'error', 5000);
+        expect(toastStub.show).not.toHaveBeenCalledWith('Whisper binary not found', 'error');
       });
 
       it('falls back to a default message when the error string is falsy', () => {

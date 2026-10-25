@@ -118,7 +118,7 @@ describe('HistoryComponent', () => {
     it('copies a string result directly and shows success toast', async () => {
       await component.copyTranscript({ id: '1', status: 'completed', startedAt: '', result: 'plain text' });
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith('plain text');
-      expect(toastStub.show).toHaveBeenCalledWith('Transcript copied to clipboard', 'success', 3000);
+      expect(toastStub.show).toHaveBeenCalledWith('Transcript copied to clipboard', 'success');
     });
 
     it('copies the text property from an object result', async () => {
@@ -129,7 +129,7 @@ describe('HistoryComponent', () => {
     it('shows error toast when clipboard write fails', async () => {
       (navigator.clipboard.writeText as jest.Mock).mockRejectedValue(new Error('denied'));
       await component.copyTranscript({ id: '1', status: 'completed', startedAt: '', result: 'text' });
-      expect(toastStub.show).toHaveBeenCalledWith('Failed to copy transcript', 'error', 3000);
+      expect(toastStub.show).toHaveBeenCalledWith('Failed to copy transcript', 'error');
     });
   });
 

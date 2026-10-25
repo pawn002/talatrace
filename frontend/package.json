@@ -23,11 +23,13 @@
     "@angular/platform-browser-dynamic": "^21.0.0",
     "@angular/router": "^21.0.0",
     "@candor-design/tokens": "6.0.0",
+    "@candor-design/web-components": "6.0.0",
     "@fontsource-variable/roboto-flex": "^5.2.8",
     "@fontsource/atkinson-hyperlegible": "5.3.0",
     "@fontsource/noto-serif": "^5.2.9",
     "@fontsource/roboto-mono": "^5.2.8",
     "@phosphor-icons/web": "^2.1.2",
+    "lit": "3.3.2",
     "rxjs": "^7.8.1",
     "tslib": "^2.6.2",
     "zone.js": "^0.15.0"

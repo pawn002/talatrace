@@ -1,4 +1,4 @@
-import { NgModule } from "@angular/core";
+import { CUSTOM_ELEMENTS_SCHEMA, NgModule } from "@angular/core";
 import { BrowserModule } from "@angular/platform-browser";
 import { HttpClientModule } from "@angular/common/http";
 import { FormsModule } from "@angular/forms";
@@ -20,6 +20,7 @@ import { ElectronService } from "./services/electron.service";
     HistoryComponent,
     ModelSelectorComponent,
   ],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   providers: [ElectronService],
   bootstrap: [AppComponent],
 })

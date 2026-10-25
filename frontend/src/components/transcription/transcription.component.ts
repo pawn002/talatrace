@@ -174,7 +174,7 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
         }
       }
     } catch (error) {
-      this.toastService.show('Failed to select file', 'error', 3000);
+      this.toastService.show('Failed to select file', 'error');
     } finally {
       this.isSelectingFile = false;
     }
@@ -187,7 +187,7 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
       return;
     }
     if (!this.selectedFilePath) {
-      this.toastService.show('Please select an audio file', 'info', 3000);
+      this.toastService.show('Please select an audio file', 'info');
       return;
     }
 
@@ -226,7 +226,7 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
 
   async saveTranscript() {
     if (!this.transcriptionResult) {
-      this.toastService.show('No transcript to save', 'info', 3000);
+      this.toastService.show('No transcript to save', 'info');
       return;
     }
 
@@ -238,10 +238,10 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
         }
       );
       if (savedPath) {
-        this.toastService.show(`Saved to: ${savedPath}`, 'success', 5000);
+        this.toastService.show(`Saved to: ${savedPath}`, 'success');
       }
     } catch (error) {
-      this.toastService.show('Failed to save transcript', 'error', 3000);
+      this.toastService.show('Failed to save transcript', 'error');
     }
   }
 

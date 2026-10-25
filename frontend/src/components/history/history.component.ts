@@ -1,4 +1,5 @@
-import { Component, OnInit, OnDestroy } from "@angular/core";
+import { TableScrollDirective } from '../../directives/table-scroll.directive';
+import { CUSTOM_ELEMENTS_SCHEMA, Component, OnInit, OnDestroy } from "@angular/core";
 
 import { ElectronService } from "../../services/electron.service";
 import { ToastService } from "../../services/toast.service";
@@ -19,7 +20,8 @@ interface TranscriptionHistoryItem {
 @Component({
   selector: "app-history",
   standalone: true,
-  imports: [],
+  imports: [TableScrollDirective],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: "./history.component.html",
   styleUrls: ["./history.component.scss"],
 })
@@ -106,9 +108,9 @@ export class HistoryComponent implements OnInit, OnDestroy {
         const text =
           typeof item.result === "string" ? item.result : item.result.text;
         await navigator.clipboard.writeText(text);
-        this.toastService.show("Transcript copied to clipboard", "success", 3000);
+        this.toastService.show("Transcript copied to clipboard", "success");
       } catch (error) {
-        this.toastService.show("Failed to copy transcript", "error", 3000);
+        this.toastService.show("Failed to copy transcript", "error");
       }
     }
   }

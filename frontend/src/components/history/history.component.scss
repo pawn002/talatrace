@@ -8,7 +8,7 @@
 .history-card .card__header { border: 0; padding: 0 0 var(--spacing-md); }
 .history-card h2 { font-size: var(--font-size-xl); letter-spacing: -.025em; }
 .history-card .card-subtitle { font-size: var(--font-size-md); font-weight: 400; margin-top: var(--spacing-xs); }
-.history-card .card__body { padding: var(--spacing-md); border: 1px solid var(--color-border-default); border-radius: 14px; background: var(--color-bg-elevated); }
+.history-card .card__body { padding: var(--spacing-md); border: 1px solid var(--color-border-default); border-radius: var(--radius-md); background: var(--color-bg-page); }
 .history-card table { font-size: var(--font-size-sm); }
 .history-card .button { min-width: var(--hit-target-aaa); min-height: var(--hit-target-aaa); }
 
@@ -57,12 +57,7 @@
   margin-top: var(--spacing-sm);
 }
 
-.file-cell {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 250px;
-}
+.file-cell { white-space: normal; overflow-wrap: anywhere; min-width: 12ch; max-width: 28ch; }
 
 .status-text {
   font-size: var(--font-size-sm);

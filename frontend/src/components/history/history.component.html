@@ -5,15 +5,14 @@
         <h2>Recent transcripts</h2>
         <p class="card-subtitle">Completed transcriptions from this session.</p>
       </div>
-      <button
-        class="button button--ghost button--small"
+      <candor-tooltip text="Refresh history" position="left"><button
+        class="button button--ghost button--small button--icon"
         (click)="loadHistory()"
         [disabled]="isLoading"
-        title="Refresh history"
         aria-label="Refresh history"
         >
         <i class="ph-fill ph-arrow-clockwise" aria-hidden="true"></i>
-      </button>
+      </button></candor-tooltip>
     </div>
   </div>
 
@@ -34,39 +33,39 @@
 
     @if (!isLoading && history.length > 0) {
       <div
-        class="table-host table-container"
+        class="table-host table-container" appTableScroll aria-label="Transcripts table"
         >
         <table>
+          <caption>Transcripts from this session</caption>
           <thead>
             <tr>
               <th>File</th>
               <th>Model</th>
               <th>Status</th>
-              <th>Audio Duration</th>
-              <th>Processing Time</th>
-              <th>Date</th>
+              <th class="cell--numeric">Audio Duration</th>
+              <th class="cell--numeric">Processing Time</th>
+              <th class="cell--mono">Date</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             @for (item of history; track item) {
               <tr>
-                <td class="file-cell cell--mono">{{ item.fileName || "Unknown" }}</td>
+                <td class="file-cell">{{ item.fileName || "Unknown" }}</td>
                 <td>{{ item.options?.model || "base" }}</td>
                 <td><span class="status-text status-text--{{ getStatusVariant(item.status) }}">@if (item.status === "completed") { <i class="ph-bold ph-check-circle" aria-hidden="true"></i> } @else { <i class="ph-bold ph-info" aria-hidden="true"></i> }{{ item.status }}</span></td>
-                <td class="cell--mono">{{ formatDuration(item.audioDuration) }}</td>
-                <td class="cell--mono">{{ formatTime(item.transcriptionTime) }}</td>
-                <td>{{ formatTimestamp(item.startedAt) }}</td>
+                <td class="cell--numeric">{{ formatDuration(item.audioDuration) }}</td>
+                <td class="cell--numeric">{{ formatTime(item.transcriptionTime) }}</td>
+                <td class="cell--mono">{{ formatTimestamp(item.startedAt) }}</td>
                 <td>
-                  <button
-                    class="button button--ghost button--small"
-                    title="Copy transcript"
+                  <candor-tooltip text="Copy transcript" position="left"><button
+                    class="button button--ghost button--small button--icon"
                     (click)="copyTranscript(item)"
                     [disabled]="item.status !== 'completed'"
                     aria-label="Copy transcript"
                     >
                     <i class="ph-fill ph-copy" aria-hidden="true"></i>
-                  </button>
+                  </button></candor-tooltip>
                 </td>
               </tr>
             }

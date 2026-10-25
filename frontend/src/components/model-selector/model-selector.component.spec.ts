@@ -103,7 +103,7 @@ describe('ModelSelectorComponent', () => {
 
       await component.loadModels();
 
-      expect(toastStub.show).toHaveBeenCalledWith('Failed to load models', 'error', 3000);
+      expect(toastStub.show).toHaveBeenCalledWith('Failed to load models', 'error');
     });
   });
 
@@ -129,7 +129,6 @@ describe('ModelSelectorComponent', () => {
       expect(toastStub.show).toHaveBeenCalledWith(
         expect.stringContaining('tiny'),
         'success',
-        5000,
       );
     });
 
@@ -143,7 +142,6 @@ describe('ModelSelectorComponent', () => {
       expect(toastStub.show).toHaveBeenCalledWith(
         expect.stringContaining('tiny'),
         'error',
-        5000,
       );
     });
   });

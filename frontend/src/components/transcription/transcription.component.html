@@ -22,23 +22,23 @@
         @if (inputMode === 'record') {
         <li class="workflow-control" [attr.aria-current]="currentStep === 1 ? 'step' : null"><span class="workflow-number" aria-hidden="true"><b>1</b> Record</span>
         <button data-action="record" class="button button--medium" [class.button--primary]="hasInstalledModel && !busy && !transcriptionResult && !selectedFilePath && !recordedAudio" [class.button--ghost]="!hasInstalledModel || busy || transcriptionResult || selectedFilePath || recordedAudio" (click)="startRecording()" [disabled]="busy || !hasInstalledModel || !!recordedAudio" aria-describedby="workflow-help">
-          <i class="ph-fill ph-microphone" aria-hidden="true"></i> Record answer
+          <i class="ph ph-microphone" aria-hidden="true"></i> Record answer
         </button>
-        <span class="workflow-connector" aria-hidden="true">→</span></li>
+        <i class="ph-bold ph-arrow-right workflow-connector" aria-hidden="true"></i></li>
         <li class="workflow-control" [attr.aria-current]="currentStep === 2 ? 'step' : null"><span class="workflow-number" aria-hidden="true"><b>2</b> Transcribe</span>
         <button data-action="stop" class="button button--medium" [class.button--primary]="isRecording" [class.button--ghost]="!isRecording" (click)="stopRecording()" [disabled]="!isRecording" aria-describedby="workflow-help">Stop &amp; transcribe</button>
-        <span class="workflow-connector" aria-hidden="true">→</span></li>
+        <i class="ph-bold ph-arrow-right workflow-connector" aria-hidden="true"></i></li>
         } @else {
           <li class="workflow-control" [attr.aria-current]="currentStep === 1 ? 'step' : null"><span class="workflow-number" aria-hidden="true"><b>1</b> Choose</span>
           <button data-action="choose-file" class="button button--medium" [class.button--primary]="!busy && !selectedFilePath && !transcriptionResult" [class.button--ghost]="busy || selectedFilePath || transcriptionResult" (click)="selectAudioFile()" [disabled]="busy" aria-describedby="workflow-help">Choose audio file…</button>
-          <span class="workflow-connector" aria-hidden="true">→</span></li>
+          <i class="ph-bold ph-arrow-right workflow-connector" aria-hidden="true"></i></li>
           <li class="workflow-control" [attr.aria-current]="currentStep === 2 ? 'step' : null"><span class="workflow-number" aria-hidden="true"><b>2</b> Transcribe</span>
           <button data-action="transcribe" class="button button--medium" [class.button--primary]="hasInstalledModel && !busy && !!selectedFilePath && !transcriptionResult" [class.button--ghost]="!hasInstalledModel || busy || !selectedFilePath || transcriptionResult" (click)="startTranscription()" [disabled]="busy || !hasInstalledModel || !selectedFilePath" aria-describedby="workflow-help">Transcribe file</button>
-          <span class="workflow-connector" aria-hidden="true">→</span></li>
+          <i class="ph-bold ph-arrow-right workflow-connector" aria-hidden="true"></i></li>
         }
         <li class="workflow-control" [attr.aria-current]="currentStep === 3 ? 'step' : null"><span class="workflow-number" aria-hidden="true"><b>3</b> Copy</span>
         <button data-action="copy" class="button button--medium" [class.button--primary]="!!transcriptionResult && !busy" [class.button--ghost]="!transcriptionResult || busy" (click)="copyToClipboard()" [disabled]="!transcriptionResult || busy" aria-describedby="workflow-help">
-          <i class="ph-fill ph-copy" aria-hidden="true"></i> Copy transcript
+          <i class="ph ph-copy" aria-hidden="true"></i> Copy transcript
         </button>
         </li>
       </ol>
@@ -49,13 +49,13 @@
           <button class="button button--ghost button--small" (click)="discardRecording()" [disabled]="(!isRecording && !recordedAudio) || isTranscribing || isStoppingRecording">Discard recording</button>
         }
         <button class="button button--ghost button--small" (click)="exportTranscript()" [disabled]="!transcriptionResult || busy">Save transcript…</button>
-      @if (hasTiming && !busy) { <label class="copy-option"><input type="checkbox" [(ngModel)]="includeTimestamps" (ngModelChange)="copied = false"> Include timing and pauses</label> }
+      @if (hasTiming && !busy) { <label class="copy-option"><input class="checkbox-input" type="checkbox" [(ngModel)]="includeTimestamps" (ngModelChange)="copied = false"><span class="checkbox-box" aria-hidden="true"></span><span>Include timing and pauses</span></label> }
       </div>
       @if (!hasInstalledModel && !busy) { <button class="button button--primary button--medium" (click)="manageModels.emit()">Download a model</button> }
       @if (selectedFilePath && !busy) { <p class="file-info"><i class="ph ph-music-note" aria-hidden="true"></i> <span>{{ getFileName() }}</span>@if (selectedFileSize) { <span class="file-size">{{ formatFileSize(selectedFileSize) }}</span> }</p> }
 
-      @if (copyError) { <p role="alert" class="record-error">{{ copyError }}</p> }
-      @if (recordingError) { <p role="alert" class="record-error">{{ recordingError }}</p> }
+      @if (copyError) { <div role="alert" class="alert alert--error record-error"><i class="ph-bold ph-x-circle alert__icon" aria-hidden="true"></i><div class="alert__content"><p class="alert__message">{{ copyError }}</p></div></div> }
+      @if (recordingError) { <div role="alert" class="alert alert--error record-error"><i class="ph-bold ph-x-circle alert__icon" aria-hidden="true"></i><div class="alert__content"><p class="alert__message">{{ recordingError }}</p></div></div> }
     </section>
     @if (transcriptionResult && !busy) {
       <section class="result-section" aria-label="Transcript preview">
@@ -73,11 +73,11 @@
             }
           } @else { <p class="transcript-segment"><span class="segment__text">{{ transcriptionResult?.text }}</span></p> }
         </div>
-        <details class="quiet-details">
+        <details class="quiet-details disclosure disclosure--default">
           <summary>About timing and pause detection</summary>
           <p class="record-hint">{{ timingDescription }} {{ pauseDescription }}</p>
           @if (transcriptionResult?.originalSegments?.length) {
-            <details class="quiet-details">
+            <details class="quiet-details disclosure disclosure--subtle">
               <summary>Original recognition timestamps</summary>
               @for (segment of transcriptionResult.originalSegments; track $index) {
                 <p class="transcript-segment"><span class="segment__time">{{ formatTimestampRange(segment.start, segment.end) }}</span><span>{{ segment.text }}</span></p>
@@ -85,7 +85,7 @@
             </details>
           }
           @if (transcriptionResult?.quietIntervals?.length) {
-            <details class="quiet-details">
+            <details class="quiet-details disclosure disclosure--subtle">
               <summary>Original quiet measurements ({{ transcriptionResult.quietIntervals.length }})</summary>
               <p class="record-hint">Audio below the detector threshold for at least 1.5 seconds. Original measurements are retained in JSON exports.</p>
               @for (interval of transcriptionResult.quietIntervals; track $index) {
@@ -97,20 +97,20 @@
       </section>
     }
     @if (!busy && hasInstalledModel) {
-      <details class="settings-details">
+      <details class="settings-details disclosure disclosure--default">
         <summary>Transcription settings · {{ selectedModel }} · {{ selectedLanguage === 'auto' ? 'Auto-detect language' : selectedLanguage }}</summary>
         <div class="options-section">
           <div class="input-wrapper">
             <label class="input-label" for="model-select">Model</label>
-            <select id="model-select" class="input" [(ngModel)]="selectedModel">
+            <div class="select-control"><select id="model-select" class="input" [(ngModel)]="selectedModel">
               @for (model of availableModels; track model.id) { <option [value]="model.id">{{ model.name }}</option> }
-            </select>
+            </select><i class="ph-bold ph-caret-down select-caret" aria-hidden="true"></i></div>
           </div>
           <div class="input-wrapper">
             <label class="input-label" for="language-select">Language</label>
-            <select id="language-select" class="input" [(ngModel)]="selectedLanguage">
+            <div class="select-control"><select id="language-select" class="input" [(ngModel)]="selectedLanguage">
               @for (lang of languages; track lang.code) { <option [value]="lang.code">{{ lang.name }}</option> }
-            </select>
+            </select><i class="ph-bold ph-caret-down select-caret" aria-hidden="true"></i></div>
           </div>
         </div>
         <p class="record-hint">These settings apply to your next transcription.</p>

@@ -13,7 +13,7 @@
 
     @if (!isLoading) {
       <div class="alert alert--info info-alert">
-        <i class="ph ph-info alert__icon" aria-hidden="true"></i>
+        <i class="ph-bold ph-info alert__icon" aria-hidden="true"></i>
         <div class="alert__content">
           <p class="alert__message">
             Smaller models favor speed; larger models favor accuracy.
@@ -30,12 +30,13 @@
     }
 
     @if (!isLoading) {
-      <div class="table-host table-container">
+      <div class="table-host table-container" appTableScroll aria-label="Speech models table">
         <table>
+          <caption>Available speech models</caption>
           <thead>
             <tr>
               <th>Model</th>
-              <th>Size</th>
+              <th class="cell--numeric">Size</th>
               <th>Speed</th>
               <th>Accuracy</th>
               <th>Status</th>
@@ -46,7 +47,7 @@
             @for (model of models; track model) {
               <tr>
                 <td>{{ model.name }}</td>
-                <td class="cell--mono">{{ model.size }}</td>
+                <td class="cell--numeric">{{ model.size }}</td>
                 <td>
                   <span class="badge badge--sm badge--{{ getSpeedVariant(model.speed) }}">
                     {{ model.speed }}
@@ -74,13 +75,13 @@
                       class="button button--primary button--small"
                       (click)="downloadModel(model)"
                       >
-                      <i class="ph-fill ph-cloud-arrow-down" aria-hidden="true"></i>
+                      <i class="ph ph-cloud-arrow-down" aria-hidden="true"></i>
                       Download
                     </button>
                   }
                   @if (model.downloading) {
                     <div class="download-progress">
-                      <div class="progress-bar">
+                      <div class="progress-bar" role="progressbar" [attr.aria-label]="'Downloading ' + model.name + ' model'">
                         <div class="progress-bar__fill progress-bar__fill--indeterminate"></div>
                       </div>
                     </div>

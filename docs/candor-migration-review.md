@@ -1,5 +1,7 @@
 # Candor 3.0.0 to 6.0.0 review
 
+The subsequent [widget construction review](candor-widget-review.md) records the broader Storybook audit, adoption of actual Candor tooltips/toasts, native-widget corrections and the latest verification results.
+
 Reviewed and migrated on 24 October 2026 for issue [#21](https://github.com/pawn002/whisper-electron-app/issues/21). The frontend now pins tokens to 6.0.0 and uses the supported CSS export.
 
 Sources: the complete release sequence in the [6.0.0 changelog](https://github.com/pawn002/candor/blob/v6.0.0/CHANGELOG.md) and the [breaking-change guide](https://github.com/pawn002/candor/blob/v6.0.0/docs/BREAKING-CHANGES.md). Reviewed minor and patch entries as well as major releases. Unreleased changes are outside the 6.0.0 target.
@@ -47,3 +49,9 @@ To reproduce, run `npm run preview:workflow`, inspect its screenshots, then run 
 3. Resolve the custom style concerns above without restoring obsolete token values to hide intentional palette changes.
 4. Measure app-authored colour pairings with klar, including mixed/transparent colours against their effective backgrounds. Keep WCAG measurements distinct from OKCA scores and Candor's own tier policy.
 5. Follow AGENTS.md for rendered light/dark, narrow, zoom, keyboard focus and workflow review. Run the existing build, tests and offline interview smoke test. Record intentional visual differences and remaining gaps.
+
+## Nested disclosure follow-up
+
+Applied the catalog's [accordion hierarchy](https://main--69c25e2492ad056c24329876.chromatic.com/?path=/story/components-accordion--hierarchy-variants) to the app's native details/summary controls. Timing explanation and transcription settings are default section headings at 16px bold. Raw recognition timestamps and quiet measurements are subtle subsections at 16px regular, with subtle text against the page-colour inset. There is no third help-disclosure level requiring the quiet variant. Native summary semantics and focus outlines are retained.
+
+Reviewed expanded desktop light/dark and 360px diagnostics. Reduced the nested inset at narrow widths to preserve room for 14px timestamps; raw transcript prose is 16px. The preview now includes original recognition segments, expanded nested states and trusted mouse/Enter checks that a child can close and reopen without closing its parent. Final preview: 36 captured states, no page-wide horizontal overflow or sub-14px readable text; klar 3.1.0 checks 39 distinct pairings with no failures. Build passes with the previously recorded warning categories (transcription styles now approximately 7.74 kB, still under the unchanged 8 kB error limit).
