@@ -28,6 +28,8 @@ Changing models does not require changing the recording workflow. Parakeet's lan
 
 A build without the Parakeet runtime displays an adjacent unavailable explanation and disables its download. Installed weights alone do not make an absent runtime usable.
 
+The model store verifies installed weights against the catalog's SHA-256, not just file size. Verification is cached until the file's identity or modification metadata changes. Missing, truncated and checksum-invalid files are excluded from installed choices, and Whisper rejects them before starting recognition with instructions to download again from Models. Catalog refreshes retain each model's active-download state independently, including when another download finishes or fails. Existing corrupt files are left in place until a verified replacement is ready; the app does not treat a saved HTTP error body as an installed model.
+
 ## Timing and pauses
 
 Completed results show the model, decoded audio duration, total processing time and audio/processing speed ratio. History uses the same duration and processing measurement. Duration comes from FFmpeg's decoded output clock, including quiet tails, so browser WebM recordings without duration headers are measured correctly. Processing includes preparation, model loading, recognition and timing analysis; first-run setup and device load can affect comparisons. Measurements are displayed in the app and retained in JSON, without adding performance text to the copied interview transcript. Earlier session entries without duration are not backfilled.

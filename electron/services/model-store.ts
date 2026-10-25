@@ -8,16 +8,33 @@ import { SPEECH_MODELS, speechModel, modelSize, SpeechModel } from './model-cata
 
 export class ModelStore {
   private downloads = new Map<string, Promise<void>>();
+  private verification = new Map<string, { stamp: string; valid: boolean }>();
   constructor(readonly directory: string) {}
   path(name: string): string { return path.join(this.directory, speechModel(name).filename); }
 
   async installed(model: SpeechModel): Promise<boolean> {
-    try { return (await fs.stat(this.path(model.name))).size === model.sizeBytes; } catch { return false; }
+    try {
+      const file = this.path(model.name);
+      const before = await fs.stat(file, { bigint: true });
+      if (!before.isFile() || before.size !== BigInt(model.sizeBytes)) return false;
+      const stamp = `${before.dev}:${before.ino}:${before.size}:${before.mtimeNs}:${before.ctimeNs}:${model.sha256}`;
+      const cached = this.verification.get(model.name);
+      if (cached?.stamp === stamp) return cached.valid;
+      const hash = createHash('sha256');
+      for await (const chunk of createReadStream(file)) hash.update(chunk);
+      const after = await fs.stat(file, { bigint: true });
+      // Do not cache a result if the file was replaced or changed while reading it.
+      if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size ||
+          before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs) return false;
+      const valid = hash.digest('hex') === model.sha256;
+      this.verification.set(model.name, { stamp, valid });
+      return valid;
+    } catch { return false; }
   }
 
   async list() {
     return Promise.all(SPEECH_MODELS.map(async model => ({ ...model, size: modelSize(model.sizeBytes),
-      installed: await this.installed(model), path: this.path(model.name) })));
+      installed: await this.installed(model), downloading: this.downloads.has(model.name), path: this.path(model.name) })));
   }
 
   download(name: string, progress?: (progress: number) => void): Promise<void> {

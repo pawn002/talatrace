@@ -212,13 +212,8 @@ export class WhisperService implements RecognitionEngine {
 
     const modelPath = this.models.path(modelName);
 
-    // Check if model exists
-    try {
-      await fs.access(modelPath);
-    } catch {
-      throw new Error(
-        `Model ${options.model} not found. Please download it first.`
-      );
+    if (!await this.models.installed(definition)) {
+      throw new Error(`Model ${modelName} is missing, incomplete or corrupt. Download it again from Models before transcribing.`);
     }
 
     // Check if audio needs conversion

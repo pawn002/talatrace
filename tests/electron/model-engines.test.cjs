@@ -85,6 +85,7 @@ test('downloads publish only verified artifacts and failed replacements preserve
   const store = new ModelStore(directory);
   let response = serve(body);
   try {
+    await fs.writeFile(store.path('tiny'), 'Entry not found');
     await store.fetch(model);
     assert.equal(await fs.readFile(store.path('tiny'), 'utf8'), 'model');
     response.mock.restore(); response = serve(Buffer.from('wrong'));
@@ -95,4 +96,44 @@ test('downloads publish only verified artifacts and failed replacements preserve
     assert.deepEqual(await fs.readdir(directory), ['ggml-tiny.bin']);
     assert.equal((await store.list()).find(model => model.name === 'tiny').installed, false);
   } finally { response.mock.restore(); await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test('installed verification rejects same-size corruption and invalidates cached results after replacement', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'speech-integrity-test-'));
+  const body = Buffer.from('valid');
+  const model = { ...speechModel('tiny'), sizeBytes: body.length, sha256: createHash('sha256').update(body).digest('hex') };
+  const store = new ModelStore(directory);
+  const target = store.path(model.name);
+  try {
+    await fs.writeFile(target, 'wrong');
+    assert.equal(await store.installed(model), false);
+    await fs.writeFile(target + '.replacement', body);
+    await fs.rename(target + '.replacement', target);
+    assert.equal(await store.installed(model), true);
+    assert.equal(await store.installed(model), true);
+    await fs.writeFile(target + '.replacement', 'wrong');
+    await fs.rename(target + '.replacement', target);
+    assert.equal(await store.installed(model), false);
+    await fs.writeFile(target, 'Entry not found');
+    assert.equal(await store.installed(model), false);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test('catalog refresh preserves independent concurrent downloads and duplicate requests share work', async () => {
+  const store = new ModelStore('/unused');
+  const releases = new Map();
+  store.fetch = async model => new Promise((resolve, reject) => releases.set(model.name, { resolve, reject }));
+  const medium = store.download('medium');
+  const large = store.download('large');
+  assert.equal(store.download('medium'), medium);
+  let list = await store.list();
+  assert.equal(list.find(model => model.name === 'medium').downloading, true);
+  assert.equal(list.find(model => model.name === 'large').downloading, true);
+  releases.get('large').reject(new Error('HTTP 404'));
+  await assert.rejects(large, /404/);
+  list = await store.list();
+  assert.equal(list.find(model => model.name === 'large').downloading, false);
+  assert.equal(list.find(model => model.name === 'medium').downloading, true);
+  releases.get('medium').resolve(); await medium;
+  assert.equal((await store.list()).some(model => model.downloading), false);
 });

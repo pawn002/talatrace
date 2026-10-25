@@ -33,6 +33,12 @@ A separate control eliminates the midpoint-cut concern: two **complete utterance
 
 For this app's pause-rich interview use, investigating that omitted continuation takes priority over replacing quality badges with a simplistic ranking. Do not promote Parakeet as the preferred interview model solely from its clean-speech speed. Turbo provides a useful comparison point, while speech-free hallucinations remain a separate behavior to track. The default model is unchanged.
 
+### Native isolation follow-up
+
+Ran the same complete-utterance pair directly through the shipped Parakeet CLI, bypassing the app's conversion, VAD and transcript parser. Both the auto backend (diagnostics confirm Vulkan) and strict CPU transcribed the one-second-gap input completely and omitted the second sentence on the 30-second-gap input. The omission is already present in the raw JSONL `text`. This rules out our Angular UI/parser and a Vulkan-only failure as the cause of this reproduction. It does not distinguish the underlying model, quantized conversion, runtime decoder or shipped CLI adapter. Raw output and native diagnostics are retained under `benchmarks/results/parakeet-native-isolation/`.
+
+Next: compare token timing enabled/disabled and the pinned runtime against upstream fixes using this same fixture. If a runtime fix is unavailable, test partitioning the audio inside long detected gaps, retaining every audio sample and mapping chunk-relative token times back to the original timeline. Verify the exact missing continuation and silence behavior before expanding the corpus. Keep this separate from suppressing hallucinations or deleting recognition text based on VAD disagreement.
+
 ## Artifacts and reproducibility
 
 - Main results: `benchmarks/results/librispeech-12-2026-10-25/results.json` and `summary.md`.
