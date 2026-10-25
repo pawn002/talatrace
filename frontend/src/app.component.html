@@ -2,14 +2,15 @@
   <img src="favicon.svg" class="app-logo" alt="" aria-hidden="true" width="28" height="28">
   <span class="app-title">{{ title }}</span>
   <div class="theme-control">
-    <span class="theme-label" aria-hidden="true">Theme</span>
     <fieldset id="theme-control" class="theme-track" role="radiogroup" aria-labelledby="theme-legend" (keydown)="onThemeKeydown($event)">
       <legend id="theme-legend" class="theme-legend">Theme</legend>
       @for (option of themeOptions; track option.value) {
-        <label class="theme-option">
-          <input type="radio" name="appearance" [value]="option.value" [checked]="themePreference === option.value" (change)="onThemeChange($event)">
-          <span class="theme-choice">{{ option.label }}</span>
-        </label>
+        <candor-tooltip [text]="option.value === 'system' ? 'Follow system appearance' : option.label + ' theme'" position="bottom">
+          <label class="theme-option">
+            <input type="radio" name="appearance" [value]="option.value" [attr.aria-label]="option.label" [attr.aria-description]="option.value === 'system' ? 'Follows the light or dark appearance of your device.' : null" [checked]="themePreference === option.value" (change)="onThemeChange($event)">
+            <span class="theme-choice" aria-hidden="true"><i [class]="'ph-bold ph-' + option.icon" aria-hidden="true"></i></span>
+          </label>
+        </candor-tooltip>
       }
     </fieldset>
   </div>

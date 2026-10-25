@@ -125,7 +125,8 @@ app.whenReady().then(async () => {
       if (button('Record answer') || button('Stop & transcribe')) throw new Error('Recording controls leaked into the file subtab');
       if (document.querySelector('.result-section')) throw new Error('Recording transcript leaked into the file subtab');
       button('Choose audio file').click();
-      for (let i = 0; i < 100 && !document.querySelector('.file-info'); i++) await wait(100);
+      for (let i = 0; i < 100 && document.querySelector('.file-name')?.textContent === 'No file selected'; i++) await wait(100);
+      if (!document.querySelector('[data-action=choose-file]').closest('.step-card').querySelector('.file-info')) throw new Error('Selected file is detached from the Choose step');
       requirePrimary('Transcribe file');
       button('Transcribe file').click();
       await wait(100);

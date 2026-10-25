@@ -78,12 +78,16 @@ app.whenReady().then(async () => {
     metrics.push(await win.webContents.executeJavaScript(`(() => {
       const panel = document.querySelector('.app-container');
       const controls = [...document.querySelectorAll('.workflow-controls button')];
+      const stop = document.querySelector('[data-action=stop]');
+      const spectrum = document.querySelector('app-audio-spectrum');
+      if (stop?.checkVisibility() && spectrum?.checkVisibility() && spectrum.getBoundingClientRect().top < stop.getBoundingClientRect().bottom) throw new Error('Microphone feedback is not below Stop & transcribe');
       const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1;
       const context = canvas.getContext('2d', { willReadFrequently: true });
       const rgba = value => { context.clearRect(0, 0, 1, 1); context.fillStyle = value; context.fillRect(0, 0, 1, 1); return [...context.getImageData(0, 0, 1, 1).data]; };
       const blend = (front, back) => front.slice(0, 3).map((v, i) => v * front[3] / 255 + back[i] * (1 - front[3] / 255));
       const resolvedBackground = el => {
-        if (el.matches('.theme-choice') && rgba(getComputedStyle(el).backgroundColor)[3] === 0) return getComputedStyle(el.closest('.theme-track'), '::before').backgroundColor;
+        const choice = el.closest('.theme-choice');
+        if (choice && rgba(getComputedStyle(choice).backgroundColor)[3] === 0) return getComputedStyle(choice.closest('.theme-track'), '::before').backgroundColor;
         const chain = []; for (let parent = el; parent; parent = parent.parentElement) chain.unshift(parent);
         const rgb = chain.reduce((back, item) => blend(rgba(getComputedStyle(item.localName === 'candor-card' ? item.shadowRoot.querySelector('.card') : item).backgroundColor), back), [255, 255, 255]);
         return 'rgb(' + rgb.map(Math.round).join(', ') + ')';
@@ -116,7 +120,7 @@ app.whenReady().then(async () => {
         if (icon.maskImage === 'none' || parseFloat(icon.width) !== 16) throw new Error('Disclosure icon is absent or incorrectly sized');
         colourPairs.push({ selector: host.classList.contains('timing-details') ? 'timing help mask' : 'settings gear mask', foreground: icon.backgroundColor, background: resolvedBackground(host), nonText: true });
       }
-      for (const selector of ['.source-help', '.action-reason', '#history-refresh-status', '.theme-label', '.theme-choice', '.spectrum-label', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
+      for (const selector of ['.file-name', '.file-size', '.source-help', '.action-reason', '#history-refresh-status', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
         for (const el of document.querySelectorAll(selector)) {
           if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
@@ -257,7 +261,7 @@ app.whenReady().then(async () => {
     if (await win.webContents.executeJavaScript("document.querySelector('.spectrum-display').getAttribute('data-mode')") !== 'levels') throw new Error('Reduced motion still scrolls the spectrum');
     await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
     await win.webContents.executeJavaScript("window.previewGain.gain.value = 0"); await wait(500); await capture('recording-quiet');
-    if (await win.webContents.executeJavaScript("document.querySelector('.spectrum-label').textContent") !== 'Recording') throw new Error('Quiet input hid the active recording label');
+    if (!await win.webContents.executeJavaScript("document.querySelector('.workflow-status h3').textContent.includes('Recording') && document.querySelector('.local-badge').textContent.includes('Recording') && !document.querySelector('.spectrum-label')")) throw new Error('Quiet input lost the main recording status or retained a redundant spectrum label');
     await win.webContents.executeJavaScript("window.previewGain.gain.value = 0.2");
     await win.webContents.executeJavaScript(`(() => {
       if (document.querySelector('#app-tab-models').disabled || document.querySelector('#app-tab-history').disabled) throw new Error('Main views unnecessarily locked during recording');
@@ -347,6 +351,7 @@ app.whenReady().then(async () => {
     await wait(1100);
 
     await click('#audio-file-tab'); await capture('audio-file');
+    nativeTheme.themeSource = 'light'; await wait(250); await capture('file-empty-light'); nativeTheme.themeSource = 'dark';
     failPicker = true; await click('[data-action="choose-file"]'); await wait(100); await capture('candor-toast');
     if (!await win.webContents.executeJavaScript("document.querySelector('candor-toast-container').shadowRoot.querySelector('.live--assertive').textContent.includes('Failed to select file')")) throw new Error('Toast was not added to the persistent assertive region');
     win.setSize(360, 780); await capture('candor-toast-small'); win.setSize(1100, 820);
@@ -354,10 +359,15 @@ app.whenReady().then(async () => {
     await win.webContents.executeJavaScript("document.querySelector('candor-toast').shadowRoot.querySelector('[aria-label=Dismiss]').click()");
     if (await win.webContents.executeJavaScript("!!document.querySelector('candor-toast')")) throw new Error('Dismiss did not remove the toast');
     await click('[data-action="choose-file"]'); await wait(100); await capture('file-selected');
+    if (!await win.webContents.executeJavaScript("document.querySelector('[data-action=choose-file]').closest('.step-card').querySelector('.file-name').textContent === 'interview-answer.wav' && document.querySelector('.file-info').textContent.includes('5 MB') && !document.querySelector('.record-actions .file-info')")) throw new Error('Selected file is not grouped with its Choose action');
+    nativeTheme.themeSource = 'light'; await wait(250); await capture('file-selected-light'); nativeTheme.themeSource = 'dark';
+    win.setSize(360, 780); await capture('file-selected-small'); win.setSize(1100, 820);
     filename = 'Research-interview-session-about-complex-decisions-and-unclear-expectations-with-detailed-follow-up-notes-2026-10-24.wav';
     await click('[data-action="choose-file"]'); await wait(100);
     win.setSize(360, 780); await capture('file-long-name'); win.setSize(1100, 820);
+    nativeTheme.themeSource = 'light'; await wait(250); await capture('file-long-name-light'); nativeTheme.themeSource = 'dark';
     await click('[data-action="transcribe"]'); await capture('file-processing'); await wait(1000);
+    if (!await win.webContents.executeJavaScript("document.querySelector('[data-action=choose-file]').closest('.step-card').querySelector('.file-name').textContent.includes('Research-interview')")) throw new Error('Transcription lost selected-file context');
     await capture('file-result');
     if (!await win.webContents.executeJavaScript("document.querySelector('[data-action=choose-file]').textContent.includes('Choose another file')")) throw new Error('File result does not offer another file');
     await click('#record-audio-tab');
@@ -380,10 +390,14 @@ app.whenReady().then(async () => {
     await click('#app-tab-models'); await capture('models');
     await win.webContents.executeJavaScript("document.querySelector('.models-page tbody tr:last-child').scrollIntoView({ block: 'center' })");
     await capture('models-added');
+    await win.webContents.executeJavaScript("document.querySelector('.models-page .info-alert').scrollIntoView({ block: 'end' })");
+    await capture('models-guidance');
     await win.webContents.executeJavaScript("document.querySelector('.app-container').scrollTop = 0");
     nativeTheme.themeSource = 'light'; await wait(350); await capture('models-light');
     nativeTheme.themeSource = 'dark'; await wait(350);
     win.setSize(360, 780); await capture('models-small');
+    await win.webContents.executeJavaScript("document.querySelector('.models-page .info-alert').scrollIntoView({ block: 'end' })");
+    await capture('models-guidance-small');
     if (!await win.webContents.executeJavaScript("document.querySelector('#app-panel-models .table-container').tabIndex === 0")) throw new Error('Overflowing table is not keyboard reachable');
     win.setSize(1100, 820); await wait(150);
     if (await win.webContents.executeJavaScript("document.querySelector('#app-panel-models .table-container').hasAttribute('tabindex')")) throw new Error('Fitting table adds an unnecessary tab stop');
@@ -461,6 +475,15 @@ app.whenReady().then(async () => {
     nativeTheme.themeSource = 'dark'; await wait(350); await capture('theme-system-dark');
     if (await pageColour() !== explicitDark) throw new Error('System did not follow the dark OS theme');
     if (!await win.webContents.executeJavaScript("!document.documentElement.hasAttribute('data-theme') && document.querySelector('#theme-control').getAttribute('aria-labelledby') === 'theme-legend' && document.querySelector('#theme-legend').textContent === 'Theme'")) throw new Error('System/theme accessible name contract failed');
+    await win.webContents.debugger.sendCommand('Accessibility.enable');
+    const accessibility = await win.webContents.debugger.sendCommand('Accessibility.getFullAXTree');
+    const themeRadios = accessibility.nodes.filter(node => !node.ignored && node.role?.value === 'radio');
+    const themeGroup = accessibility.nodes.find(node => !node.ignored && node.role?.value === 'radiogroup' && node.name?.value === 'Theme');
+    if (!themeGroup || themeRadios.length !== 3 || !['Light', 'Dark', 'System'].every(name => themeRadios.some(node => node.name?.value === name))) throw new Error('Theme group/options lack real accessibility-tree names');
+    if (!themeRadios.find(node => node.name.value === 'System').description?.value?.includes('appearance of your device')) throw new Error('System option does not describe its automatic appearance behavior');
+    const checkedRadios = themeRadios.filter(node => node.properties?.some(property => property.name === 'checked' && String(property.value.value) === 'true'));
+    if (checkedRadios.length !== 1 || checkedRadios[0].name.value !== 'System') throw new Error('Theme checked state is missing from the accessibility tree');
+    await fs.writeFile(path.join(output, 'theme-accessibility.json'), JSON.stringify({ group: themeGroup.name.value, radios: themeRadios.map(node => ({ name: node.name.value, description: node.description?.value, properties: node.properties })) }, null, 2));
     await win.webContents.executeJavaScript("document.querySelector('#theme-control input:checked').focus()");
     const themeKey = async (key, code) => {
       await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key, windowsVirtualKeyCode: code });
@@ -482,7 +505,20 @@ app.whenReady().then(async () => {
     await themeKey('Tab', 9); // Return focus below the group before refocusing for a keyboard-visible ring.
     await win.webContents.executeJavaScript("document.querySelector('#theme-control input:checked').focus()");
     await capture('theme-keyboard-focus');
+    const themeBubbleVisible = () => win.webContents.executeJavaScript("document.querySelector('#theme-control input[value=system]').closest('candor-tooltip').shadowRoot.querySelector('.tooltip__bubble').matches(':popover-open')");
+    if (!await themeBubbleVisible()) throw new Error('Theme tooltip is unavailable on radio focus');
+    await themeKey('Escape', 27);
+    if (await themeBubbleVisible()) throw new Error('Escape did not dismiss theme tooltip');
     win.setSize(360, 780); await capture('theme-small');
+    await win.webContents.executeJavaScript("document.querySelector('#app-tab-transcription').focus()");
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 10, y: 200 }); await wait(100);
+    const themePoint = await win.webContents.executeJavaScript("(() => { const r = document.querySelector('#theme-control input[value=system]').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()");
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', ...themePoint });
+    await wait(200); await capture('theme-tooltip-small');
+    if (!await themeBubbleVisible()) throw new Error('Theme tooltip is unavailable on hover');
+    const themeBubblePoint = await win.webContents.executeJavaScript("(() => { const bubble = document.querySelector('#theme-control input[value=system]').closest('candor-tooltip').shadowRoot.querySelector('.tooltip__bubble'); const r=bubble.getBoundingClientRect(); if (bubble.getAttribute('aria-hidden') !== 'true' || r.left<0 || r.right>innerWidth || r.top<0 || r.bottom>innerHeight || document.querySelector('#theme-control input[value=system]').hasAttribute('aria-describedby')) throw new Error('Theme tooltip contract/placement failed'); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()");
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', ...themeBubblePoint }); await wait(100);
+    if (!await themeBubbleVisible()) throw new Error('Theme tooltip disappears on pointer entry');
     await fs.writeFile(path.join(output, 'metrics.json'), JSON.stringify(metrics, null, 2));
     console.log('Visual review:', output);
     clearTimeout(watchdog);

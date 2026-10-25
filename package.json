@@ -27,6 +27,8 @@
     "build:whisper-sycl": "node scripts/build-whisper-variants.js --variant=sycl",
     "build:whisper-openvino": "node scripts/build-whisper-variants.js --variant=openvino",
     "benchmark": "node scripts/benchmark-variants.js",
+    "eval:speech:prepare": "python scripts/prepare-speech-eval.py",
+    "eval:speech": "npm run build:electron && electron scripts/evaluate-speech-models.cjs",
     "clean": "node -e \"['dist','frontend/dist','frontend/.angular'].forEach(d=>{try{require('fs').rmSync(d,{recursive:true,force:true})}catch(e){}})\"",
     "clean:release": "node -e \"require('fs').rmSync('release',{recursive:true,force:true})\"",
     "dist": "npm run build && electron-builder",

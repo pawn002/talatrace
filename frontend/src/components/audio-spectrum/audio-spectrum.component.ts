@@ -4,7 +4,6 @@ import { AudioRecorderService } from '../../services/audio-recorder.service';
 @Component({
   selector: 'app-audio-spectrum', standalone: true,
   template: `
-    <strong class="spectrum-label" [class.spectrum-label--active]="active">{{ active ? 'Recording' : 'Microphone off' }}</strong>
     <div class="spectrum-display" [attr.data-mode]="active && available ? (reducedMotion ? 'levels' : 'spectrogram') : 'idle'">
       <canvas #spectrum aria-hidden="true"></canvas>
       @if (active && unavailable) { <span class="spectrum-fallback">Audio display unavailable</span> }

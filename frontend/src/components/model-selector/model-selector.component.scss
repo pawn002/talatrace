@@ -22,7 +22,8 @@
   color: var(--color-text-default);
 }
 
-.info-alert { margin-bottom: var(--spacing-md); }
+.guidance-divider { border: 0; border-top: var(--border-width-thin) solid var(--color-border-default); margin: var(--spacing-lg) 0 var(--spacing-md); }
+.info-alert { margin: 0; }
 .model-description { margin-top: var(--spacing-xs); font: var(--font-size-md)/var(--line-height-relaxed) var(--font-family-reading); color: var(--color-text-default); max-width: 24ch; }
 
 .table-container {

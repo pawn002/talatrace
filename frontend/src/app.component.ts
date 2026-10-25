@@ -15,7 +15,7 @@ export class AppComponent implements OnInit {
   systemInfo: any = null;
   activeTab = 0;
   themePreference = readThemePreference();
-  readonly themeOptions = [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }, { value: 'system', label: 'System' }];
+  readonly themeOptions = [{ value: 'light', label: 'Light', icon: 'sun' }, { value: 'dark', label: 'Dark', icon: 'moon' }, { value: 'system', label: 'System', icon: 'desktop' }];
 
   onThemeChange(event: Event): void {
     if (!(event.target instanceof HTMLInputElement) || !event.target.checked) return;

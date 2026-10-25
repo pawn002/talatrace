@@ -361,6 +361,10 @@ While recording or transcribing, you can visit Models or History and return to T
 
 After an answer, **Record another** starts a new recording in the same workflow. Once a file is selected, **Choose another file…** lets you select the next recording; cancelling the picker keeps the current file and transcript. The transcript footer's question icon opens **About timing and pause detection**.
 
+The **Choose** card shows the selected audio filename and size beneath the picker button, including while transcription is running. Long filenames wrap so the complete name remains readable.
+
+The recording workflow uses the same action-then-feedback order: the live spectrum appears beneath **Stop & transcribe**. Recording status is shown in the main workflow heading and app header.
+
 ## Appearance
 
-Use the three-position **Theme** control in the app header to choose **Light**, **Dark**, or **System**. Changes apply immediately. Tab into the group, then use the arrow keys to select a mode; Home and End select the first and last options. System is the default and follows the operating system, including changes while the app is open. Light and Dark override the system preference for this app. The choice is stored locally and restored on reload or restart. Theme switching is available during recording and does not interrupt capture.
+Use the sun (**Light**), moon (**Dark**), or desktop (**System**) icons in the app header to choose an appearance. Each option has a programmatic name and a Candor tooltip on hover or keyboard focus. Changes apply immediately. Tab into the Theme group, then use the arrow keys to select a mode; Home and End select the first and last options. System is the default and follows the operating system, including changes while the app is open. Light and Dark override the system preference for this app. The choice is stored locally and restored on reload or restart. Theme switching is available during recording and does not interrupt capture.

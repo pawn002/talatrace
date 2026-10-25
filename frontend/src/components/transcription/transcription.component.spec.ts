@@ -292,11 +292,18 @@ describe('TranscriptionComponent', () => {
       component.availableModels = [{ id: 'base', name: 'Base', installed: true }];
       component.switchWorkflow('file');
       component.selectedFilePath = '/audio/answer.wav';
+      component.selectedFileSize = 0;
       fixture.detectChanges();
       const primary = fixture.nativeElement.querySelectorAll('button.button--primary');
       expect(primary).toHaveLength(1);
       expect(primary[0].textContent).toContain('Transcribe file');
       expect(fixture.nativeElement.textContent).toContain('answer.wav');
+      const chooseCard = fixture.nativeElement.querySelector('[data-action="choose-file"]').closest('candor-card');
+      expect(chooseCard.querySelector('.file-name').textContent).toBe('answer.wav');
+      expect(chooseCard.querySelector('.file-size').textContent).toBe('0 Bytes');
+      component.isTranscribing = true;
+      fixture.detectChanges();
+      expect(chooseCard.querySelector('.file-name').textContent).toBe('answer.wav');
     });
 
     it('separates workflow controls and restores each workflow’s input, transcript and duration', () => {
