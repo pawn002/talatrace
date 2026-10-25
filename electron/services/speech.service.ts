@@ -4,7 +4,7 @@ import { WhisperService } from './whisper.service';
 import { TranscribeEngine } from './transcribe-engine';
 import { ModelStore } from './model-store';
 import { speechModel } from './model-catalog';
-import { RecognitionEngine } from './recognition-engine';
+import { RecognitionEngine, RecognitionContext } from './recognition-engine';
 import { TranscriptionOptions, TranscriptionResult } from './types';
 
 /** Share preprocessing/VAD while selecting recognition independently of the workflow. */
@@ -32,10 +32,16 @@ export class SpeechService implements RecognitionEngine {
     return this.models.download(name, progress);
   }
 
-  async transcribe(input: string, options: TranscriptionOptions, progress?: (progress: number) => void): Promise<TranscriptionResult> {
+  async transcribe(input: string, options: TranscriptionOptions, progress?: (progress: number) => void, context?: RecognitionContext): Promise<TranscriptionResult> {
     await this.initialize();
     const model = speechModel(options.model);
     const engine: RecognitionEngine = model.engine === 'whisper.cpp' ? this.whisper : this.alternate;
-    return { ...await engine.transcribe(input, options, progress), engine: model.engine, model: model.name, modelName: model.displayName };
+    let warning: string | undefined;
+    if (model.engine === 'transcribe.cpp' && context?.noSpeechIntervals === undefined) {
+      try { context = { noSpeechIntervals: (await this.whisper.detectSpeechActivity(input)).noSpeechIntervals }; }
+      catch { warning = 'Speech detection unavailable. Parakeet could not partition long pauses; speech after long pauses may be missed.'; }
+    }
+    return { ...await engine.transcribe(input, options, progress, context),
+      ...(warning ? { speechDetectionWarning: warning } : {}), engine: model.engine, model: model.name, modelName: model.displayName };
   }
 }

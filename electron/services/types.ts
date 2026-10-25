@@ -31,6 +31,7 @@ export interface TranscriptionResult {
   noSpeechIntervals?: Array<{ start: number; end: number }>;
   speechDetectionMethod?: 'silero-v5.1.2';
   speechDetectionWarning?: string;
+  recognitionChunks?: Array<{ start: number; end: number }>;
 }
 
 export interface TranscriptionJob {

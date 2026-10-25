@@ -35,6 +35,14 @@ Remove-Item Env:SPEECH_EVAL_ONLY,Env:SPEECH_EVAL_REPEATS
 
 These optional variables filter catalog model IDs and set repeat count (0–10). Omit them for all complete installed models and three repeats.
 
+After a focused Parakeet boundary evaluation, gate its actual output with:
+
+```powershell
+node tests/electron/parakeet-pause-regression.cjs benchmarks/results/my-boundary-run/results.json
+```
+
+This checks complete reference recognition, the continuation's original-clock timing, retained pause metadata and continuous coverage of the audio by the partitions. It rejects the original unpartitioned failure. Use the boundary manifest and include Parakeet when producing that result directory.
+
 ## Corpus and measurements
 
 The default selection contains one 14–30-word utterance from each of 12 distinct speakers, six female and six male according to corpus metadata. Speakers and utterances are chosen by a fixed SHA-256 ordering, before looking at recognition results. Three of those utterances also have a 30-second gap inserted midway and an independent additive white-noise variant at 10 dB signal-to-noise ratio. Two 30-second speech-free clips contain digital silence or quiet white noise. Three repeats of the first clean clip expose repeated-run latency. Noise/pause variants reuse source utterances and are not independent samples.

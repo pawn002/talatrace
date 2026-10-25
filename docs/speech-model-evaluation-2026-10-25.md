@@ -39,6 +39,27 @@ Ran the same complete-utterance pair directly through the shipped Parakeet CLI, 
 
 Next: compare token timing enabled/disabled and the pinned runtime against upstream fixes using this same fixture. If a runtime fix is unavailable, test partitioning the audio inside long detected gaps, retaining every audio sample and mapping chunk-relative token times back to the original timeline. Verify the exact missing continuation and silence behavior before expanding the corpus. Keep this separate from suppressing hallucinations or deleting recognition text based on VAD disagreement.
 
+### Implemented pause mitigation
+
+Disabling timestamps did not change the native omission. The latest published upstream release remained v0.4.1, and [upstream issue #71](https://github.com/handy-computer/transcribe.cpp/issues/71) reports a similar open omission problem. This is related evidence, not proof that every reported omission has the same cause.
+
+The app now partitions normalized PCM inside detector-estimated gaps of at least five seconds. It inserts at least a midpoint boundary; longer gaps receive enough boundaries to keep the quiet portions of each partition at most 15 seconds. No samples are removed, including any faint speech or sound the detector labelled incorrectly. The original samples appear exactly once across contiguous pieces, submitted through one native batch. Recognition text is concatenated in file order and token times are shifted by each piece's original start time. Missing/out-of-order/failed batch results are errors, and malformed timings preserve the full recognized text with a warning. Existing detector results are reused; file workflows obtain them when needed. Detector failure uses the original full-input path with an explicit warning.
+
+The original complete-utterance control now has **zero word errors with both the one-second and 30-second gaps**. The continuation begins at approximately 36.96 seconds on the original clock, and the detector's original 6.91–37.35-second pause remains in the result. A native regression gate checks the actual output, timeline and coverage; it rejects the saved defective baseline and passes the new result.
+
+Re-ran the entire 23-job Parakeet baseline with the mitigation:
+
+| Condition | Before | After |
+| --- | ---: | ---: |
+| Clean speech | 5 / 265 errors | 5 / 265 errors |
+| Three midpoint-pause clips | 24 / 61 errors | 2 / 61 errors |
+| Three noisy clips | 1 / 61 errors | 1 / 61 errors |
+| Silence / noise-only | Empty / empty | Empty / empty |
+
+The remaining midpoint-pause errors include recognition near an artificially split word; this is not presented as perfect detection or transcription. No complete continuation is omitted in the controlled sentence-boundary test. Long-gap partitioning is a mitigation for the reproduced case, not a guarantee against the upstream family's other context-sensitive omissions. The shipped native model/runtime and default model selection remain unchanged.
+
+Post-change artifacts: `benchmarks/results/parakeet-partitioned-baseline/` and `benchmarks/results/parakeet-partitioned-boundary/`. All 35 Electron tests pass, including byte-for-byte PCM preservation, boundary planning, shifted timing, failed/missing batch rows and text preservation on timing disagreement. Offline fake-microphone smokes pass recording, timed Copy, file import and repeat recording for both Parakeet and Whisper Base with HTTP(S) blocked. No frontend widgets were changed for this mitigation.
+
 ## Artifacts and reproducibility
 
 - Main results: `benchmarks/results/librispeech-12-2026-10-25/results.json` and `summary.md`.

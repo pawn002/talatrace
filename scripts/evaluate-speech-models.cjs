@@ -101,6 +101,7 @@ app.whenReady().then(async () => {
         duration: job.audioDuration ?? item.duration, processingMs: job.transcriptionTime, wallMs: Date.now() - started,
         error: job.error, text: job.result?.text, segments: job.result?.segments,
         noSpeechIntervals: job.result?.noSpeechIntervals, timingMethod: job.result?.timingMethod,
+        recognitionChunks: job.result?.recognitionChunks,
         alignmentWarning: job.result?.alignmentWarning, speechDetectionWarning: job.result?.speechDetectionWarning };
       if (!row.error) row.score = score(item.reference, row.text);
       report.runs.push(row); save();

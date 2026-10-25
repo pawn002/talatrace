@@ -1,11 +1,11 @@
 import { spawn } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { RecognitionEngine } from './recognition-engine';
+import { RecognitionEngine, RecognitionContext } from './recognition-engine';
 import { TranscriptionOptions, TranscriptionResult } from './types';
 import { speechModel } from './model-catalog';
 import { ModelStore } from './model-store';
-import { parseTransducerTranscript } from './transducer-transcript';
+import { prepareParakeetChunks, parseParakeetChunks } from './parakeet-chunks';
 
 export class TranscribeEngine implements RecognitionEngine {
   readonly binary: string;
@@ -22,7 +22,7 @@ export class TranscribeEngine implements RecognitionEngine {
     } catch { return false; }
   }
 
-  async transcribe(audioPath: string, options: TranscriptionOptions, progress?: (progress: number) => void): Promise<TranscriptionResult> {
+  async transcribe(audioPath: string, options: TranscriptionOptions, progress?: (progress: number) => void, context?: RecognitionContext): Promise<TranscriptionResult> {
     const model = speechModel(options.model);
     if (model.engine !== 'transcribe.cpp') throw new Error('Unsupported alternate speech model');
     if (options.translate) throw new Error('Parakeet transcribes speech; it does not translate. Choose a Whisper model for translation.');
@@ -33,8 +33,9 @@ export class TranscribeEngine implements RecognitionEngine {
     const wav = await this.convert(audioPath);
     const workspace = path.dirname(wav);
     try {
+      const chunks = await prepareParakeetChunks(wav, context?.noSpeechIntervals || []);
       const batch = path.join(workspace, 'input.txt');
-      await fs.writeFile(batch, wav + '\n');
+      await fs.writeFile(batch, chunks.map(chunk => chunk.file).join('\n') + '\n');
       const output = await new Promise<string>((resolve, reject) => {
         const args = ['-m', this.models.path(model.name), '--batch', batch, '--batch-jsonl', '--timestamps', 'token', '--threads', String(options.threads || 4), '--backend', 'auto', '-q'];
         if (options.language && options.language !== 'auto') args.push('-l', options.language);
@@ -47,7 +48,7 @@ export class TranscribeEngine implements RecognitionEngine {
         child.on('close', code => code === 0 ? resolve(stdout) : reject(new Error(`Parakeet transcription failed (exit ${code}). ${diagnostic}`)));
       });
       progress?.(100);
-      return { ...parseTransducerTranscript(output), engine: model.engine, model: model.name };
+      return { ...parseParakeetChunks(output, chunks), engine: model.engine, model: model.name };
     } finally { await fs.rm(workspace, { recursive: true, force: true }); }
   }
 }

@@ -36,7 +36,9 @@ Completed results show the model, decoded audio duration, total processing time 
 
 Whisper recordings request its model-specific DTW alignment where supported, including the Turbo preset. Parakeet exposes native token timestamps through the app's pinned CLI adapter. Both are estimates rather than exact word boundaries. Closing punctuation can be emitted late; it attaches to the preceding text without extending speech into silence.
 
-Silero speech detection and quiet-level measurements run independently of recognition. They do not remove samples or change the recording clock. Recognition remains visible where detectors disagree. Invalid or incomplete token alignment preserves the full text with a warning instead of inventing timestamps. Long pauses are context, not evidence of thinking time.
+Parakeet partitions normalized audio inside detector-estimated gaps of at least five seconds. This mitigates a reproduced native failure where speech after a long pause was silently omitted. Every audio sample is retained, including sound the detector may have missed; gaps select boundaries rather than removing audio. All pieces are decoded in one native batch, and token times are shifted back onto the original recording clock. Long gaps remain in the transcript metadata. JSON exports include `recognitionChunks` for auditing. If speech detection is unavailable, recognition falls back to the full input with a warning that the pause mitigation could not run. This does not resolve every kind of native omission.
+
+Silero speech detection and quiet-level measurements estimate gaps independently of recognition. They do not remove samples or change the recording clock. Recognition remains visible where detectors disagree. Invalid or incomplete token alignment preserves the full text with a warning instead of inventing timestamps. Long pauses are context, not evidence of thinking time.
 
 ## Development and packaging
 

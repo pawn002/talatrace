@@ -98,7 +98,8 @@ export class TranscriptionService {
             job.progress,
             'Transcribing audio'
           );
-        }
+        },
+        { noSpeechIntervals: speechActivity.noSpeechIntervals }
       );
 
       job.transcriptionTime = performance.now() - processingStartTime;
