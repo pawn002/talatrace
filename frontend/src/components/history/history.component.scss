@@ -70,5 +70,6 @@
 }
 
 .status-text { display: inline-flex; align-items: center; gap: var(--spacing-xs); color: var(--color-text-default); }
-.status-text i { color: var(--color-status-success); }
+.status-text i { color: var(--color-text-subtle); }
+.status-text--success i { color: var(--color-status-success); }
 .status-text--error i { color: var(--color-status-error); }

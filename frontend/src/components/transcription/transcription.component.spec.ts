@@ -144,6 +144,17 @@ describe('TranscriptionComponent', () => {
 
   // ─── startTranscription guard ─────────────────────────────────────────────
 
+  it('keeps the previous file and transcript when choosing another file is cancelled', async () => {
+    component.inputMode = 'file';
+    component.selectedFilePath = '/audio/previous.wav';
+    const previousResult = { text: 'Previous answer' };
+    component.transcriptionResult = previousResult;
+    electronStub.selectAudioFile.mockResolvedValue(null);
+    await component.selectAudioFile();
+    expect(component.selectedFilePath).toBe('/audio/previous.wav');
+    expect(component.transcriptionResult).toBe(previousResult);
+  });
+
   it('shows a toast and returns early when no file is selected', async () => {
     component.selectedFilePath = null;
 
@@ -205,6 +216,7 @@ describe('TranscriptionComponent', () => {
       expect(record.disabled).toBe(false);
       expect(stop.disabled).toBe(true);
       expect(copy.disabled).toBe(true);
+      expect(component.sourceHint).toBe('');
       component.isRecording = true;
       fixture.detectChanges();
       expect(record.disabled).toBe(true);
@@ -223,6 +235,7 @@ describe('TranscriptionComponent', () => {
       component.isTranscribing = false;
       component.recordedAudio = new Blob(['audio']);
       fixture.detectChanges();
+      expect(record.textContent).toContain('Record another');
       expect(fixture.nativeElement.querySelector('[data-action="transcribe"]')).toBeNull();
       component.recordingError = 'Transcription failed';
       fixture.detectChanges();
@@ -235,6 +248,7 @@ describe('TranscriptionComponent', () => {
       expect(record.disabled).toBe(false);
       expect(stop.disabled).toBe(true);
       expect(copy.disabled).toBe(false);
+      expect(record.textContent).toContain('Record another');
       expect([...fixture.nativeElement.querySelectorAll('.workflow-controls button')]).toEqual(controls);
     });
 

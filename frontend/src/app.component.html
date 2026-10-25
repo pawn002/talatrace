@@ -13,7 +13,7 @@
       }
     </fieldset>
   </div>
-  <span class="local-badge" [class.local-badge--recording]="!!transcription?.isRecording"><i class="ph-bold" [class.ph-record]="!!transcription?.isRecording" [class.ph-shield-check]="!transcription?.isRecording" aria-hidden="true"></i> {{ transcription?.isRecording ? 'Recording' : transcription?.isTranscribing ? 'Transcribing' : 'On device' }}</span>
+  <span class="local-badge" [class.local-badge--recording]="!!transcription?.isRecording"><i class="ph-bold" [class.ph-record]="!!transcription?.isRecording" [class.ph-waveform]="!!transcription?.isTranscribing" [class.ph-shield-check]="!transcription?.isRecording && !transcription?.isTranscribing" aria-hidden="true"></i> {{ transcription?.isRecording ? 'Recording' : transcription?.isTranscribing ? 'Transcribing' : 'On device' }}</span>
 </header>
 
 <div class="app-container">
@@ -29,7 +29,7 @@
         [attr.aria-selected]="activeTab === 0"
         (click)="activeTab = 0"
         >
-        Transcription
+        <i class="ph-fill ph-microphone" aria-hidden="true"></i> Transcription
       </button>
       <button
         class="tabs__tab"
@@ -41,7 +41,7 @@
         [attr.aria-selected]="activeTab === 1"
         (click)="activeTab = 1"
         >
-        Models
+        <i class="ph-fill ph-cpu" aria-hidden="true"></i> Models
       </button>
       <button
         class="tabs__tab"
@@ -53,7 +53,7 @@
         [attr.aria-selected]="activeTab === 2"
         (click)="activeTab = 2"
         >
-        History
+        <i class="ph-bold ph-clock-counter-clockwise" aria-hidden="true"></i> History
       </button>
     </div>
     <div class="tabs__panels">

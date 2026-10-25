@@ -12,7 +12,7 @@
         aria-label="Refresh history"
         aria-describedby="history-refresh-status"
         >
-        <i class="ph-fill ph-arrow-clockwise" aria-hidden="true"></i>
+        <i class="ph-bold ph-arrow-clockwise" aria-hidden="true"></i>
       </button></candor-tooltip>
     </div>
   </div>
@@ -21,7 +21,7 @@
 
     @if (!isLoading && history.length === 0) {
       <div class="empty-state">
-        <i class="ph-fill ph-clock-counter-clockwise" aria-hidden="true"></i>
+        <i class="ph-bold ph-clock-counter-clockwise" aria-hidden="true"></i>
         <p>No transcripts yet</p>
         <p class="hint">Completed recordings and files will appear here during this session.</p>
       </div>
@@ -49,7 +49,7 @@
               <tr>
                 <td class="file-cell">{{ item.fileName || "Unknown" }}</td>
                 <td>{{ item.options?.model || "base" }}</td>
-                <td><span class="status-text status-text--{{ getStatusVariant(item.status) }}">@if (item.status === "completed") { <i class="ph-bold ph-check-circle" aria-hidden="true"></i> } @else { <i class="ph-bold ph-info" aria-hidden="true"></i> }{{ item.status }}</span></td>
+                <td><span class="status-text status-text--{{ getStatusVariant(item.status) }}"><i [class]="'ph-bold ph-' + getStatusIcon(item.status)" aria-hidden="true"></i>{{ item.status }}</span></td>
                 <td class="cell--numeric">{{ formatDuration(item.audioDuration) }}</td>
                 <td class="cell--numeric">{{ formatTime(item.transcriptionTime) }}</td>
                 <td class="cell--mono">{{ formatTimestamp(item.startedAt) }}</td>

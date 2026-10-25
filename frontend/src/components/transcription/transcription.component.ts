@@ -323,7 +323,7 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
       ? `Copied ${this.includeTimestamps && this.hasTiming ? 'with timing and pauses' : 'as plain text'}. Paste into your chat or terminal.`
       : `Ready to copy ${this.includeTimestamps && this.hasTiming ? 'with timing and pauses' : 'as plain text'}.`;
     if (!this.hasInstalledModel) return 'Download a speech model to enable Record, Transcribe and Retry. Copy and Save require a completed transcript.';
-    if (this.recordedAudio) return 'Your recording is retained. Choose Retry transcription, or Record answer to start again.';
+    if (this.recordedAudio) return `Your recording is retained. Choose Retry transcription, or ${this.recordActionLabel} to start again.`;
     if (this.selectedFilePath) return 'Your file is ready. Transcribe file to enable Copy and Save; adjust settings below if needed.';
     return this.inputMode === 'record'
       ? 'Start recording (up to 30 minutes) to enable Stop & transcribe. Copy and Save become available after transcription.'
@@ -333,7 +333,11 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
   get sourceHint(): string {
     if (this.isSelectingFile) return 'Close the file dialog to switch sources.';
     if (this.isRecording || this.isStartingRecording) return 'Stop and transcribe to switch sources.';
-    return this.busy ? 'Finish transcription to switch sources.' : 'Each source keeps its own transcript.';
+    return this.busy ? 'Finish transcription to switch sources.' : '';
+  }
+
+  get recordActionLabel(): string {
+    return this.recordedAudio || this.transcriptionResult ? 'Record another' : 'Record answer';
   }
 
   async startRecording(): Promise<void> {

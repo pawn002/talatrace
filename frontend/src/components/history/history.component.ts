@@ -108,6 +108,17 @@ export class HistoryComponent implements OnInit, OnDestroy {
     }
   }
 
+  getStatusIcon(status: string): string {
+    switch (status) {
+      case 'completed': return 'check-circle';
+      case 'failed': return 'x-circle';
+      case 'pending': return 'hourglass';
+      case 'processing': return 'waveform';
+      case 'cancelled': return 'prohibit';
+      default: return 'info';
+    }
+  }
+
   async copyTranscript(item: TranscriptionHistoryItem): Promise<void> {
     if (this.copyUnavailableReason(item)) return;
     if (item.result) {

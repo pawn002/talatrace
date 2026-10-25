@@ -99,6 +99,23 @@ app.whenReady().then(async () => {
       }).map(el => ({ text: el.textContent.trim().slice(0, 80), size: getComputedStyle(el).fontSize }));
       if (smallText.length) throw new Error('Readable text below 14px: ' + JSON.stringify(smallText));
       const colourPairs = [];
+      const iconMetrics = [...document.querySelectorAll('i.ph, i.ph-fill, i.ph-bold')].filter(el => el.checkVisibility({ checkVisibilityCSS: true })).map(el => {
+        const style = getComputedStyle(el);
+        const weights = ['ph', 'ph-fill', 'ph-bold'].filter(weight => el.classList.contains(weight));
+        if (weights.length !== 1 || el.getAttribute('aria-hidden') !== 'true' || !getComputedStyle(el, '::before').fontFamily.includes('Phosphor') || ['none', 'normal', ''].includes(getComputedStyle(el, '::before').content)) throw new Error('Invalid or unnamed decorative Phosphor icon: ' + el.className);
+        const button = el.closest('.button');
+        const expected = button?.classList.contains('button--icon') ? (weights[0] === 'ph-fill' ? 28 : 20) : button ? parseFloat(getComputedStyle(button).fontSize) : null;
+        if (expected !== null && parseFloat(style.fontSize) !== expected) throw new Error('Icon does not follow its control size: ' + el.className);
+        if (!el.closest('button:disabled')) colourPairs.push({ selector: 'icon ' + el.className, foreground: style.color, background: resolvedBackground(el), nonText: true });
+        return { classes: el.className, size: parseFloat(style.fontSize), width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height };
+      });
+      for (const host of document.querySelectorAll('.settings-details, .timing-details')) {
+        const label = host.shadowRoot?.querySelector('[part=label]');
+        if (!label?.checkVisibility()) continue;
+        const icon = getComputedStyle(label, '::before');
+        if (icon.maskImage === 'none' || parseFloat(icon.width) !== 16) throw new Error('Disclosure icon is absent or incorrectly sized');
+        colourPairs.push({ selector: host.classList.contains('timing-details') ? 'timing help mask' : 'settings gear mask', foreground: icon.backgroundColor, background: resolvedBackground(host), nonText: true });
+      }
       for (const selector of ['.source-help', '.action-reason', '#history-refresh-status', '.theme-label', '.theme-choice', '.spectrum-label', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
         for (const el of document.querySelectorAll(selector)) {
           if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
@@ -146,7 +163,7 @@ app.whenReady().then(async () => {
       if (readingMeasures.some(item => item.widthCh > 65.5)) throw new Error('Reading column exceeds 65ch: ' + JSON.stringify(readingMeasures));
       return { name: ${JSON.stringify(name)}, width: innerWidth, height: innerHeight,
         horizontalOverflow: panel.scrollWidth > panel.clientWidth + 1 || document.documentElement.scrollWidth > innerWidth + 1 || document.querySelector('.app-header').scrollWidth > document.querySelector('.app-header').clientWidth + 1,
-        contrasts, colourPairs, smallText, readingMeasures,
+        contrasts, colourPairs, smallText, readingMeasures, iconMetrics,
         controls: controls.map(el => ({ label: el.textContent.trim(), disabled: el.disabled,
           x: Math.round(el.getBoundingClientRect().x), y: Math.round(el.getBoundingClientRect().y),
           width: Math.round(el.getBoundingClientRect().width), height: Math.round(el.getBoundingClientRect().height) })) };
@@ -258,6 +275,7 @@ app.whenReady().then(async () => {
     await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
     await wait(1000);
     await capture('result');
+    if (!await win.webContents.executeJavaScript("document.querySelector('[data-action=record]').textContent.includes('Record another') && !document.querySelector('#source-help').textContent.trim() && !document.querySelector('#record-audio-tab').hasAttribute('aria-describedby')")) throw new Error('Completed recording lacks repeat action or retains idle filler');
     await click('.copy-option');
     if (await win.webContents.executeJavaScript("document.querySelector('.copy-option input').checked")) throw new Error('Timing checkbox label did not toggle the native input');
     await click('.copy-option');
@@ -341,6 +359,7 @@ app.whenReady().then(async () => {
     win.setSize(360, 780); await capture('file-long-name'); win.setSize(1100, 820);
     await click('[data-action="transcribe"]'); await capture('file-processing'); await wait(1000);
     await capture('file-result');
+    if (!await win.webContents.executeJavaScript("document.querySelector('[data-action=choose-file]').textContent.includes('Choose another file')")) throw new Error('File result does not offer another file');
     await click('#record-audio-tab');
     if (await win.webContents.executeJavaScript("!!document.querySelector('.record-actions [data-action=transcribe]')")) throw new Error('Retry is visible after success');
     nativeTheme.themeSource = 'light'; await wait(200); await capture('result-light');
@@ -382,12 +401,18 @@ app.whenReady().then(async () => {
     history = [...history,
       { id: 'waiting', status: 'processing', fileName: 'Answer in progress', startedAt: '2026-10-24T21:31:00.000Z' },
       { id: 'failed', status: 'failed', fileName: 'Failed answer', startedAt: '2026-10-24T21:32:00.000Z' },
-      { id: 'missing', status: 'completed', fileName: 'Result unavailable', startedAt: '2026-10-24T21:33:00.000Z' }];
+      { id: 'missing', status: 'completed', fileName: 'Result unavailable', startedAt: '2026-10-24T21:33:00.000Z' },
+      { id: 'pending', status: 'pending', fileName: 'Queued answer', startedAt: '2026-10-24T21:34:00.000Z' },
+      { id: 'cancelled', status: 'cancelled', fileName: 'Cancelled answer', startedAt: '2026-10-24T21:35:00.000Z' }];
     historyDelay = 1000;
     await click('#app-panel-history [aria-label="Refresh history"]'); await capture('history-refreshing');
     if (!await win.webContents.executeJavaScript("document.querySelector('#app-panel-history [aria-label=\"Refresh history\"]').disabled && document.querySelector('#history-refresh-status').textContent.includes('Refreshing')")) throw new Error('Disabled Refresh lacks visible reason');
     await wait(850); historyDelay = 0; await capture('history-unavailable');
-    if (!await win.webContents.executeJavaScript("[...document.querySelectorAll('.history-action button:disabled')].length === 3 && [...document.querySelectorAll('.history-action button:disabled')].every(el => !!document.getElementById(el.getAttribute('aria-describedby'))?.textContent)")) throw new Error('Disabled history actions lack adjacent reasons');
+    if (!await win.webContents.executeJavaScript("[...document.querySelectorAll('.history-action button:disabled')].length === 5 && [...document.querySelectorAll('.history-action button:disabled')].every(el => !!document.getElementById(el.getAttribute('aria-describedby'))?.textContent)")) throw new Error('Disabled history actions lack adjacent reasons');
+    if (!await win.webContents.executeJavaScript("['check-circle', 'waveform', 'x-circle', 'check-circle', 'hourglass', 'prohibit'].every((glyph, index) => document.querySelectorAll('#app-panel-history tbody .status-text i')[index].classList.contains('ph-' + glyph))")) throw new Error('History states do not have distinct outcome shapes');
+    await win.webContents.executeJavaScript("document.querySelector('#app-panel-history tbody tr:last-child').scrollIntoView({ block: 'nearest' })");
+    await capture('history-outcome-shapes');
+    await win.webContents.executeJavaScript("document.querySelector('#app-panel-history').scrollIntoView({ block: 'start' })");
     win.setSize(360, 780); await capture('history-unavailable-small');
     await wait(150);
     await win.webContents.executeJavaScript("const historyScroll = document.querySelector('#app-panel-history .table-container'); historyScroll.scrollLeft = historyScroll.scrollWidth; void 0");

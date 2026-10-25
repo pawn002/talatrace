@@ -66,7 +66,7 @@ app.whenReady().then(async () => {
       if (clipboardPermission.state === 'denied') throw new Error('App permission policy blocks Copy');
       let copied = '';
       Object.defineProperty(navigator, 'clipboard', { value: { writeText: async text => { copied = text; } }, configurable: true });
-      button('Record answer').click();
+      document.querySelector('[data-action=record]').click();
       for (let i = 0; i < 100 && button('Stop & transcribe')?.disabled; i++) await wait(100);
       if (button('Stop & transcribe')?.disabled) throw new Error(document.querySelector('.record-error')?.textContent || 'Recording did not start');
       requirePrimary('Stop & transcribe');
@@ -137,7 +137,8 @@ app.whenReady().then(async () => {
       if (document.querySelector('.result-section')?.textContent !== visibleText) throw new Error('Switching subtabs lost the recorded transcript');
       if (document.querySelector('[role="timer"]').textContent !== finalDuration) throw new Error('Switching subtabs lost the recorded duration');
       stableControls = [...document.querySelectorAll('.workflow-controls button')];
-      button('Record answer').click();
+      if (!button('Record another')) throw new Error('Completed recording does not offer another answer');
+      button('Record another').click();
       for (let i = 0; i < 100 && button('Stop & transcribe')?.disabled; i++) await wait(100);
       requirePrimary('Stop & transcribe');
       if (document.querySelector('.result-section')) throw new Error('Previous transcript obscures the new recording');
