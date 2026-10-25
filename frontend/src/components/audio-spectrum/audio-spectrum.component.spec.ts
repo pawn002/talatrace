@@ -72,6 +72,18 @@ describe('AudioSpectrumComponent', () => {
     expect(stream.getTracks).not.toHaveBeenCalled();
   });
 
+  it('clears old-colour history on a theme change without restarting analysis', async () => {
+    await start(); nextFrame!(1000);
+    painter.clearRect.mockClear();
+    const canvas = component.canvas.nativeElement;
+    jest.spyOn(globalThis, 'getComputedStyle').mockReturnValue({ color: 'rgb(40, 50, 60)' } as CSSStyleDeclaration);
+    nextFrame!(1100);
+    expect(painter.clearRect).toHaveBeenCalledWith(0, 0, canvas.width, canvas.height);
+    expect(source.disconnect).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+    expect(component.available).toBe(true);
+  });
+
   it('uses a non-scrolling display for reduced motion and follows preference changes', async () => {
     await start();
     preference.matches = true;

@@ -323,7 +323,7 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
       ? `Copied ${this.includeTimestamps && this.hasTiming ? 'with timing and pauses' : 'as plain text'}. Paste into your chat or terminal.`
       : `Ready to copy ${this.includeTimestamps && this.hasTiming ? 'with timing and pauses' : 'as plain text'}.`;
     if (!this.hasInstalledModel) return 'Download a speech model once to enable local recording and transcription.';
-    if (this.recordedAudio) return 'Your recording is retained. Choose Retry transcription, or Discard recording to start over.';
+    if (this.recordedAudio) return 'Your recording is retained. Choose Retry transcription, or Record answer to start again.';
     if (this.selectedFilePath) return 'Your file is ready. Adjust the model or language below if needed, then transcribe.';
     return this.inputMode === 'record'
       ? 'Record up to 30 minutes. Stop to transcribe automatically.'

@@ -60,7 +60,7 @@ DTW needs attention weights, so this path disables flash attention and may take 
 
 Quiet intervals can reflect pauses, low microphone volume, or other recording conditions; they do not establish why a person paused. This is timing context, not a psychological assessment.
 
-Use **Discard** to stop without transcription. Recording is limited to 30 minutes / 64 MB. If transcription fails, the captured audio stays in memory for **Retry transcription**; switching input, discarding, or closing the app clears that copy. Electron deletes temporary recording files after success or failure. A crash can leave temporary files; app recording folders older than 24 hours are removed at the next launch. Transcription history remains limited to the current session.
+Recording is limited to 30 minutes / 64 MB. If transcription fails, the captured audio stays in memory and **Retry transcription** appears; choose **Record answer** to start again instead. The retained copy is replaced after a new recording starts successfully or cleared when the app closes. Normally the secondary action row contains only **Save transcript** and the **Include timing and pauses** copy preference. Electron deletes temporary recording files after success or failure. A crash can leave temporary files; app recording folders older than 24 hours are removed at the next launch. Transcription history remains limited to the current session.
 
 Recording and transcription do not upload voice data. Model downloads require an initial network connection. On macOS the packaged app includes a microphone usage description; permissions and device availability still need platform-specific testing.
 
@@ -356,3 +356,7 @@ Currently, the app uses standard system shortcuts:
 ### GPU Acceleration
 
 **Available on Windows with Intel Iris Xe** — The app automatically uses the Vulkan iGPU backend when available, providing 1.7–4x faster transcription compared to CPU-only. No configuration required.
+
+## Appearance
+
+Use the three-position **Theme** control in the app header to choose **Light**, **Dark**, or **System**. Changes apply immediately. Tab into the group, then use the arrow keys to select a mode; Home and End select the first and last options. System is the default and follows the operating system, including changes while the app is open. Light and Dark override the system preference for this app. The choice is stored locally and restored on reload or restart. Theme switching is available during recording and does not interrupt capture.

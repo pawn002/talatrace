@@ -1,0 +1,54 @@
+# Candor disabled-state guidance and app review
+
+Reviewed 25 October 2026 against current Candor main, commit `a4d27af8edc503aa801b7b336e1e23b41287c9e5`. The app remains pinned to Candor 6.0.0. This is a documentation and code review, not a new rendered or screen-reader audit. No app behavior changed.
+
+## Candor's requirements
+
+1. **Explain a disabled control next to it.** The explanation must preserve what action is unavailable, why, and what would unlock it, where applicable. A grey control alone can read as broken. Reasons include permissions, system limitations, missing options, dependencies, and settings managed elsewhere. These are consumer responsibilities, not behavior supplied automatically by a component.
+2. **The rule covers more than form fields.** It applies to inputs, selects, listboxes, comboboxes, checkboxes, radios, switches and sliders; it also extends to buttons, menu items and tabs when their dimmed label is the only cue to the unavailable action.
+3. **The exception is narrow.** A separate hint can be omitted when immediate context unambiguously explains the dependency, such as an off toggle directly above the field it disables. Do not assume the entire screen or a previously read instruction supplies that immediate context.
+4. **Keep the explanation readable at full opacity.** Candor deliberately permits inactive labels below its normal contrast floor. Dimming conveys unavailability; the readable adjacent explanation preserves the actionable meaning. Do not dim the explanatory parent, use disabled text colour for the explanation, or raise the global disabled token to make it look enabled. For this app, instructions remain at least 16px and use semantic text tokens; measure their actual background pairing with Klar 3.x.
+5. **Never hide the reason in a tooltip.** Native disabled buttons leave the Tab order, so focus-gated help is inaccessible. Candor tooltip bubbles are also deliberately AT-hidden and have no `aria-describedby`. Essential information belongs in visible content, with an independently named control. An ARIA relationship can supplement that content but cannot replace it.
+6. **Use the right hint construction.** Select and Switch have built-in hints. Input, Listbox and Combobox stories demonstrate meaningful hints too. Button has no hint API: supply a readable sibling. Slider also needs an external sibling, because its host is dimmed when disabled. Checkbox and Radio require adjacent explanations; their default slots are inside the label and must not contain separate interactive help/links. Use the supported end slot for independent interactive content.
+7. **Explain unavailable options as well as whole fields.** Select's disabled-option example uses a visible field hint naming the unavailable option. Listbox's example explains the unavailable role. Preserve the reason when other options remain selectable.
+8. **Retain names, state and real interaction semantics.** Native disabled controls expose their state and block activation. Radio navigation skips disabled siblings; Toolbar's navigation filters disabled controls. Menu items use `aria-disabled` and explicitly block selection events. Do not assume one universal focus rule, or replace native disabled with CSS dimming. Empty/disabled grid cells and items still need meaningful labels; TonePicker explicitly names out-of-gamut cells rather than leaving silence.
+9. **A bare showcase is not a usage template.** Button's Disabled States story explicitly warns that it demonstrates visual treatment only. Radio and other galleries also contain bare disabled examples; the system-wide authoring rule still applies to real applications.
+
+The field hints demonstrate useful specificity: a fixed username cannot be changed; an organisation-managed setting identifies who can change it; a billing-dependent field points to the place to update it; a locked slider identifies the ongoing recording. A generic "Disabled" or "Unavailable" conveys state without explaining it.
+
+## Sources
+
+- [System-wide form authoring and disabled-label convention](https://github.com/pawn002/candor/blob/a4d27af8edc503aa801b7b336e1e23b41287c9e5/CLAUDE.md#form-authoring)
+- [Button: Disabled with reason, plus treatment-only warning](https://main--69c25e2492ad056c24329876.chromatic.com/?path=/story/components-button--disabled-with-reason) and [story source](https://github.com/pawn002/candor/blob/a4d27af8edc503aa801b7b336e1e23b41287c9e5/src/web-components/components/button/candor-button.stories.ts#L59-L98)
+- [Select: disabled field and disabled option](https://github.com/pawn002/candor/blob/a4d27af8edc503aa801b7b336e1e23b41287c9e5/src/web-components/components/form/select/candor-select.stories.ts#L75-L94)
+- [Switch: hints and table-row explanation](https://github.com/pawn002/candor/blob/a4d27af8edc503aa801b7b336e1e23b41287c9e5/src/web-components/components/form/switch/candor-switch.stories.ts)
+- [Slider: external recording-lock explanation](https://github.com/pawn002/candor/blob/a4d27af8edc503aa801b7b336e1e23b41287c9e5/src/web-components/components/form/slider/candor-slider.stories.ts)
+- [Tooltip's supplementary-only contract](https://github.com/pawn002/candor/blob/a4d27af8edc503aa801b7b336e1e23b41287c9e5/src/web-components/components/tooltip/candor-tooltip.stories.ts#L19-L35)
+- [Consumer responsibilities](https://github.com/pawn002/candor/blob/a4d27af8edc503aa801b7b336e1e23b41287c9e5/docs/ACCESSIBILITY-CONFORMANCE.md#consumer-responsibilities), [label disabled cells/items](https://github.com/pawn002/candor/blob/a4d27af8edc503aa801b7b336e1e23b41287c9e5/.github/PULL_REQUEST_TEMPLATE.md#L66)
+
+## Relevance to Whisper Transcription
+
+The findings below come from the current Angular templates, workflow-state getters, styles and model capability handling. Suggested wording and the grouping strategy are app recommendations, not quotations or additional Candor requirements.
+
+| Area | Current implementation | Assessment and recommendation |
+| --- | --- | --- |
+| Record / Stop / Copy sequence | Stable disabled buttons; numbered steps; shared visible workflow hint; each button references that hint. | Good foundation, but numbered sequencing alone does not explain every disabled action. Ready-state text explains recording, not explicitly when Stop/Copy unlock. Say that Stop becomes available during recording and Copy/Save after transcription. During processing, Copy availability is already stated. |
+| File workflow | Choose/Transcribe/Copy plus shared hint. Missing model has a visible setup instruction and Download a model action. | Preserve the setup route. Explicitly tie disabled Transcribe to choosing a file or installing a model. Explain Copy/Save availability after transcription. |
+| Save transcript | Disabled before a result or while busy; no associated helper; appears below the shared workflow hint. | Clear gap: include Save in the shared availability message and associate it with the visible explanation. Example: "Copy and Save become available when transcription finishes." |
+| Main tabs: Models / History | Disabled whenever transcription is busy; selected Transcription tab remains available. | No explicit explanation of why navigation is locked or when it returns. Put a short visible message near navigation, or reconsider which locks are necessary. Do not presume "Recording" in the badge explains this restriction. |
+| Source tabs: Record audio / Audio file | Both disabled while busy, including the selected source tab. | Explain that source switching returns when the recording/transcription finishes; review focus when the selected tab becomes disabled. Candor does not prescribe disabling these tabs—the lock is our design choice. |
+| Retry transcription | Shown only after failure; disabled if no usable selected model is installed. Retained-audio hint and error remain visible. | Keep that recovery context. If missing model disables Retry, the visible explanation must connect model installation to retrying and preserve the retained recording. |
+| Unavailable model download | Disabled Download with visible Unavailable status and runtime-specific reason in the same table row. | Closest existing match to Candor. Keep the reason readable, independent of disabled styling, and actionable where a remedy exists. Associate it programmatically with the action if useful; adjacent visible content remains essential. |
+| History Refresh | Native disabled icon button while loading; visible "Loading history..." in the content; tooltip merely repeats the button's name. | Loading text provides context, but is separated from the action and is not a live status. Prefer an adjacent status explaining refresh is in progress, with an appropriate announcement. Tooltip cannot be the explanation. |
+| History Copy | Disabled for non-completed rows; visible status in another column; tooltip says Copy transcript. | Row state alone may not communicate whether copying is waiting or permanently impossible. Add readable row-local wording, e.g. "Copy available when transcription completes" versus "No transcript to copy" for failure. This is a conditional path even if most session rows are completed. |
+| Model/language settings | Currently hidden while busy rather than disabled. | Not a direct disabled-state violation. Separate workflow question: retaining their location with a visible lock explanation could improve discoverability, but needs its own design review. |
+| Timing checkbox and theme radios | Remain enabled while recording/processing. | No disabled explanation needed. Preserve useful independent preferences. If a future option becomes unavailable, explain that option rather than disabling the entire group by default. |
+
+## Recommended next effort
+
+1. Strengthen the shared workflow message to cover unavailable actions and their prerequisites, including Save. Keep it outside dimmed controls and connect the relevant controls to it.
+2. Make the navigation/source locks explicit; verify whether each restriction is necessary. Check focus as controls change enabled state.
+3. Add row-local unavailable-copy explanations in History and a clear refresh-in-progress status; preserve the model table's existing visible reasons.
+4. Inspect all these combinations in light/dark and narrow layouts, including keyboard/document order and readable explanation contrast. Do not add a separate paragraph to every step when one nearby, explicit group explanation can serve the related actions. That grouping is our proposed way to honor Candor without making the layout noisy.
+
+Preserve the stable Record/Stop/Copy locations and use spacing and readable text for the explanations.

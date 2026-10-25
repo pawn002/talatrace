@@ -1,6 +1,18 @@
 <header class="app-header">
   <img src="favicon.svg" class="app-logo" alt="" aria-hidden="true" width="28" height="28">
   <span class="app-title">{{ title }}</span>
+  <div class="theme-control">
+    <span class="theme-label" aria-hidden="true">Theme</span>
+    <fieldset id="theme-control" class="theme-track" role="radiogroup" aria-labelledby="theme-legend" (keydown)="onThemeKeydown($event)">
+      <legend id="theme-legend" class="theme-legend">Theme</legend>
+      @for (option of themeOptions; track option.value) {
+        <label class="theme-option">
+          <input type="radio" name="appearance" [value]="option.value" [checked]="themePreference === option.value" (change)="onThemeChange($event)">
+          <span class="theme-choice">{{ option.label }}</span>
+        </label>
+      }
+    </fieldset>
+  </div>
   <span class="local-badge" [class.local-badge--recording]="!!transcription?.isRecording"><i class="ph-bold" [class.ph-record]="!!transcription?.isRecording" [class.ph-shield-check]="!transcription?.isRecording" aria-hidden="true"></i> {{ transcription?.isRecording ? 'Recording' : transcription?.isTranscribing ? 'Transcribing' : 'On device' }}</span>
 </header>
 

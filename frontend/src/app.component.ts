@@ -1,3 +1,4 @@
+import { readThemePreference, saveThemePreference } from './theme';
 import { Component, OnInit, ViewChild } from "@angular/core";
 import { TranscriptionComponent } from "./components/transcription/transcription.component";
 import { ElectronService } from "./services/electron.service";
@@ -13,6 +14,27 @@ export class AppComponent implements OnInit {
   title = "Whisper Transcription";
   systemInfo: any = null;
   activeTab = 0;
+  themePreference = readThemePreference();
+  readonly themeOptions = [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }, { value: 'system', label: 'System' }];
+
+  onThemeChange(event: Event): void {
+    if (!(event.target instanceof HTMLInputElement) || !event.target.checked) return;
+    const value = event.target.value;
+    if (value !== 'light' && value !== 'dark' && value !== 'system') return;
+    this.themePreference = value;
+    saveThemePreference(value);
+  }
+
+  onThemeKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'Home' && event.key !== 'End') return;
+    const inputs = document.querySelectorAll<HTMLInputElement>('#theme-control input');
+    const next = inputs[event.key === 'Home' ? 0 : inputs.length - 1];
+    if (!next) return;
+    event.preventDefault();
+    next.focus();
+    next.click();
+  }
+
   @ViewChild(TranscriptionComponent) transcription?: TranscriptionComponent;
 
   onAppTabKeydown(event: KeyboardEvent): void {

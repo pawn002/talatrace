@@ -223,7 +223,12 @@ describe('TranscriptionComponent', () => {
       component.isTranscribing = false;
       component.recordedAudio = new Blob(['audio']);
       fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[data-action="transcribe"]')).toBeNull();
+      component.recordingError = 'Transcription failed';
+      fixture.detectChanges();
       expect(fixture.nativeElement.querySelector('[data-action="transcribe"]').disabled).toBe(false);
+      expect(record.disabled).toBe(false);
+      expect(fixture.nativeElement.textContent).not.toContain('Discard recording');
       component.recordedAudio = null;
       component.transcriptionResult = { text: 'Answer', segments: [{ start: 0, end: 2, text: 'Answer' }] };
       fixture.detectChanges();
@@ -476,6 +481,12 @@ describe('TranscriptionComponent', () => {
       expect(component.recordedAudio).not.toBeNull();
       expect(component.recordingError).toContain('available to retry');
       expect(component.isTranscribing).toBe(false);
+      component.availableModels = [{ id: 'base', name: 'Base', installed: true }];
+      jest.spyOn(TestBed.inject(AudioRecorderService), 'start').mockResolvedValue();
+      await component.startRecording();
+      expect(component.isRecording).toBe(true);
+      expect(component.recordedAudio).toBeNull();
+      expect(component.recordingError).toBe('');
     });
   });
 

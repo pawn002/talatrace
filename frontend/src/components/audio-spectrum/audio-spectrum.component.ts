@@ -27,6 +27,7 @@ export class AudioSpectrumComponent implements AfterViewInit, OnChanges, OnDestr
   private generation = 0;
   private preference?: MediaQueryList;
   private lastFrame = 0;
+  private signalColour = '';
   private onPreference = () => {
     this.reducedMotion = !!this.preference?.matches;
     this.clearCanvas();
@@ -104,6 +105,11 @@ export class AudioSpectrumComponent implements AfterViewInit, OnChanges, OnDestr
     const width = Math.max(1, Math.round(canvas.clientWidth * scale));
     const height = Math.max(1, Math.round(canvas.clientHeight * scale));
     if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+    const colour = getComputedStyle(canvas).color;
+    if (colour !== this.signalColour) {
+      painter.clearRect(0, 0, width, height);
+      this.signalColour = colour;
+    }
     const step = Math.max(1, Math.round(width / 120)); // Approximately six seconds at 20 fps.
     if (this.reducedMotion) painter.clearRect(0, 0, width, height);
     else {
@@ -112,7 +118,7 @@ export class AudioSpectrumComponent implements AfterViewInit, OnChanges, OnDestr
       painter.globalCompositeOperation = 'source-over';
       painter.clearRect(width - step, 0, step, height);
     }
-    painter.fillStyle = getComputedStyle(canvas).color;
+    painter.fillStyle = colour;
     const rows = 40;
     const maxFrequency = Math.min(8000, sampleRate / 2);
     for (let row = 0; row < rows; row++) {

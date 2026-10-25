@@ -535,3 +535,7 @@ select.input {
 .table-host :is(th, td).cell--numeric { font-family: var(--font-family-mono); text-align: right; font-variant-numeric: tabular-nums; }
 .table-host :is(th, td).cell--mono { font-family: var(--font-family-mono); font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { .progress-bar__fill--indeterminate, .spinner, .spinner__arc { animation: none; } }
+
+// Official Phosphor regular gear: supplementary to Candor's independently named trigger.
+.settings-details::part(label) { display: flex; align-items: center; gap: var(--spacing-xs); }
+.settings-details::part(label)::before { content: ''; flex: 0 0 var(--font-size-md); width: var(--font-size-md); height: var(--font-size-md); background: currentColor; mask: url('./assets/icons/phosphor-gear.svg') center / contain no-repeat; }

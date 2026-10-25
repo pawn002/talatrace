@@ -58,6 +58,12 @@ app.whenReady().then(async () => {
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point });
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point });
   };
+    const chooseTheme = async value => {
+      await win.webContents.executeJavaScript(`(() => {
+        document.querySelector('#theme-control input[value=' + ${JSON.stringify(value)} + ']').click();
+      })()`);
+      await wait(250);
+    };
   const waitForRecording = async () => {
     for (let i = 0; i < 100; i++) {
       if (await win.webContents.executeJavaScript("!document.querySelector('[data-action=stop]').disabled")) return;
@@ -76,6 +82,7 @@ app.whenReady().then(async () => {
       const rgba = value => { context.clearRect(0, 0, 1, 1); context.fillStyle = value; context.fillRect(0, 0, 1, 1); return [...context.getImageData(0, 0, 1, 1).data]; };
       const blend = (front, back) => front.slice(0, 3).map((v, i) => v * front[3] / 255 + back[i] * (1 - front[3] / 255));
       const resolvedBackground = el => {
+        if (el.matches('.theme-choice') && rgba(getComputedStyle(el).backgroundColor)[3] === 0) return getComputedStyle(el.closest('.theme-track'), '::before').backgroundColor;
         const chain = []; for (let parent = el; parent; parent = parent.parentElement) chain.unshift(parent);
         const rgb = chain.reduce((back, item) => blend(rgba(getComputedStyle(item.localName === 'candor-card' ? item.shadowRoot.querySelector('.card') : item).backgroundColor), back), [255, 255, 255]);
         return 'rgb(' + rgb.map(Math.round).join(', ') + ')';
@@ -91,7 +98,7 @@ app.whenReady().then(async () => {
       }).map(el => ({ text: el.textContent.trim().slice(0, 80), size: getComputedStyle(el).fontSize }));
       if (smallText.length) throw new Error('Readable text below 14px: ' + JSON.stringify(smallText));
       const colourPairs = [];
-      for (const selector of ['.spectrum-label', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
+      for (const selector of ['.theme-label', '.theme-choice', '.spectrum-label', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
         for (const el of document.querySelectorAll(selector)) {
           if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
@@ -99,21 +106,25 @@ app.whenReady().then(async () => {
           colourPairs.push({ selector, foreground: style.color, background, size: parseFloat(style.fontSize), weight: parseInt(style.fontWeight), text: el.textContent.trim().slice(0, 80) });
         }
       }
-      for (const selector of ['.input', '.button:focus-visible', '.status-text i', '.local-badge--recording i', '.workflow-connector']) {
+      for (const selector of ['.input', '.button:focus-visible', '.status-text i', '.local-badge--recording i', '.workflow-connector', '.spectrum-display canvas']) {
         for (const el of document.querySelectorAll(selector)) {
           if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
           let parent = el.matches('.workflow-connector') ? el.closest('.workflow-panel') : el.parentElement;
           const background = resolvedBackground(parent);
-          colourPairs.push({ selector, foreground: el.matches('i') ? style.color : el.matches(':focus-visible') ? style.outlineColor : style.borderTopColor, background, nonText: true });
+          colourPairs.push({ selector, foreground: el.matches('i, canvas') ? style.color : el.matches(':focus-visible') ? style.outlineColor : style.borderTopColor, background, nonText: true });
         }
       }
+      for (const el of document.querySelectorAll('.theme-option input:checked + .theme-choice')) {
+        colourPairs.push({ selector: 'theme selected border', foreground: getComputedStyle(el).borderTopColor, background: getComputedStyle(el.closest('.theme-track'), '::before').backgroundColor, nonText: true });
+        if (el.previousElementSibling.matches(':focus-visible')) colourPairs.push({ selector: 'theme focus ring', foreground: getComputedStyle(el).outlineColor, background: resolvedBackground(document.querySelector('.app-header')), nonText: true });
+      }
       for (const host of document.querySelectorAll('candor-tooltip, candor-toast, candor-disclosure, candor-accordion-item')) {
-        for (const el of host.shadowRoot?.querySelectorAll('.tooltip__bubble, .toast__message, .disclosure__trigger, .accordion-item__title') || []) {
+        for (const el of host.shadowRoot?.querySelectorAll('.tooltip__bubble, .toast__message, .disclosure__trigger, .accordion-item__title, .select') || []) {
           if (!host.checkVisibility() || !el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
           const box = el.closest('.toast') || el;
-          colourPairs.push({ selector: host.localName + ' ' + el.className, foreground: style.color, background: host.matches('candor-disclosure, candor-accordion-item') ? resolvedBackground(host) : getComputedStyle(box).backgroundColor, size: parseFloat(style.fontSize), weight: parseInt(style.fontWeight) });
+          colourPairs.push({ selector: host.localName + ' ' + el.className, foreground: style.color, background: host.matches('candor-select') ? getComputedStyle(el).backgroundColor : host.matches('candor-disclosure, candor-accordion-item') ? resolvedBackground(host) : getComputedStyle(box).backgroundColor, size: parseFloat(style.fontSize), weight: parseInt(style.fontWeight) });
         }
       }
       for (const selector of ['.workflow-status h3', '#workflow-help', '.segment__time', '.segment__text', '.workflow-controls .button--primary']) {
@@ -133,7 +144,7 @@ app.whenReady().then(async () => {
         });
       if (readingMeasures.some(item => item.widthCh > 65.5)) throw new Error('Reading column exceeds 65ch: ' + JSON.stringify(readingMeasures));
       return { name: ${JSON.stringify(name)}, width: innerWidth, height: innerHeight,
-        horizontalOverflow: panel.scrollWidth > panel.clientWidth + 1,
+        horizontalOverflow: panel.scrollWidth > panel.clientWidth + 1 || document.documentElement.scrollWidth > innerWidth + 1 || document.querySelector('.app-header').scrollWidth > document.querySelector('.app-header').clientWidth + 1,
         contrasts, colourPairs, smallText, readingMeasures,
         controls: controls.map(el => ({ label: el.textContent.trim(), disabled: el.disabled,
           x: Math.round(el.getBoundingClientRect().x), y: Math.round(el.getBoundingClientRect().y),
@@ -183,6 +194,15 @@ app.whenReady().then(async () => {
       // Use the real MediaRecorder so the generated stream is consumed like a microphone.
     })()`);
     await capture('ready');
+    nativeTheme.themeSource = 'light'; await wait(350); await capture('ready-light');
+    nativeTheme.themeSource = 'dark'; await wait(350);
+    if (!await win.webContents.executeJavaScript(`(() => {
+      const actions = document.querySelector('.record-actions');
+      return actions.querySelectorAll('button').length === 1 && !!actions.querySelector('.copy-option')
+        && !document.querySelector('[data-action=transcribe]') && !actions.textContent.includes('Discard')
+        && document.querySelector('.settings-details').label === 'Transcription settings';
+    })()`)) throw new Error('Ready secondary actions are not simplified');
+
     win.setSize(1024, 680); await capture('ready-short'); win.setSize(1100, 820);
     const stopPosition = () => win.webContents.executeJavaScript("(() => { const r = document.querySelector('[data-action=stop]').getBoundingClientRect(); return JSON.stringify([r.x,r.y,r.width,r.height]); })()");
     const readyStopPosition = await stopPosition();
@@ -197,6 +217,10 @@ app.whenReady().then(async () => {
       return weighted / total;
     })()`);
     await capture('recording-low-tone');
+    await chooseTheme('light'); await capture('theme-recording-light');
+    await chooseTheme('dark'); await capture('theme-recording-dark');
+    if (!await win.webContents.executeJavaScript("document.querySelector('.spectrum-display').dataset.mode === 'spectrogram' && !document.querySelector('[data-action=stop]').disabled")) throw new Error('Theme switching interrupted live recording');
+    await chooseTheme('system');
     const lowBand = await bandCenter();
     if (typeof lowBand !== 'number') throw new Error(JSON.stringify(lowBand));
     await win.webContents.executeJavaScript("window.previewTone.frequency.value = 1760");
@@ -294,6 +318,11 @@ app.whenReady().then(async () => {
     failNext = true;
     await win.webContents.executeJavaScript('window.advancePreviewClock()'); await wait(300);
     await click('[data-action="stop"]'); await wait(1100); await capture('retry');
+    if (!await win.webContents.executeJavaScript("!!document.querySelector('.record-actions [data-action=transcribe]') && !document.querySelector('[data-action=record]').disabled")) throw new Error('Failed recording cannot retry or start again');
+    await click('.record-actions [data-action="transcribe"]'); await capture('retry-processing');
+    if (await win.webContents.executeJavaScript("!!document.querySelector('.record-actions [data-action=transcribe]')")) throw new Error('Retry remains visible during processing');
+    await wait(1100);
+
     await click('#audio-file-tab'); await capture('audio-file');
     failPicker = true; await click('[data-action="choose-file"]'); await wait(100); await capture('candor-toast');
     if (!await win.webContents.executeJavaScript("document.querySelector('candor-toast-container').shadowRoot.querySelector('.live--assertive').textContent.includes('Failed to select file')")) throw new Error('Toast was not added to the persistent assertive region');
@@ -308,7 +337,7 @@ app.whenReady().then(async () => {
     await click('[data-action="transcribe"]'); await capture('file-processing'); await wait(1000);
     await capture('file-result');
     await click('#record-audio-tab');
-    await click('[data-action="transcribe"]'); await wait(1100);
+    if (await win.webContents.executeJavaScript("!!document.querySelector('.record-actions [data-action=transcribe]')")) throw new Error('Retry is visible after success');
     nativeTheme.themeSource = 'light'; await wait(200); await capture('result-light');
     await win.webContents.executeJavaScript("document.querySelector('.settings-details').open = true; document.querySelector('#model-select').classList.add('input--error'); document.querySelector('#model-select').focus(); document.querySelector('#model-select').scrollIntoView({ block: 'center' })");
     await capture('input-error-focus-light');
@@ -371,6 +400,43 @@ app.whenReady().then(async () => {
     await win.webContents.executeJavaScript("document.querySelector('.models-page tbody tr:last-child').scrollIntoView({ block: 'center' })");
     await capture('models-runtime-unavailable');
     if (!await win.webContents.executeJavaScript("document.querySelector('.models-page tbody tr:last-child button').disabled")) throw new Error('Unavailable engine offers an unusable download');
+    // Native single-choice radios -> Angular preference, with OS changes and reload.
+    await click('#app-tab-transcription');
+    const pageColour = () => win.webContents.executeJavaScript('getComputedStyle(document.body).backgroundColor');
+    nativeTheme.themeSource = 'dark'; await wait(350);
+    await chooseTheme('light'); const explicitLight = await pageColour(); await capture('theme-explicit-light');
+    nativeTheme.themeSource = 'light'; await wait(350);
+    await chooseTheme('dark'); const explicitDark = await pageColour(); await capture('theme-explicit-dark');
+    if (explicitLight === explicitDark) throw new Error('Explicit themes do not change the surface');
+    await new Promise(resolve => { win.webContents.once('did-finish-load', resolve); win.webContents.reload(); }); await wait(500);
+    if (!await win.webContents.executeJavaScript("document.querySelector('#theme-control input[value=dark]').checked && document.documentElement.dataset.theme === 'dark' && localStorage.getItem('whisper.theme') === 'dark'")) throw new Error('Theme preference did not survive reload');
+    await chooseTheme('system'); await capture('theme-system-light');
+    if (await pageColour() !== explicitLight) throw new Error('System did not follow the light OS theme');
+    nativeTheme.themeSource = 'dark'; await wait(350); await capture('theme-system-dark');
+    if (await pageColour() !== explicitDark) throw new Error('System did not follow the dark OS theme');
+    if (!await win.webContents.executeJavaScript("!document.documentElement.hasAttribute('data-theme') && document.querySelector('#theme-control').getAttribute('aria-labelledby') === 'theme-legend' && document.querySelector('#theme-legend').textContent === 'Theme'")) throw new Error('System/theme accessible name contract failed');
+    await win.webContents.executeJavaScript("document.querySelector('#theme-control input:checked').focus()");
+    const themeKey = async (key, code) => {
+      await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key, windowsVirtualKeyCode: code });
+      await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode: code });
+      await wait(30);
+    };
+    const expectTheme = async value => {
+      if (!await win.webContents.executeJavaScript(`document.activeElement.matches('#theme-control input[value=${value}]') && document.activeElement.checked && document.querySelectorAll('#theme-control input:checked').length === 1 && localStorage.getItem('whisper.theme') === '${value}'`)) throw new Error('Theme keyboard selection failed: ' + value);
+    };
+    await themeKey('ArrowRight', 39); await expectTheme('light');
+    await themeKey('ArrowLeft', 37); await expectTheme('system');
+    await themeKey('Home', 36); await expectTheme('light');
+    await themeKey('End', 35); await expectTheme('system');
+    await win.webContents.executeJavaScript("document.querySelector('#theme-control input[value=dark]').focus()");
+    await themeKey(' ', 32); await expectTheme('dark');
+    await themeKey('End', 35); await expectTheme('system');
+    await themeKey('Tab', 9);
+    if (!await win.webContents.executeJavaScript("document.activeElement.id === 'app-tab-transcription'")) throw new Error('Theme radio group adds extra Tab stops');
+    await themeKey('Tab', 9); // Return focus below the group before refocusing for a keyboard-visible ring.
+    await win.webContents.executeJavaScript("document.querySelector('#theme-control input:checked').focus()");
+    await capture('theme-keyboard-focus');
+    win.setSize(360, 780); await capture('theme-small');
     await fs.writeFile(path.join(output, 'metrics.json'), JSON.stringify(metrics, null, 2));
     console.log('Visual review:', output);
     clearTimeout(watchdog);

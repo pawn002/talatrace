@@ -44,9 +44,9 @@ app.whenReady().then(async () => {
     const result = await win.webContents.executeJavaScript(`(async () => {
       const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
-      const button = text => [...document.querySelectorAll('.transcription-card button')].find(el => el.textContent.includes(text));
+      const button = text => [...document.querySelectorAll('.transcription-page button')].find(el => el.textContent.includes(text));
       const requirePrimary = text => {
-        const actions = [...document.querySelectorAll('.transcription-card button.button--primary')];
+        const actions = [...document.querySelectorAll('.transcription-page button.button--primary')];
         if (actions.length !== 1 || !actions[0].textContent.includes(text)) throw new Error('Unclear primary action: ' + actions.map(el => el.textContent).join('; '));
       };
       for (let i = 0; i < 200 && ![...document.querySelectorAll('#model-select option')].some(option => option.value === window.__smokeModel); i++) await wait(100);
@@ -137,9 +137,10 @@ app.whenReady().then(async () => {
       for (let i = 0; i < 100 && button('Stop & transcribe')?.disabled; i++) await wait(100);
       requirePrimary('Stop & transcribe');
       if (document.querySelector('.result-section')) throw new Error('Previous transcript obscures the new recording');
-      button('Discard recording').click();
-      await wait(100);
-      requirePrimary('Record answer');
+      if (button('Discard recording')) throw new Error('Discard action is still exposed');
+      button('Stop & transcribe').click();
+      for (let i = 0; i < 300 && button('Copy transcript').disabled; i++) await wait(100);
+      requirePrimary('Copy transcript');
       assertStable();
       return { segment, copied, liveDuration, finalDuration, visibleText };
     })()`);

@@ -21,7 +21,7 @@
       <ol class="workflow-controls" [class.workflow-controls--file]="inputMode === 'file'" aria-label="Transcription steps">
         @if (inputMode === 'record') {
         <li class="workflow-control" [attr.aria-current]="currentStep === 1 ? 'step' : null"><candor-card class="step-card" variant="default" padding="none"><div class="workflow-step-content"><span class="workflow-number" aria-hidden="true"><b>1</b> Record</span>
-        <button data-action="record" class="button button--medium" [class.button--primary]="hasInstalledModel && !busy && !transcriptionResult && !selectedFilePath && !recordedAudio" [class.button--ghost]="!hasInstalledModel || busy || transcriptionResult || selectedFilePath || recordedAudio" (click)="startRecording()" [disabled]="busy || !hasInstalledModel || !!recordedAudio" aria-describedby="workflow-help">
+        <button data-action="record" class="button button--medium" [class.button--primary]="hasInstalledModel && !busy && !transcriptionResult && !selectedFilePath && !recordedAudio" [class.button--ghost]="!hasInstalledModel || busy || transcriptionResult || selectedFilePath || recordedAudio" (click)="startRecording()" [disabled]="busy || !hasInstalledModel" aria-describedby="workflow-help">
           <i class="ph ph-microphone" aria-hidden="true"></i> Record answer
         </button>
         </div></candor-card><i class="ph-bold ph-arrow-right workflow-connector" aria-hidden="true"></i></li>
@@ -45,12 +45,11 @@
       </ol>
       <p id="workflow-help" class="record-hint">{{ workflowHint }}</p>
       <div class="record-actions">
-        @if (inputMode === 'record') {
-          <button data-action="transcribe" class="button button--small" [class.button--primary]="!busy && !!recordedAudio" [class.button--ghost]="busy || !recordedAudio" (click)="startTranscription()" [disabled]="busy || !hasInstalledModel || !recordedAudio">Retry transcription</button>
-          <button class="button button--ghost button--small" (click)="discardRecording()" [disabled]="(!isRecording && !recordedAudio) || isTranscribing || isStoppingRecording">Discard recording</button>
+        @if (inputMode === 'record' && recordedAudio && recordingError && !busy) {
+          <button data-action="transcribe" class="button button--primary button--small" (click)="startTranscription()" [disabled]="!hasInstalledModel">Retry transcription</button>
         }
         <button class="button button--ghost button--small" (click)="exportTranscript()" [disabled]="!transcriptionResult || busy">Save transcript…</button>
-      @if (hasTiming && !busy) { <label class="copy-option"><input class="checkbox-input" type="checkbox" [(ngModel)]="includeTimestamps" (ngModelChange)="copied = false"><span class="checkbox-box" aria-hidden="true"></span><span>Include timing and pauses</span></label> }
+      <label class="copy-option"><input class="checkbox-input" type="checkbox" [(ngModel)]="includeTimestamps" (ngModelChange)="copied = false"><span class="checkbox-box" aria-hidden="true"></span><span>Include timing and pauses</span></label>
       </div>
       @if (!hasInstalledModel && !busy) { <button class="button button--primary button--medium" (click)="manageModels.emit()">Download a model</button> }
       @if (selectedFilePath && !busy) { <p class="file-info"><i class="ph ph-music-note" aria-hidden="true"></i> <span>{{ getFileName() }}</span>@if (selectedFileSize) { <span class="file-size">{{ formatFileSize(selectedFileSize) }}</span> }</p> }
@@ -105,7 +104,7 @@
       </section>
     }
     @if (!busy && hasInstalledModel) {
-      <candor-disclosure class="settings-details" [label]="'Transcription settings · ' + selectedModel + ' · ' + (selectedLanguage === 'auto' ? 'Auto-detect language' : selectedLanguage)">
+      <candor-disclosure class="settings-details" label="Transcription settings">
         <div class="options-section">
           <div class="input-wrapper">
             <label class="input-label" for="model-select">Model</label>
