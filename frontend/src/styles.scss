@@ -5,6 +5,7 @@
 @import '@phosphor-icons/web/bold/style.css';
 @import '@fontsource/atkinson-hyperlegible/400.css';
 @import '@fontsource/atkinson-hyperlegible/700.css';
+@import '@fontsource/noto-sans/400.css';
 @import '@candor-design/tokens/candor-tokens.css';
 
 // ─── Base ───────────────────────────────────────────────────────────────────
@@ -22,6 +23,17 @@ body {
   background-color: var(--color-bg-page);
   color: var(--color-text-default);
 }
+
+// Native semantic headings follow Candor Heading's scale and variable-font recipe.
+.page-heading h2, .result-heading h3 {
+  margin: 0;
+  font-family: var(--font-family-display);
+  font-weight: var(--font-weight-bold);
+  font-optical-sizing: auto;
+  letter-spacing: var(--letter-spacing-tight);
+}
+.page-heading h2 { font-size: var(--font-size-h2); line-height: var(--line-height-display); }
+.result-heading h3 { font-size: var(--font-size-h3); line-height: var(--line-height-snug); }
 
 // ─── Phosphor Icons ──────────────────────────────────────────────────────────
 i.ph-fill {

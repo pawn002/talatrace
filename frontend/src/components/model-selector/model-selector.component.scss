@@ -3,7 +3,6 @@
   margin: 0 auto;
 }
 .models-page .page-heading { padding-bottom: var(--spacing-md); }
-.models-page h2 { margin: 0; font-weight: var(--font-weight-semibold); font-size: var(--font-size-xl); letter-spacing: -.025em; }
 .models-page .page-subtitle { font-size: var(--font-size-md); font-weight: 400; color: var(--color-text-subtle); margin: var(--spacing-xs) 0 0; }
 .models-page .page-content { min-width: 0; }
 .models-page table { font-size: var(--font-size-sm); min-width: 880px; }
@@ -24,7 +23,7 @@
 }
 
 .info-alert { margin-bottom: var(--spacing-md); }
-.model-description { margin-top: var(--spacing-xs); font: var(--font-size-md)/var(--line-height-normal) var(--font-family-accessible); color: var(--color-text-default); max-width: 24ch; }
+.model-description { margin-top: var(--spacing-xs); font: var(--font-size-md)/var(--line-height-relaxed) var(--font-family-reading); color: var(--color-text-default); max-width: 24ch; }
 
 .table-container {
   overflow-x: auto;

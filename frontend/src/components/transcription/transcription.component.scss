@@ -1,13 +1,12 @@
 .transcription-page { max-width: 1040px; margin: auto; font-size: var(--font-size-sm); }
 .transcription-page .page-heading { display: flex; justify-content: space-between; align-items: center; gap: var(--spacing-md); padding: 0 0 var(--spacing-md); border: 0; font-weight: 400; }
-.page-heading h2 { margin: 0; font-weight: var(--font-weight-semibold); font-size: var(--font-size-xl); line-height: 1.25; letter-spacing: -.025em; }
 .page-subtitle { color: var(--color-text-subtle); font-size: var(--font-size-md); font-weight: 400; margin: var(--spacing-xs) 0 0; }
 .workflow-tabs { width: fit-content; flex-shrink: 0; padding: 0; background: transparent; }
 .workflow-tabs .tabs__tab { padding: var(--spacing-xs) var(--spacing-sm); }
 .workflow-panel { display: block; }
 .workflow-step { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .workflow-status { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); min-height: 56px; margin-bottom: var(--spacing-md); }
-.workflow-status h3 { margin: 0; font-size: var(--font-size-lg); line-height: 1.4; font-weight: 600; }
+.workflow-status h3 { margin: 0; font: var(--font-size-lg)/var(--line-height-tight) var(--font-family-accessible); letter-spacing: var(--letter-spacing-body); }
 .workflow-status--recording h3::before { content: '● '; color: var(--color-status-error-text); }
 .workflow-status--copied h3::before { content: '✓ '; color: var(--color-status-success); }
 .status-spinner { display: inline-block; width: 12px; height: 12px; margin-right: var(--spacing-xs); border: 2px solid var(--color-action-primary); border-right-color: transparent; border-radius: 50%; animation: working .8s linear infinite; }
@@ -29,15 +28,17 @@
 .workflow-controls .button:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
 .workflow-controls .button:disabled { opacity: 1; color: var(--color-text-default); background: transparent; }
 .workflow-connector { position: absolute; left: calc(100% + var(--spacing-md) / 2 + 1px); top: calc(var(--spacing-sm) + 12px); transform: translate(-50%, -50%); font-size: var(--font-size-md); line-height: 1; color: var(--color-text-subtle); }
-.record-hint { font-size: var(--font-size-md); line-height: var(--line-height-normal); font-family: var(--font-family-accessible); letter-spacing: var(--letter-spacing-body); margin: var(--spacing-sm) 0; }
+.record-hint { max-inline-size: 65ch; font-size: var(--font-size-md); line-height: var(--line-height-normal); font-family: var(--font-family-accessible); letter-spacing: var(--letter-spacing-body); margin: var(--spacing-sm) 0; }
 #workflow-help { min-height: 1.6em; }
 .record-actions { display: flex; gap: var(--spacing-xs); flex-wrap: wrap; padding-top: var(--spacing-sm); border-top: 1px solid var(--color-border-default); }
 .record-actions .button { min-height: var(--hit-target-aaa); padding: var(--spacing-xs) var(--spacing-sm); }
 .copy-option { display: flex; align-items: center; gap: var(--spacing-xs); margin-left: auto; min-height: var(--hit-target-aaa); cursor: pointer; }
 .settings-details { display: block; margin-top: var(--spacing-md); }
+.settings-details, .disclosure--inline { max-inline-size: 65ch; font: var(--font-size-md)/var(--line-height-normal) var(--font-family-reading); }
 candor-disclosure::part(trigger) { font-weight: var(--font-weight-bold); }
 candor-disclosure::part(panel) { overflow: visible; }
 .transcript-footer { padding: var(--spacing-2xs) var(--spacing-md); color: var(--color-text-default); }
+.transcript-footer .transcript-segment { grid-template-columns: 1fr; gap: var(--spacing-xs); }
 .disclosure--inline::part(trigger) { border-bottom: 0; }
 .disclosure--subtle { display: block; margin-left: var(--spacing-sm); padding-inline: var(--spacing-xs); }
 .options-section { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm); margin-top: var(--spacing-sm); }
@@ -45,16 +46,17 @@ candor-disclosure::part(panel) { overflow: visible; }
 .options-section .input { min-width: 0; font-size: var(--font-size-md); }
 .result-section { margin-top: var(--spacing-md); }
 .result-heading { display: flex; justify-content: space-between; align-items: baseline; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm); }
-.result-heading h3 { margin: 0; font-size: var(--font-size-lg); }
 .transcript-output { display: block; --candor-card-overflow: visible; }
 .transcript-heading { padding: var(--spacing-md); font-weight: var(--font-weight-regular); }
 .transcript-heading .record-hint { margin-bottom: 0; }
 .transcript-content { padding: var(--spacing-2xs) var(--spacing-md); }
 .transcript-view { max-height: 360px; overflow: auto; }
-.transcript-segment { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: baseline; gap: var(--spacing-sm); margin: 0; padding: var(--spacing-sm) 0; border-bottom: 1px solid color-mix(in srgb, var(--color-border-default) 55%, transparent); line-height: 1.65; }
+.transcript-segment { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: baseline; gap: var(--spacing-sm); margin: 0; padding: var(--spacing-sm) 0; border-bottom: 1px solid color-mix(in srgb, var(--color-border-default) 55%, transparent); line-height: var(--line-height-relaxed); }
 .transcript-segment:last-child { border: 0; }
-.segment__time { font: var(--font-size-sm)/1.7 var(--font-family-mono); white-space: nowrap; }
-.segment__text { font-size: var(--font-size-md); }
+.segment__time { font: var(--font-size-sm)/var(--line-height-relaxed) var(--font-family-mono); white-space: nowrap; }
+.explanation-prose, .segment__text { font: var(--font-size-md)/var(--line-height-relaxed) var(--font-family-reading); letter-spacing: var(--letter-spacing-normal); max-inline-size: 65ch; }
+.explanation-prose { margin: 0 0 var(--spacing-md); }
+.performance-summary { max-inline-size: none; font-family: var(--font-family-base); letter-spacing: var(--letter-spacing-normal); }
 .record-error { margin-top: var(--spacing-sm); }
 .file-info { display: flex; gap: var(--spacing-xs); padding: var(--spacing-sm); border: 1px solid var(--color-border-default); border-radius: var(--radius-md); overflow-wrap: anywhere; }
 .file-size { margin-left: auto; white-space: nowrap; }

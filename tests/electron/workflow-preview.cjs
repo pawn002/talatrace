@@ -17,6 +17,8 @@ const fixture = {
   segments: [{ start: 1.2, end: 5.1, text: 'I needed time to consider the tradeoffs.' }, { start: 35.5, end: 38.1, text: 'Then I made a decision.' }],
   noSpeechIntervals: [{ start: 5.5, end: 35.2 }], quietIntervals: [{ start: 7, end: 32 }],
 };
+fixture.segments[0].text = 'I needed time to consider the tradeoffs. The deadline was fixed, but the requirements were still changing, so I wrote down the assumptions and asked the team to choose the risks they could accept. That gave us a shared starting point and made it easier to explain why I chose a smaller, testable first step instead of promising everything at once.';
+fixture.text = fixture.segments.map(segment => segment.text).join(' ');
 fixture.originalSegments = fixture.segments;
 const { SPEECH_MODELS, modelSize } = require('../../dist/electron/services/model-catalog');
 let alternateReady = true;
@@ -89,7 +91,7 @@ app.whenReady().then(async () => {
       }).map(el => ({ text: el.textContent.trim().slice(0, 80), size: getComputedStyle(el).fontSize }));
       if (smallText.length) throw new Error('Readable text below 14px: ' + JSON.stringify(smallText));
       const colourPairs = [];
-      for (const selector of ['.spectrum-label', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
+      for (const selector of ['.spectrum-label', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
         for (const el of document.querySelectorAll(selector)) {
           if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
@@ -122,9 +124,17 @@ app.whenReady().then(async () => {
         const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
         contrasts[selector] = Math.round((values[0] + .05) / (values[1] + .05) * 100) / 100;
       }
+      const readingMeasures = [...document.querySelectorAll('.disclosure--inline, .settings-details, .explanation-prose, .segment__text, .record-hint:not(.performance-summary)')]
+        .filter(el => el.checkVisibility({ checkVisibilityCSS: true })).map(el => {
+          const style = getComputedStyle(el);
+          context.font = style.fontSize + ' ' + style.fontFamily;
+          return { selector: el.className, widthCh: el.getBoundingClientRect().width / context.measureText('0').width,
+            font: style.fontFamily, size: parseFloat(style.fontSize), leading: style.lineHeight };
+        });
+      if (readingMeasures.some(item => item.widthCh > 65.5)) throw new Error('Reading column exceeds 65ch: ' + JSON.stringify(readingMeasures));
       return { name: ${JSON.stringify(name)}, width: innerWidth, height: innerHeight,
         horizontalOverflow: panel.scrollWidth > panel.clientWidth + 1,
-        contrasts, colourPairs, smallText,
+        contrasts, colourPairs, smallText, readingMeasures,
         controls: controls.map(el => ({ label: el.textContent.trim(), disabled: el.disabled,
           x: Math.round(el.getBoundingClientRect().x), y: Math.round(el.getBoundingClientRect().y),
           width: Math.round(el.getBoundingClientRect().width), height: Math.round(el.getBoundingClientRect().height) })) };
@@ -135,6 +145,7 @@ app.whenReady().then(async () => {
     win.webContents.session.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, (_details, callback) => callback({ cancel: true }));
     await win.loadFile(path.join(root, 'frontend/dist/index.html'));
     await wait(600);
+    await win.webContents.executeJavaScript("document.fonts.load('16px \"Noto Sans\"').then(() => true)");
     await win.webContents.executeJavaScript(`(async () => {
       await customElements.whenDefined('candor-card');
       for (const card of document.querySelectorAll('candor-card')) {

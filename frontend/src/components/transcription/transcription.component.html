@@ -82,20 +82,20 @@
         </div>
         <div slot="footer" class="transcript-footer">
         <candor-disclosure class="quiet-details disclosure--inline" label="About timing and pause detection">
-          <p class="record-hint">{{ timingDescription }} {{ pauseDescription }}</p>
-          @if (performanceSummary) { <p class="record-hint">Processing time includes audio preparation, model loading, transcription and timing analysis. Real-time speed is audio duration divided by processing time; higher is faster.</p> }
+          <p class="explanation-prose">{{ timingDescription }} {{ pauseDescription }}</p>
+          @if (performanceSummary) { <p class="explanation-prose">Processing time includes audio preparation, model loading, transcription and timing analysis. Real-time speed is audio duration divided by processing time; higher is faster.</p> }
           @if (transcriptionResult?.originalSegments?.length) {
             <candor-accordion-item class="quiet-details disclosure--subtle" variant="subtle" heading="Original recognition timestamps">
               @for (segment of transcriptionResult.originalSegments; track $index) {
-                <p class="transcript-segment"><span class="segment__time">{{ formatTimestampRange(segment.start, segment.end) }}</span><span>{{ segment.text }}</span></p>
+                <p class="transcript-segment"><span class="segment__time">{{ formatTimestampRange(segment.start, segment.end) }}</span><span class="segment__text">{{ segment.text }}</span></p>
               }
             </candor-accordion-item>
           }
           @if (transcriptionResult?.quietIntervals?.length) {
             <candor-accordion-item class="quiet-details disclosure--subtle" variant="subtle" [heading]="'Original quiet measurements (' + transcriptionResult.quietIntervals.length + ')'">
-              <p class="record-hint">Audio below the detector threshold for at least 1.5 seconds. Original measurements are retained in JSON exports.</p>
+              <p class="explanation-prose">Audio below the detector threshold for at least 1.5 seconds. Original measurements are retained in JSON exports.</p>
               @for (interval of transcriptionResult.quietIntervals; track $index) {
-                <p class="transcript-segment"><span class="segment__time">{{ formatTimestampRange(interval.start, interval.end) }}</span><span>Quiet ({{ (interval.end - interval.start).toFixed(1) }} s)</span></p>
+                <p class="transcript-segment"><span class="segment__time">{{ formatTimestampRange(interval.start, interval.end) }}</span><span class="segment__text">Quiet ({{ (interval.end - interval.start).toFixed(1) }} s)</span></p>
               }
             </candor-accordion-item>
           }
