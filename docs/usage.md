@@ -357,6 +357,8 @@ Currently, the app uses standard system shortcuts:
 
 **Available on Windows with Intel Iris Xe** — The app automatically uses the Vulkan iGPU backend when available, providing 1.7–4x faster transcription compared to CPU-only. No configuration required.
 
+While recording or transcribing, you can visit Models or History and return to Transcription without interrupting the operation. The header continues to show recording/transcription status. The recording/file source switch stays locked until the operation finishes; its explanation appears beneath the source tabs. Workflow hints explain when Stop, Copy and Save become available. History shows a reason beside unavailable Copy actions.
+
 ## Appearance
 
 Use the three-position **Theme** control in the app header to choose **Light**, **Dark**, or **System**. Changes apply immediately. Tab into the group, then use the arrow keys to select a mode; Home and End select the first and last options. System is the default and follows the operating system, including changes while the app is open. Light and Dark override the system preference for this app. The choice is stored locally and restored on reload or restart. Theme switching is available during recording and does not interrupt capture.

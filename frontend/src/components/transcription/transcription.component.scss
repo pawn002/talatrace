@@ -3,6 +3,8 @@
 .page-subtitle { color: var(--color-text-subtle); font-size: var(--font-size-md); font-weight: 400; margin: var(--spacing-xs) 0 0; }
 .workflow-tabs { width: fit-content; flex-shrink: 0; padding: 0; background: transparent; }
 .workflow-tabs .tabs__tab { padding: var(--spacing-xs) var(--spacing-sm); }
+.source-selector { max-inline-size: 32ch; }
+.source-help { min-block-size: 3em; margin: var(--spacing-xs) 0 0; }
 .workflow-panel { display: block; }
 .workflow-step { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .workflow-status { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); min-height: 56px; margin-bottom: var(--spacing-md); }
@@ -26,9 +28,9 @@
 .workflow-controls .button { margin-top: auto; font-size: var(--font-size-sm); width: 100%; min-height: var(--hit-target-aaa); padding: var(--spacing-xs); border: 1px solid var(--color-border-default); white-space: normal; }
 .workflow-controls .button--primary { border-color: transparent; }
 .workflow-controls .button:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
-.workflow-controls .button:disabled { opacity: 1; color: var(--color-text-default); background: transparent; }
 .workflow-connector { position: absolute; left: calc(100% + var(--spacing-md) / 2 + 1px); top: calc(var(--spacing-sm) + 12px); transform: translate(-50%, -50%); font-size: var(--font-size-md); line-height: 1; color: var(--color-text-subtle); }
-.record-hint { max-inline-size: 65ch; font-size: var(--font-size-md); line-height: var(--line-height-normal); font-family: var(--font-family-accessible); letter-spacing: var(--letter-spacing-body); margin: var(--spacing-sm) 0; }
+.record-hint, .source-help { max-inline-size: 65ch; font-size: var(--font-size-md); line-height: var(--line-height-normal); font-family: var(--font-family-accessible); letter-spacing: var(--letter-spacing-body); }
+.record-hint { margin: var(--spacing-sm) 0; }
 #workflow-help { min-height: 1.6em; }
 .record-actions { display: flex; gap: var(--spacing-xs); flex-wrap: wrap; padding-top: var(--spacing-sm); border-top: 1px solid var(--color-border-default); }
 .record-actions .button { min-height: var(--hit-target-aaa); padding: var(--spacing-xs) var(--spacing-sm); }
@@ -73,7 +75,6 @@ candor-disclosure::part(panel) { overflow: visible; }
   .workflow-control--monitor app-audio-spectrum { grid-column: 2; }
   .workflow-connector { left: calc(var(--spacing-xs) + 12px); top: calc(100% + var(--spacing-sm) / 2 + 1px); transform: translate(-50%, -50%) rotate(90deg); }
   .transcript-segment { grid-template-columns: 1fr; gap: var(--spacing-2xs); }
-  .recording-status [role='timer'] { font-size: var(--font-size-xl); }
   .result-heading { align-items: flex-start; flex-direction: column; gap: var(--spacing-2xs); }
   .copy-option { margin-left: 0; }
   .options-section { grid-template-columns: 1fr; }

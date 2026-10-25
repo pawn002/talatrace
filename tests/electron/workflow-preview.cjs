@@ -26,7 +26,8 @@ ipcMain.handle('get-available-models', () => SPEECH_MODELS.map(model => ({ ...mo
 ipcMain.handle('download-model', () => new Promise(resolve => setTimeout(() => resolve({ success: true }), 1500)));
 ipcMain.handle('get-system-info', () => ({ platform: process.platform, version: '1.1.5' }));
 let history = [];
-ipcMain.handle('get-transcription-history', () => history);
+let historyDelay = 0;
+ipcMain.handle('get-transcription-history', async () => { if (historyDelay) await new Promise(resolve => setTimeout(resolve, historyDelay)); return history; });
 let filename = 'interview-answer.wav';
 let failPicker = false;
 ipcMain.handle('select-audio-file', () => { if (failPicker) { failPicker = false; throw new Error('File picker unavailable'); } return { path: `C:/Audio/${filename}`, size: 5 * 1024 * 1024 }; });
@@ -42,7 +43,7 @@ function transcribe(event) {
 ipcMain.handle('transcribe-recording', transcribe);
 ipcMain.handle('transcribe-audio', transcribe);
 app.whenReady().then(async () => {
-  const watchdog = setTimeout(() => { console.error('Visual review timed out'); app.exit(1); }, 60000);
+  const watchdog = setTimeout(() => { console.error('Visual review timed out'); app.exit(1); }, 90000);
   const win = new BrowserWindow({ width: 1100, height: 820, show: false, webPreferences: {
     offscreen: true, backgroundThrottling: false, preload: path.join(root, 'dist/electron/preload.js'),
   } });
@@ -98,7 +99,7 @@ app.whenReady().then(async () => {
       }).map(el => ({ text: el.textContent.trim().slice(0, 80), size: getComputedStyle(el).fontSize }));
       if (smallText.length) throw new Error('Readable text below 14px: ' + JSON.stringify(smallText));
       const colourPairs = [];
-      for (const selector of ['.theme-label', '.theme-choice', '.spectrum-label', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
+      for (const selector of ['.source-help', '.action-reason', '#history-refresh-status', '.theme-label', '.theme-choice', '.spectrum-label', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
         for (const el of document.querySelectorAll(selector)) {
           if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
@@ -242,11 +243,14 @@ app.whenReady().then(async () => {
     if (await win.webContents.executeJavaScript("document.querySelector('.spectrum-label').textContent") !== 'Recording') throw new Error('Quiet input hid the active recording label');
     await win.webContents.executeJavaScript("window.previewGain.gain.value = 0.2");
     await win.webContents.executeJavaScript(`(() => {
-      if (!document.querySelector('#app-tab-models').disabled || !document.querySelector('#app-tab-history').disabled) throw new Error('Active recording can be hidden by main navigation');
+      if (document.querySelector('#app-tab-models').disabled || document.querySelector('#app-tab-history').disabled) throw new Error('Main views unnecessarily locked during recording');
       document.querySelector('#app-tab-transcription').dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
-      if (document.querySelector('#app-panel-transcription').hidden) throw new Error('Keyboard navigation hid an active recording');
+      if (document.querySelector('#app-panel-history').hidden) throw new Error('Keyboard navigation cannot inspect History during recording');
       if (!document.querySelector('.local-badge').textContent.includes('Recording')) throw new Error('Header recording status is missing');
     })()`);
+    await capture('history-during-recording');
+    await click('#app-tab-transcription');
+    if (!await win.webContents.executeJavaScript("!document.querySelector('[data-action=stop]').disabled && document.querySelector('#audio-file-tab').disabled && !document.querySelector('#record-audio-tab').disabled && document.querySelector('#source-help').textContent.includes('switch sources')")) throw new Error('Recording or source guard lost after navigating back');
     await click('[data-action="stop"]'); await capture('processing');
     await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
     if (await win.webContents.executeJavaScript("getComputedStyle(document.querySelector('.status-spinner')).animationName") !== 'none') throw new Error('Reduced motion preference was ignored');
@@ -283,6 +287,7 @@ app.whenReady().then(async () => {
     await win.webContents.executeJavaScript("document.querySelectorAll('.quiet-details').forEach(el => el.open = true); document.querySelector('.quiet-details').scrollIntoView({ block: 'start' })");
     await capture('nested-diagnostics');
     win.setSize(360, 780);
+    await wait(150);
     await win.webContents.executeJavaScript("document.querySelector('.quiet-details').scrollIntoView({ block: 'start' })");
     await capture('nested-diagnostics-small');
     await win.webContents.executeJavaScript("document.querySelector('.disclosure--subtle').scrollIntoView({ block: 'start' })");
@@ -374,9 +379,25 @@ app.whenReady().then(async () => {
     await click('#app-tab-history'); await capture('history');
     history = [{ id: 'fixture', status: 'completed', fileName: 'Recorded answer', options: { model: 'base' }, audioDuration: 38.6, transcriptionTime: 1450, startedAt: '2026-10-24T21:30:00.000Z', result: fixture }];
     await click('#app-panel-history [aria-label="Refresh history"]'); await wait(100); await capture('history-populated');
+    history = [...history,
+      { id: 'waiting', status: 'processing', fileName: 'Answer in progress', startedAt: '2026-10-24T21:31:00.000Z' },
+      { id: 'failed', status: 'failed', fileName: 'Failed answer', startedAt: '2026-10-24T21:32:00.000Z' },
+      { id: 'missing', status: 'completed', fileName: 'Result unavailable', startedAt: '2026-10-24T21:33:00.000Z' }];
+    historyDelay = 1000;
+    await click('#app-panel-history [aria-label="Refresh history"]'); await capture('history-refreshing');
+    if (!await win.webContents.executeJavaScript("document.querySelector('#app-panel-history [aria-label=\"Refresh history\"]').disabled && document.querySelector('#history-refresh-status').textContent.includes('Refreshing')")) throw new Error('Disabled Refresh lacks visible reason');
+    await wait(850); historyDelay = 0; await capture('history-unavailable');
+    if (!await win.webContents.executeJavaScript("[...document.querySelectorAll('.history-action button:disabled')].length === 3 && [...document.querySelectorAll('.history-action button:disabled')].every(el => !!document.getElementById(el.getAttribute('aria-describedby'))?.textContent)")) throw new Error('Disabled history actions lack adjacent reasons');
+    win.setSize(360, 780); await capture('history-unavailable-small');
+    await wait(150);
+    await win.webContents.executeJavaScript("const historyScroll = document.querySelector('#app-panel-history .table-container'); historyScroll.scrollLeft = historyScroll.scrollWidth; void 0");
+    await capture('history-actions-small');
+    nativeTheme.themeSource = 'light'; await wait(250); await capture('history-actions-small-light');
+    nativeTheme.themeSource = 'dark'; win.setSize(1100, 820);
+    await win.webContents.executeJavaScript("document.querySelector('#app-panel-history .table-container').scrollLeft = 0");
     await win.webContents.executeJavaScript("document.querySelector('#app-tab-history').focus(); document.querySelector('#app-panel-history [aria-label=\"Refresh history\"]').focus()");
     await capture('candor-tooltip-focus');
-    if (!await win.webContents.executeJavaScript("(() => { const host = document.querySelector('#app-panel-history candor-tooltip'); const bubble = host.shadowRoot.querySelector('.tooltip__bubble'); return bubble.matches(':popover-open') && bubble.getAttribute('aria-hidden') === 'true' && !host.querySelector('button').hasAttribute('aria-describedby'); })()")) throw new Error('Candor tooltip contract failed');
+    if (!await win.webContents.executeJavaScript("(() => { const host = document.querySelector('#app-panel-history candor-tooltip'); const bubble = host.shadowRoot.querySelector('.tooltip__bubble'); return bubble.matches(':popover-open') && bubble.getAttribute('aria-hidden') === 'true' && host.querySelector('button').getAttribute('aria-describedby') === 'history-refresh-status'; })()")) throw new Error('Candor tooltip contract failed');
     await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
     await wait(50);
     if (await win.webContents.executeJavaScript("document.querySelector('#app-panel-history candor-tooltip').shadowRoot.querySelector('.tooltip__bubble').matches(':popover-open')")) throw new Error('Escape did not dismiss the tooltip');

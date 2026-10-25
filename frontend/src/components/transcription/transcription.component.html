@@ -4,10 +4,11 @@
       <h2>{{ inputMode === 'record' ? 'Record an answer' : 'Transcribe an audio file' }}</h2>
       <p class="page-subtitle">{{ inputMode === 'record' ? 'Keep the words, the pauses, and the context.' : 'Turn a local recording into text you can use anywhere.' }}</p>
     </div>
-    <div class="tabs__list workflow-tabs" role="tablist" aria-label="Audio source">
-      <button #recordTab id="record-audio-tab" role="tab" class="tabs__tab" [attr.aria-selected]="inputMode === 'record'" [attr.tabindex]="inputMode === 'record' ? 0 : -1" aria-controls="transcription-workflow-panel" [disabled]="busy" (click)="switchWorkflow('record')" (keydown)="onWorkflowTabKeydown($event)">Record audio</button>
-      <button #fileTab id="audio-file-tab" role="tab" class="tabs__tab" [attr.aria-selected]="inputMode === 'file'" [attr.tabindex]="inputMode === 'file' ? 0 : -1" aria-controls="transcription-workflow-panel" [disabled]="busy" (click)="switchWorkflow('file')" (keydown)="onWorkflowTabKeydown($event)">Audio file</button>
+    <div class="source-selector"><div class="tabs__list workflow-tabs" role="tablist" aria-label="Audio source">
+      <button #recordTab id="record-audio-tab" role="tab" class="tabs__tab" [attr.aria-selected]="inputMode === 'record'" [attr.tabindex]="inputMode === 'record' ? 0 : -1" aria-controls="transcription-workflow-panel" [disabled]="busy && inputMode !== 'record'" aria-describedby="source-help" (click)="switchWorkflow('record')" (keydown)="onWorkflowTabKeydown($event)">Record audio</button>
+      <button #fileTab id="audio-file-tab" role="tab" class="tabs__tab" [attr.aria-selected]="inputMode === 'file'" [attr.tabindex]="inputMode === 'file' ? 0 : -1" aria-controls="transcription-workflow-panel" [disabled]="busy && inputMode !== 'file'" aria-describedby="source-help" (click)="switchWorkflow('file')" (keydown)="onWorkflowTabKeydown($event)">Audio file</button>
     </div>
+    <p id="source-help" class="source-help">{{ sourceHint }}</p></div>
   </div>
 
   <div class="page-content">
@@ -46,9 +47,9 @@
       <p id="workflow-help" class="record-hint">{{ workflowHint }}</p>
       <div class="record-actions">
         @if (inputMode === 'record' && recordedAudio && recordingError && !busy) {
-          <button data-action="transcribe" class="button button--primary button--small" (click)="startTranscription()" [disabled]="!hasInstalledModel">Retry transcription</button>
+          <button data-action="transcribe" class="button button--primary button--small" (click)="startTranscription()" [disabled]="!hasInstalledModel" aria-describedby="workflow-help">Retry transcription</button>
         }
-        <button class="button button--ghost button--small" (click)="exportTranscript()" [disabled]="!transcriptionResult || busy">Save transcript…</button>
+        <button class="button button--ghost button--small" (click)="exportTranscript()" [disabled]="!transcriptionResult || busy" aria-describedby="workflow-help">Save transcript…</button>
       <label class="copy-option"><input class="checkbox-input" type="checkbox" [(ngModel)]="includeTimestamps" (ngModelChange)="copied = false"><span class="checkbox-box" aria-hidden="true"></span><span>Include timing and pauses</span></label>
       </div>
       @if (!hasInstalledModel && !busy) { <button class="button button--primary button--medium" (click)="manageModels.emit()">Download a model</button> }

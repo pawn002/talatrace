@@ -340,6 +340,8 @@ describe('TranscriptionComponent', () => {
         component[flag] = true;
         fixture.detectChanges();
         expect(fixture.nativeElement.querySelector('#audio-file-tab').disabled).toBe(true);
+        expect(fixture.nativeElement.querySelector('#record-audio-tab').disabled).toBe(false);
+        expect(fixture.nativeElement.querySelector('#source-help').textContent).toContain('switch sources');
         component.switchWorkflow('file');
         expect(component.inputMode).toBe('record');
         component[flag] = false;

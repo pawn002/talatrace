@@ -75,7 +75,11 @@ app.whenReady().then(async () => {
       if (document.querySelector('.spectrum-display')?.getAttribute('data-mode') !== 'spectrogram') throw new Error('Recorded microphone stream is not being analyzed');
       const spectrum = document.querySelector('app-audio-spectrum canvas');
       if (!spectrum.getContext('2d').getImageData(0, 0, spectrum.width, spectrum.height).data.some((value, index) => index % 4 === 3 && value > 0)) throw new Error('Real microphone audio produced no spectrum');
-      if (!document.querySelector('#app-tab-models').disabled || !document.querySelector('#app-tab-history').disabled) throw new Error('Main navigation can hide an active recording');
+      if (document.querySelector('#app-tab-models').disabled || document.querySelector('#app-tab-history').disabled) throw new Error('Main views unnecessarily locked during recording');
+      document.querySelector('#app-tab-history').click(); await wait(100);
+      if (document.querySelector('#app-panel-history').hidden) throw new Error('Cannot inspect History during recording');
+      document.querySelector('#app-tab-transcription').click(); await wait(100);
+      if (document.querySelector('[data-action=stop]').disabled || !document.querySelector('.local-badge').textContent.includes('Recording')) throw new Error('Navigating interrupted recording');
       await wait(38000);
       const liveDuration = document.querySelector('[role="timer"]').textContent;
       if (!/^\\d{2}:\\d{2}$/.test(liveDuration)) throw new Error('Live duration should show whole seconds: ' + liveDuration);

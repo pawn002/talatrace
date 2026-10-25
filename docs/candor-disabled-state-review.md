@@ -1,6 +1,6 @@
 # Candor disabled-state guidance and app review
 
-Reviewed 25 October 2026 against current Candor main, commit `a4d27af8edc503aa801b7b336e1e23b41287c9e5`. The app remains pinned to Candor 6.0.0. This is a documentation and code review, not a new rendered or screen-reader audit. No app behavior changed.
+Initially reviewed 25 October 2026 against current Candor main, commit `a4d27af8edc503aa801b7b336e1e23b41287c9e5`. The app remains pinned to Candor 6.0.0. The initial review changed no app behavior; subsequent implementation and rendered verification are recorded below. No manual screen-reader audit is claimed.
 
 ## Candor's requirements
 
@@ -52,3 +52,19 @@ The findings below come from the current Angular templates, workflow-state gette
 4. Inspect all these combinations in light/dark and narrow layouts, including keyboard/document order and readable explanation contrast. Do not add a separate paragraph to every step when one nearby, explicit group explanation can serve the related actions. That grouping is our proposed way to honor Candor without making the layout noisy.
 
 Preserve the stable Record/Stop/Copy locations and use spacing and readable text for the explanations.
+
+## Implementation follow-up
+
+The preceding table records findings before implementation. The user requested a checkpoint commit; `5b8db1d` contains that review and the prior recording/theme work. The following changes are subsequent work:
+
+- Removed the main-navigation lock: views already remain mounted, so viewing Models/History does not need to stop or discard recording. The persistent recording badge remains visible. The preview visits History by keyboard during active capture, then returns and verifies Stop is still available.
+- Kept the source-switch guard, with the selected tab enabled and focusable. A readable 16px Atkinson explanation now sits immediately beneath the source tabs, with specific wording for recording, transcription or the file dialog. An app-specific reserved two-line measure keeps that explanation from shifting the workflow as its text changes. Both tabs reference this visible explanation.
+- Expanded the shared workflow hint to explain Stop, Copy and Save prerequisites. Save and Retry now reference that visible hint too. Removed the previous full-opacity disabled-workflow override; action explanations stay outside the dimmed controls.
+- Kept History's refresh status mounted as a polite, atomic live region in the heading beside Refresh. The disabled button references that visible status, not the supplementary Candor tooltip bubble.
+- Added a readable row-local Copy explanation for pending/processing results and for failed/cancelled/missing results. Completed rows without a result are disabled too; the handler enforces the same availability guard. Table headings and numeric columns stay unwrapped, with existing keyboard-accessible horizontal overflow for narrow windows.
+
+Reviewed the current Tabs, Button, Table, Tooltip and AccessibleText stories/constructions and typography contrast guidance before the changes. Native elements and token-based type remain deliberate app adaptations; no new tooltip or card imitation was introduced.
+
+Four rendered inspection passes corrected the initially detached source hint, restored Candor disabled-button dimming, prevented wrapped History headings/numeric values, and checked the narrow table's Actions column after horizontal scrolling. The History table uses an app-specific 8px horizontal cell inset, retaining its existing vertical inset and 44px action targets so the explanatory action column fits desktop. The final 73-state preview has no page-wide overflow or text below 14px; 55 sampled pairings pass Klar 3.1.0. Record/Stop/Copy desktop bounds are identical across ready, recording, processing, completed and copied. Inspected light/dark, 360/480px, short window, 200% zoom, focus, retry and file workflows. All 114 frontend tests pass. Build passes within the unchanged hard limits (transcription styles 7.83 kB); existing warning categories remain. These improvements follow the checkpoint commit and are uncommitted.
+
+The native offline smoke also passes real MediaRecorder capture, local transcription, Copy, file import and a second recording. Its old lock assertion was replaced with visiting History and returning during capture, confirming that recording remains active. Tests use an isolated profile, synthetic microphone and blocked HTTP(S); the user's open app session was not restarted. Manual screen-reader testing remains outstanding.

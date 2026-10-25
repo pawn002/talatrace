@@ -115,6 +115,17 @@ describe('HistoryComponent', () => {
       expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
     });
 
+    it('blocks unfinished results and explains waiting versus unavailable copies', async () => {
+      const pending = { id: 'p', status: 'processing', startedAt: '', result: 'partial' };
+      const failed = { id: 'f', status: 'failed', startedAt: '', result: 'partial' };
+      expect(component.copyUnavailableReason(pending)).toContain('when transcription finishes');
+      expect(component.copyUnavailableReason(failed)).toContain('No transcript');
+      expect(component.copyUnavailableReason({ id: 'm', status: 'completed', startedAt: '' })).toContain('No transcript');
+      await component.copyTranscript(pending);
+      await component.copyTranscript(failed);
+      expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+    });
+
     it('copies a string result directly and shows success toast', async () => {
       await component.copyTranscript({ id: '1', status: 'completed', startedAt: '', result: 'plain text' });
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith('plain text');

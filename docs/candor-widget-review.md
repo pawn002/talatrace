@@ -37,6 +37,8 @@ The arrow follow-up rebuilt successfully and reran all 44 preview states without
 
 ## Verification and limits
 
+Disabled-state follow-up: see [the disabled-state review](candor-disabled-state-review.md) for current Candor sources, the app audit and implementation. Main views remain accessible during capture; source locks have adjacent explanations, workflow hints cover Copy/Save availability, and History exposes readable disabled-action reasons. Existing native controls use Candor disabled treatment; explanations remain at full opacity with 16px Atkinson and measured text-token pairings.
+
 Theme preference initially used the actual Candor Select. The compact-control follow-up below supersedes that header widget; model/language selects retain their existing construction.
 
 Compact theme control: reviewed current Switch and Radio stories and construction, plus the Toolbar pressed-state guidance. Candor has no multi-state switch; requested one in [Candor #361](https://github.com/pawn002/candor/issues/361), with our Light/Dark/System header anecdote. This deliberate app-specific adaptation uses native same-name radios in a named fieldset, not a three-valued ARIA switch. Native arrows wrap and select immediately; Space selects; Home/End select the endpoints. The group occupies one Tab stop. Visible labels avoid tooltip/icon interpretation. Selection persists through the existing preference helpers.

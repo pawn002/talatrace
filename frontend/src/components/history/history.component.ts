@@ -70,6 +70,12 @@ export class HistoryComponent implements OnInit, OnDestroy {
     }
   }
 
+  copyUnavailableReason(item: TranscriptionHistoryItem): string {
+    if (item.status === 'completed' && item.result) return '';
+    if (item.status === 'pending' || item.status === 'processing') return 'Copy becomes available when transcription finishes.';
+    return 'No transcript is available to copy.';
+  }
+
   formatDuration(seconds?: number): string {
     if (!seconds) return "N/A";
     const mins = Math.floor(seconds / 60);
@@ -103,6 +109,7 @@ export class HistoryComponent implements OnInit, OnDestroy {
   }
 
   async copyTranscript(item: TranscriptionHistoryItem): Promise<void> {
+    if (this.copyUnavailableReason(item)) return;
     if (item.result) {
       try {
         const text =

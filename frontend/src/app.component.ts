@@ -38,7 +38,6 @@ export class AppComponent implements OnInit {
   @ViewChild(TranscriptionComponent) transcription?: TranscriptionComponent;
 
   onAppTabKeydown(event: KeyboardEvent): void {
-    if (this.transcription?.busy) return;
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
     this.activeTab = event.key === 'Home' ? 0 : event.key === 'End' ? 2

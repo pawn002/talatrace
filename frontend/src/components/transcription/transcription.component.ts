@@ -316,18 +316,24 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
 
   get workflowHint(): string {
     if (this.isSelectingFile) return 'Choose a file in the dialog, or cancel to return here.';
-    if (this.isRecording) return 'Speak at your own pace. Stop when you’re finished; your microphone will turn off.';
-    if (this.isTranscribing || this.isStoppingRecording) return `${this.progressMessage || 'Processing audio on this device…'} Copy will be available when it’s ready.`;
+    if (this.isRecording) return 'Stop & transcribe turns off the microphone and starts transcription. Copy and Save become available when it finishes.';
+    if (this.isTranscribing || this.isStoppingRecording) return `${this.progressMessage || 'Processing audio on this device…'} Copy and Save become available when transcription finishes.`;
     if (this.isStartingRecording) return 'Allow microphone access if prompted. Recording will begin automatically.';
     if (this.transcriptionResult) return this.copied
       ? `Copied ${this.includeTimestamps && this.hasTiming ? 'with timing and pauses' : 'as plain text'}. Paste into your chat or terminal.`
       : `Ready to copy ${this.includeTimestamps && this.hasTiming ? 'with timing and pauses' : 'as plain text'}.`;
-    if (!this.hasInstalledModel) return 'Download a speech model once to enable local recording and transcription.';
+    if (!this.hasInstalledModel) return 'Download a speech model to enable Record, Transcribe and Retry. Copy and Save require a completed transcript.';
     if (this.recordedAudio) return 'Your recording is retained. Choose Retry transcription, or Record answer to start again.';
-    if (this.selectedFilePath) return 'Your file is ready. Adjust the model or language below if needed, then transcribe.';
+    if (this.selectedFilePath) return 'Your file is ready. Transcribe file to enable Copy and Save; adjust settings below if needed.';
     return this.inputMode === 'record'
-      ? 'Record up to 30 minutes. Stop to transcribe automatically.'
-      : 'WAV, MP3, M4A and more. Choose a local recording to begin.';
+      ? 'Start recording (up to 30 minutes) to enable Stop & transcribe. Copy and Save become available after transcription.'
+      : 'Choose an audio file to enable Transcribe file. Copy and Save become available after transcription.';
+  }
+
+  get sourceHint(): string {
+    if (this.isSelectingFile) return 'Close the file dialog to switch sources.';
+    if (this.isRecording || this.isStartingRecording) return 'Stop and transcribe to switch sources.';
+    return this.busy ? 'Finish transcription to switch sources.' : 'Each source keeps its own transcript.';
   }
 
   async startRecording(): Promise<void> {

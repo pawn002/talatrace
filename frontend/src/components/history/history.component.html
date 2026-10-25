@@ -3,13 +3,14 @@
     <div class="page-heading-row">
       <div>
         <h2>Recent transcripts</h2>
-        <p class="page-subtitle">Completed transcriptions from this session.</p>
+        <p id="history-refresh-status" class="page-subtitle" role="status" aria-atomic="true">{{ isLoading ? 'Refreshing history. Refresh becomes available when this finishes.' : 'Transcriptions from this session.' }}</p>
       </div>
       <candor-tooltip text="Refresh history" position="left"><button
         class="button button--ghost button--small button--icon"
         (click)="loadHistory()"
         [disabled]="isLoading"
         aria-label="Refresh history"
+        aria-describedby="history-refresh-status"
         >
         <i class="ph-fill ph-arrow-clockwise" aria-hidden="true"></i>
       </button></candor-tooltip>
@@ -17,11 +18,6 @@
   </div>
 
   <div class="page-content">
-    @if (isLoading) {
-      <div class="loading-container">
-        <p>Loading history...</p>
-      </div>
-    }
 
     @if (!isLoading && history.length === 0) {
       <div class="empty-state">
@@ -49,7 +45,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (item of history; track item) {
+            @for (item of history; track item; let rowIndex = $index) {
               <tr>
                 <td class="file-cell">{{ item.fileName || "Unknown" }}</td>
                 <td>{{ item.options?.model || "base" }}</td>
@@ -57,15 +53,17 @@
                 <td class="cell--numeric">{{ formatDuration(item.audioDuration) }}</td>
                 <td class="cell--numeric">{{ formatTime(item.transcriptionTime) }}</td>
                 <td class="cell--mono">{{ formatTimestamp(item.startedAt) }}</td>
-                <td>
+                <td class="history-action">
                   <candor-tooltip text="Copy transcript" position="left"><button
                     class="button button--ghost button--small button--icon"
                     (click)="copyTranscript(item)"
-                    [disabled]="item.status !== 'completed'"
+                    [disabled]="!!copyUnavailableReason(item)"
+                    [attr.aria-describedby]="copyUnavailableReason(item) ? 'history-copy-reason-' + rowIndex : null"
                     aria-label="Copy transcript"
                     >
                     <i class="ph-fill ph-copy" aria-hidden="true"></i>
                   </button></candor-tooltip>
+                  @if (copyUnavailableReason(item)) { <p class="action-reason" [id]="'history-copy-reason-' + rowIndex">{{ copyUnavailableReason(item) }}</p> }
                 </td>
               </tr>
             }

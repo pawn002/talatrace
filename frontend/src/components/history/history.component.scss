@@ -4,8 +4,13 @@
 }
 .history-page .page-heading { padding-bottom: var(--spacing-md); }
 .history-page .page-subtitle { font-size: var(--font-size-md); font-weight: 400; color: var(--color-text-subtle); margin: var(--spacing-xs) 0 0; }
+.history-page .page-subtitle { max-inline-size: 65ch; font-family: var(--font-family-accessible); color: var(--color-text-default); }
+.page-heading-row { gap: var(--spacing-sm); }
+.history-action .action-reason { min-inline-size: 18ch; max-inline-size: 28ch; margin: var(--spacing-xs) 0 0; font: var(--font-size-md)/var(--line-height-normal) var(--font-family-accessible); letter-spacing: var(--letter-spacing-body); color: var(--color-text-default); white-space: normal; }
 .history-page .page-content { min-width: 0; }
 .history-page caption { text-align: left; }
+.history-page th, .history-page .cell--numeric, .history-page .cell--mono { white-space: nowrap; }
+.history-page th, .history-page td { padding-inline: var(--spacing-xs); }
 .history-page table { font-size: var(--font-size-sm); }
 .history-page .button { min-width: var(--hit-target-aaa); min-height: var(--hit-target-aaa); }
 
