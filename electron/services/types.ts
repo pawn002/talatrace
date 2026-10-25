@@ -19,9 +19,13 @@ export interface TranscriptionResult {
   }>;
   language?: string;
   duration?: number;
+  processingTimeMs?: number;
+  modelName?: string;
   quietIntervals?: Array<{ start: number; end: number }>;
   originalSegments?: Array<{ start: number; end: number; text: string }>;
-  timingMethod?: 'whisper-segments' | 'whisper-dtw';
+  timingMethod?: 'whisper-segments' | 'whisper-dtw' | 'transducer-tokens';
+  model?: string;
+  engine?: 'whisper.cpp' | 'transcribe.cpp';
   alignmentWarning?: string;
   speechIntervals?: Array<{ start: number; end: number }>;
   noSpeechIntervals?: Array<{ start: number; end: number }>;

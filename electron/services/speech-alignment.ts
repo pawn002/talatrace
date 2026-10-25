@@ -5,6 +5,7 @@ interface Token { id: number; text: string; t_dtw: number }
 interface NativeSegment { text: string; offsets?: { from: number; to: number }; start?: number; end?: number; tokens?: Token[] }
 
 export function alignmentPreset(model: string): string | undefined {
+  if (model === 'large-v3-turbo-q5_0') return 'large.v3.turbo';
   // The app's unversioned "large" alias does not identify its alignment-head variant.
   return ['tiny', 'base', 'small', 'medium'].includes(model) ? model : undefined;
 }

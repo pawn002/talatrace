@@ -19,6 +19,7 @@
     "setup": "npm install && npm run install:all && node scripts/setup-whisper.js",
     "install:all": "cd frontend && npm install",
     "build:whisper": "node scripts/build-whisper.js",
+    "setup:transcribe": "node scripts/setup-transcribe.cjs",
     "system-info": "node scripts/system-info.js",
     "build:whisper-variants": "node scripts/build-whisper-variants.js",
     "build:whisper-baseline": "node scripts/build-whisper-variants.js --variant=baseline",
@@ -78,6 +79,11 @@
     ],
     "extraResources": [
       {
+        "from": "transcribe-runtime",
+        "to": "transcribe-runtime",
+        "filter": ["**/*"]
+      },
+      {
         "from": "whisper.cpp/build-vulkan/bin",
         "to": "whisper.cpp/build-vulkan/bin",
         "filter": [
@@ -106,7 +112,9 @@
         "from": "models",
         "to": "models",
         "filter": [
-          "**/*"
+          "ggml-tiny.bin",
+          "ggml-base.bin",
+          "ggml-silero-v5.1.2.bin"
         ]
       },
       {

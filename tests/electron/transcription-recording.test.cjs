@@ -10,7 +10,7 @@ function harness(transcribe) {
   const service = Object.create(TranscriptionService.prototype);
   Object.assign(service, {
     jobs: new Map(), transcriptionHistory: [], busy: false,
-    whisperService: { getAudioDuration: async () => 20, transcribe },
+    whisperService: { initialize: async () => {}, getAudioDuration: async () => 20, transcribe },
     mainWindow: { isDestroyed: () => false, webContents: { send: (channel, payload) => {
       events.push([channel, payload]);
       if (channel === 'transcription-completed' || channel === 'transcription-error') finish();
@@ -34,6 +34,11 @@ test('recording job uses structured local timestamps and cleans up before publis
   assert.equal(h.service.busy, false);
   assert.equal(h.events.at(-1)[0], 'transcription-completed');
   assert.equal(h.events.at(-1)[1].segments[0].start, 2);
+  const job = h.service.getTranscriptionHistory()[0];
+  assert.equal(job.audioDuration, 20);
+  assert.equal(job.result.duration, job.audioDuration);
+  assert.ok(job.transcriptionTime > 0);
+  assert.equal(job.result.processingTimeMs, job.transcriptionTime);
 });
 
 test('failed transcription also cleans up temporary audio and releases the job lock', async () => {

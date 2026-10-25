@@ -1,0 +1,6 @@
+:host { display: block; height: 72px; margin-bottom: var(--spacing-xs); min-width: 0; }
+.spectrum-label { display: block; font-family: var(--font-family-accessible); font-size: var(--font-size-md); line-height: 24px; font-weight: var(--font-weight-regular); letter-spacing: var(--letter-spacing-body); color: var(--color-text-subtle-on-surface); }
+.spectrum-label--active { font-weight: var(--font-weight-bold); color: var(--color-text-default); }
+.spectrum-display { position: relative; height: 44px; margin-top: var(--spacing-2xs); }
+canvas { display: block; width: 100%; height: 100%; color: var(--color-action-primary); }
+.spectrum-fallback { position: absolute; inset: 0; font: var(--font-size-md)/var(--line-height-tight) var(--font-family-accessible); letter-spacing: var(--letter-spacing-body); color: var(--color-text-default); }

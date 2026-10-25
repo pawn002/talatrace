@@ -1,17 +1,16 @@
-.models-card {
+.models-page {
   max-width: 1040px;
   margin: 0 auto;
-  background: transparent;
-  box-shadow: none;
-  overflow: visible;
 }
-.models-card .card__header { border: 0; padding: 0 0 var(--spacing-md); }
-.models-card h2 { font-size: var(--font-size-xl); letter-spacing: -.025em; }
-.models-card .card-subtitle { font-size: var(--font-size-md); font-weight: 400; margin-top: var(--spacing-xs); }
-.models-card .card__body { padding: var(--spacing-md); border: 1px solid var(--color-border-default); border-radius: var(--radius-md); background: var(--color-bg-page); }
-.models-card table { font-size: var(--font-size-sm); }
-.models-card .cell--mono { white-space: nowrap; }
-.models-card .button { min-height: var(--hit-target-aaa); padding: var(--spacing-xs) var(--spacing-sm); font-size: var(--font-size-sm); }
+.models-page .page-heading { padding-bottom: var(--spacing-md); }
+.models-page h2 { margin: 0; font-weight: var(--font-weight-semibold); font-size: var(--font-size-xl); letter-spacing: -.025em; }
+.models-page .page-subtitle { font-size: var(--font-size-md); font-weight: 400; color: var(--color-text-subtle); margin: var(--spacing-xs) 0 0; }
+.models-page .page-content { min-width: 0; }
+.models-page table { font-size: var(--font-size-sm); min-width: 880px; }
+.models-page caption { text-align: left; }
+.models-page .cell--numeric, .models-page .status-text { white-space: nowrap; }
+.models-page .cell--mono { white-space: nowrap; }
+.models-page .button { min-height: var(--hit-target-aaa); padding: var(--spacing-xs) var(--spacing-sm); font-size: var(--font-size-sm); }
 
 .loading-container {
   display: flex;
@@ -25,6 +24,7 @@
 }
 
 .info-alert { margin-bottom: var(--spacing-md); }
+.model-description { margin-top: var(--spacing-xs); font: var(--font-size-md)/var(--line-height-normal) var(--font-family-accessible); color: var(--color-text-default); max-width: 24ch; }
 
 .table-container {
   overflow-x: auto;
@@ -41,7 +41,6 @@
 .download-progress {
   width: 120px;
 }
-@media (max-width: 640px) { .models-card .card__body { padding: var(--spacing-sm); } }
 
 .status-text { display: inline-flex; align-items: center; gap: var(--spacing-xs); color: var(--color-text-default); }
 .status-text i { color: var(--color-status-success); }

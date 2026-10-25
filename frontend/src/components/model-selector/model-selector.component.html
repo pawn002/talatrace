@@ -1,10 +1,10 @@
-<div class="card card--elevated card--padding-md models-card">
-  <div class="card__header">
+<div class="models-page">
+  <div class="page-heading">
     <h2>Speech models</h2>
-    <p class="card-subtitle">Download once. Transcribe on your device.</p>
+    <p class="page-subtitle">Download once. Transcribe on your device.</p>
   </div>
 
-  <div class="card__body">
+  <div class="page-content">
     @if (isLoading) {
       <div class="loading-container">
         <p>Loading models...</p>
@@ -16,10 +16,10 @@
         <i class="ph-bold ph-info alert__icon" aria-hidden="true"></i>
         <div class="alert__content">
           <p class="alert__message">
-            Smaller models favor speed; larger models favor accuracy.
+            Compare models on your recordings. Speed and quality vary by device and language.
             Downloads from
             <a
-              href="https://huggingface.co/ggerganov/whisper.cpp"
+              href="https://huggingface.co"
               target="_blank"
               rel="noopener noreferrer"
             >Hugging Face</a>
@@ -37,8 +37,8 @@
             <tr>
               <th>Model</th>
               <th class="cell--numeric">Size</th>
-              <th>Speed</th>
-              <th>Accuracy</th>
+              <th>Expected speed</th>
+              <th>Quality</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -46,7 +46,7 @@
           <tbody>
             @for (model of models; track model) {
               <tr>
-                <td>{{ model.name }}</td>
+                <td>{{ model.displayName || model.name }}@if (model.description) { <p class="model-description">{{ model.description }}</p> }</td>
                 <td class="cell--numeric">{{ model.size }}</td>
                 <td>
                   <span class="badge badge--sm badge--{{ getSpeedVariant(model.speed) }}">
@@ -59,10 +59,14 @@
                   </span>
                 </td>
                 <td>
-                  @if (model.installed) {
+                  @if (model.installed && model.available !== false) {
                     <span class="status-text status-text--installed"><i class="ph-bold ph-check-circle" aria-hidden="true"></i>Installed</span>
                   }
-                  @if (!model.installed && !model.downloading) {
+                  @if (model.available === false) {
+                    <span class="status-text">Unavailable</span>
+                    <p class="model-description">{{ model.unavailableReason }}</p>
+                  }
+                  @if (!model.installed && !model.downloading && model.available !== false) {
                     <span class="status-text">Not Installed</span>
                   }
                   @if (model.downloading) {
@@ -74,6 +78,7 @@
                     <button
                       class="button button--primary button--small"
                       (click)="downloadModel(model)"
+                      [disabled]="model.available === false"
                       >
                       <i class="ph ph-cloud-arrow-down" aria-hidden="true"></i>
                       Download

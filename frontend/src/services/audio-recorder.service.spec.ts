@@ -42,8 +42,10 @@ describe('AudioRecorderService', () => {
 
   it('releases the microphone immediately on stop and includes the final audio chunk', async () => {
     await service.start(jest.fn(), jest.fn());
+    expect(service.streamForAnalysis).toBe(await getUserMedia.mock.results[0].value);
     const result = service.stop();
     expect(track.stop).toHaveBeenCalledTimes(1);
+    expect(service.streamForAnalysis).toBeNull();
     expect((await result).size).toBe(11);
     expect(getUserMedia).toHaveBeenCalledWith({ audio: true, video: false });
   });

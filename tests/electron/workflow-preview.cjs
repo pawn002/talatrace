@@ -8,15 +8,19 @@ const output = path.join(os.tmpdir(), 'whisper-visual-review', process.env.WHISP
 const profile = require('node:fs').mkdtempSync(path.join(os.tmpdir(), 'whisper-visual-profile-'));
 app.setPath('userData', profile);
 app.commandLine.appendSwitch('force-device-scale-factor', '1');
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.disableHardwareAcceleration();
 nativeTheme.themeSource = 'dark';
 const fixture = {
   text: 'I needed time to consider the tradeoffs. Then I made a decision.', timingMethod: 'whisper-dtw',
+  duration: 38.52, processingTimeMs: 6420, modelName: 'Parakeet TDT 0.6B v3 · Q8',
   segments: [{ start: 1.2, end: 5.1, text: 'I needed time to consider the tradeoffs.' }, { start: 35.5, end: 38.1, text: 'Then I made a decision.' }],
   noSpeechIntervals: [{ start: 5.5, end: 35.2 }], quietIntervals: [{ start: 7, end: 32 }],
 };
 fixture.originalSegments = fixture.segments;
-ipcMain.handle('get-available-models', () => [{ name: 'base', size: '74 MB', installed: true }]);
+const { SPEECH_MODELS, modelSize } = require('../../dist/electron/services/model-catalog');
+let alternateReady = true;
+ipcMain.handle('get-available-models', () => SPEECH_MODELS.map(model => ({ ...model, size: modelSize(model.sizeBytes), installed: model.name === 'base', available: model.engine !== 'transcribe.cpp' || alternateReady, unavailableReason: 'Parakeet runtime is not included in this build.' })));
 ipcMain.handle('download-model', () => new Promise(resolve => setTimeout(() => resolve({ success: true }), 1500)));
 ipcMain.handle('get-system-info', () => ({ platform: process.platform, version: '1.1.5' }));
 let history = [];
@@ -38,13 +42,13 @@ ipcMain.handle('transcribe-audio', transcribe);
 app.whenReady().then(async () => {
   const watchdog = setTimeout(() => { console.error('Visual review timed out'); app.exit(1); }, 60000);
   const win = new BrowserWindow({ width: 1100, height: 820, show: false, webPreferences: {
-    offscreen: true, preload: path.join(root, 'dist/electron/preload.js'),
+    offscreen: true, backgroundThrottling: false, preload: path.join(root, 'dist/electron/preload.js'),
   } });
   const metrics = [];
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const click = async selector => {
     const point = await win.webContents.executeJavaScript(`(() => {
-      const el = document.querySelector(${JSON.stringify(selector)});
+      const el = ${JSON.stringify(selector)}.split(' >>> ').reduce((root, part, i) => (i ? root.shadowRoot : root).querySelector(part), document);
       el.scrollIntoView({ block: 'nearest' });
       const rect = el.getBoundingClientRect();
       return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
@@ -60,7 +64,7 @@ app.whenReady().then(async () => {
     throw new Error('Preview recording did not start');
   };
   async function capture(name) {
-    await wait(150);
+    await wait(250); // Let the 200ms control colour transitions settle before sampling.
     await fs.writeFile(path.join(output, `${name}.png`), (await win.webContents.capturePage()).toPNG());
     metrics.push(await win.webContents.executeJavaScript(`(() => {
       const panel = document.querySelector('.app-container');
@@ -69,6 +73,11 @@ app.whenReady().then(async () => {
       const context = canvas.getContext('2d', { willReadFrequently: true });
       const rgba = value => { context.clearRect(0, 0, 1, 1); context.fillStyle = value; context.fillRect(0, 0, 1, 1); return [...context.getImageData(0, 0, 1, 1).data]; };
       const blend = (front, back) => front.slice(0, 3).map((v, i) => v * front[3] / 255 + back[i] * (1 - front[3] / 255));
+      const resolvedBackground = el => {
+        const chain = []; for (let parent = el; parent; parent = parent.parentElement) chain.unshift(parent);
+        const rgb = chain.reduce((back, item) => blend(rgba(getComputedStyle(item.localName === 'candor-card' ? item.shadowRoot.querySelector('.card') : item).backgroundColor), back), [255, 255, 255]);
+        return 'rgb(' + rgb.map(Math.round).join(', ') + ')';
+      };
       const luminance = rgb => rgb.map(v => v / 255).map(v => v <= .04045 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4)).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
       const contrasts = {};
       const deepElements = root => [...root.querySelectorAll('*')].flatMap(el => [el, ...(el.shadowRoot ? deepElements(el.shadowRoot) : [])]);
@@ -80,15 +89,11 @@ app.whenReady().then(async () => {
       }).map(el => ({ text: el.textContent.trim().slice(0, 80), size: getComputedStyle(el).fontSize }));
       if (smallText.length) throw new Error('Readable text below 14px: ' + JSON.stringify(smallText));
       const colourPairs = [];
-      for (const selector of ['.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
+      for (const selector of ['.spectrum-label', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
         for (const el of document.querySelectorAll(selector)) {
           if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
-          let background = 'white';
-          for (let parent = el; parent; parent = parent.parentElement) {
-            const fill = getComputedStyle(parent).backgroundColor;
-            if (rgba(fill)[3] === 255) { background = fill; break; }
-          }
+          const background = resolvedBackground(el);
           colourPairs.push({ selector, foreground: style.color, background, size: parseFloat(style.fontSize), weight: parseInt(style.fontWeight), text: el.textContent.trim().slice(0, 80) });
         }
       }
@@ -97,26 +102,22 @@ app.whenReady().then(async () => {
           if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
           let parent = el.matches('.workflow-connector') ? el.closest('.workflow-panel') : el.parentElement;
-          let background = 'white';
-          for (; parent; parent = parent.parentElement) {
-            const fill = getComputedStyle(parent).backgroundColor;
-            if (rgba(fill)[3] === 255) { background = fill; break; }
-          }
+          const background = resolvedBackground(parent);
           colourPairs.push({ selector, foreground: el.matches('i') ? style.color : el.matches(':focus-visible') ? style.outlineColor : style.borderTopColor, background, nonText: true });
         }
       }
-      for (const host of document.querySelectorAll('candor-tooltip, candor-toast')) {
-        for (const el of host.shadowRoot?.querySelectorAll('.tooltip__bubble, .toast__message') || []) {
+      for (const host of document.querySelectorAll('candor-tooltip, candor-toast, candor-disclosure, candor-accordion-item')) {
+        for (const el of host.shadowRoot?.querySelectorAll('.tooltip__bubble, .toast__message, .disclosure__trigger, .accordion-item__title') || []) {
           if (!host.checkVisibility() || !el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
           const box = el.closest('.toast') || el;
-          colourPairs.push({ selector: host.localName + ' ' + el.className, foreground: style.color, background: getComputedStyle(box).backgroundColor, size: parseFloat(style.fontSize), weight: parseInt(style.fontWeight) });
+          colourPairs.push({ selector: host.localName + ' ' + el.className, foreground: style.color, background: host.matches('candor-disclosure, candor-accordion-item') ? resolvedBackground(host) : getComputedStyle(box).backgroundColor, size: parseFloat(style.fontSize), weight: parseInt(style.fontWeight) });
         }
       }
       for (const selector of ['.workflow-status h3', '#workflow-help', '.segment__time', '.segment__text', '.workflow-controls .button--primary']) {
         const el = document.querySelector(selector); if (!el) continue;
         const chain = []; for (let parent = el; parent; parent = parent.parentElement) chain.unshift(parent);
-        const background = chain.reduce((back, item) => blend(rgba(getComputedStyle(item).backgroundColor), back), [255, 255, 255]);
+        const background = chain.reduce((back, item) => blend(rgba(getComputedStyle(item.localName === 'candor-card' ? item.shadowRoot.querySelector('.card') : item).backgroundColor), back), [255, 255, 255]);
         const foreground = blend(rgba(getComputedStyle(el).color), background);
         const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
         contrasts[selector] = Math.round((values[0] + .05) / (values[1] + .05) * 100) / 100;
@@ -134,6 +135,15 @@ app.whenReady().then(async () => {
     win.webContents.session.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, (_details, callback) => callback({ cancel: true }));
     await win.loadFile(path.join(root, 'frontend/dist/index.html'));
     await wait(600);
+    await win.webContents.executeJavaScript(`(async () => {
+      await customElements.whenDefined('candor-card');
+      for (const card of document.querySelectorAll('candor-card')) {
+        await card.updateComplete;
+        const box = card.shadowRoot.querySelector('.card');
+        if (card.variant !== (card.classList.contains('step-card') ? 'default' : 'outlined') || getComputedStyle(box).boxShadow !== 'none') throw new Error('Unexpected card elevation');
+        if (!card.shadowRoot.querySelector('.card__header').hidden || !card.shadowRoot.querySelector('.card__footer').hidden) throw new Error('Empty card slots retain chrome');
+      }
+    })()`);
     if (await win.webContents.executeJavaScript("!!document.querySelector('[title]')")) throw new Error('Native title tooltip found; use Candor tooltip');
     // Attach after the renderer exists. Offscreen windows have no OS focus;
     // renderer emulation lets trusted keys exercise real :focus-visible rules.
@@ -141,28 +151,61 @@ app.whenReady().then(async () => {
     await win.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true });
     await win.webContents.executeJavaScript(`(() => {
       const realNow = performance.now.bind(performance); let offset = 0;
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); // Offscreen fixture represents a foreground recorder.
+      const readFrequency = AnalyserNode.prototype.getByteFrequencyData;
+      AnalyserNode.prototype.getByteFrequencyData = function(data) { readFrequency.call(this, data); window.previewFftPeak = Math.max(...data); window.previewFftState = this.context.state; window.previewFftTime = this.context.currentTime; };
       Object.defineProperty(performance, 'now', { value: () => realNow() + offset });
       window.advancePreviewClock = () => { offset += 38000; };
       Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => {} } });
-      const track = () => ({ stop() {}, onended: null });
       Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { value: async () => {
         await new Promise(resolve => setTimeout(resolve, 400));
-        const tracks = [track()]; return { getTracks: () => tracks, getAudioTracks: () => tracks };
+        const context = new AudioContext({ sinkId: { type: 'none' } });
+        const oscillator = context.createOscillator(); oscillator.frequency.value = 440;
+        const gain = context.createGain(); gain.gain.value = 0.2;
+        const destination = context.createMediaStreamDestination();
+        oscillator.connect(gain); gain.connect(destination); oscillator.start(); await context.resume();
+        window.previewTone = oscillator; window.previewGain = gain;
+        const track = destination.stream.getAudioTracks()[0]; const stop = track.stop.bind(track);
+        track.stop = () => { stop(); oscillator.stop(); void context.close(); };
+        return destination.stream;
       } });
-      window.MediaRecorder = class {
-        static isTypeSupported() { return true; }
-        mimeType = 'audio/webm'; state = 'inactive';
-        start() { this.state = 'recording'; }
-        stop() { this.state = 'inactive'; queueMicrotask(() => {
-          this.ondataavailable?.({ data: new Blob(['local visual fixture']) }); this.onstop?.();
-        }); }
-      };
+      // Use the real MediaRecorder so the generated stream is consumed like a microphone.
     })()`);
     await capture('ready');
     win.setSize(1024, 680); await capture('ready-short'); win.setSize(1100, 820);
+    const stopPosition = () => win.webContents.executeJavaScript("(() => { const r = document.querySelector('[data-action=stop]').getBoundingClientRect(); return JSON.stringify([r.x,r.y,r.width,r.height]); })()");
+    const readyStopPosition = await stopPosition();
     await click('[data-action="record"]'); await capture('starting'); await waitForRecording();
+    await wait(1000);
+    const bandCenter = async () => win.webContents.executeJavaScript(`(() => {
+      const canvas = document.querySelector('app-audio-spectrum canvas');
+      const pixels = canvas.getContext('2d').getImageData(canvas.width - 2, 0, 2, canvas.height).data;
+      let total = 0, weighted = 0;
+      for (let y = 0; y < canvas.height; y++) { const alpha = pixels[(y * 2) * 4 + 3]; total += alpha; weighted += y * alpha; }
+      if (!total) return { error: 'No spectrum at newest edge', mode: document.querySelector('.spectrum-display').getAttribute('data-mode'), width: canvas.width, height: canvas.height, hidden: document.hidden, audio: window.previewTone.context.state, peak: window.previewFftPeak, state: window.previewFftState, sampleTime: window.previewFftTime, sourceTime: window.previewTone.context.currentTime, streamActive: window.previewGain.context.state };
+      return weighted / total;
+    })()`);
+    await capture('recording-low-tone');
+    const lowBand = await bandCenter();
+    if (typeof lowBand !== 'number') throw new Error(JSON.stringify(lowBand));
+    await win.webContents.executeJavaScript("window.previewTone.frequency.value = 1760");
+    await wait(800);
+    await capture('recording-high-tone');
+    const highBand = await bandCenter();
+    if (typeof highBand !== 'number') throw new Error(JSON.stringify(highBand));
+    if (highBand >= lowBand - 3) throw new Error('Spectrum did not follow the change in real input frequency');
     await win.webContents.executeJavaScript('window.advancePreviewClock()'); await wait(300);
     await capture('recording');
+    if (await stopPosition() !== readyStopPosition) throw new Error('Stop moved when recording started');
+    win.setSize(360, 780); await capture('recording-small'); win.setSize(1100, 820);
+    nativeTheme.themeSource = 'light'; await wait(200); await capture('recording-light'); nativeTheme.themeSource = 'dark';
+    await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+    await wait(300); await capture('recording-reduced-motion');
+    if (await win.webContents.executeJavaScript("document.querySelector('.spectrum-display').getAttribute('data-mode')") !== 'levels') throw new Error('Reduced motion still scrolls the spectrum');
+    await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
+    await win.webContents.executeJavaScript("window.previewGain.gain.value = 0"); await wait(500); await capture('recording-quiet');
+    if (await win.webContents.executeJavaScript("document.querySelector('.spectrum-label').textContent") !== 'Recording') throw new Error('Quiet input hid the active recording label');
+    await win.webContents.executeJavaScript("window.previewGain.gain.value = 0.2");
     await win.webContents.executeJavaScript(`(() => {
       if (!document.querySelector('#app-tab-models').disabled || !document.querySelector('#app-tab-history').disabled) throw new Error('Active recording can be hidden by main navigation');
       document.querySelector('#app-tab-transcription').dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
@@ -192,8 +235,11 @@ app.whenReady().then(async () => {
     await click('[data-action="copy"]');
     win.setSize(480, 820); await capture('result-narrow');
     win.setSize(360, 780); await capture('result-small');
+    await win.webContents.executeJavaScript("document.querySelector('.performance-summary').scrollIntoView({ block: 'center' })");
+    await capture('performance-small');
     win.setSize(1100, 820);
-    await win.webContents.executeJavaScript("document.querySelector('.disclosure--inline > summary').focus(); document.querySelector('.disclosure--inline').scrollIntoView({ block: 'center' })");
+    await win.webContents.executeJavaScript("document.querySelector('.disclosure--inline').shadowRoot.querySelector('button').focus(); document.querySelector('.disclosure--inline').scrollIntoView({ block: 'center' })");
+    if (!await win.webContents.executeJavaScript("!!document.querySelector('.transcript-output').shadowRoot.querySelector('.card__footer:not([hidden])') && document.querySelector('.disclosure--inline').parentElement.slot === 'footer'")) throw new Error('Timing disclosure is not in the Card footer');
     await capture('timing-disclosure-focus');
     await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
     await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
@@ -208,12 +254,13 @@ app.whenReady().then(async () => {
     await capture('nested-rows-small');
     win.setSize(1100, 820); nativeTheme.themeSource = 'light'; await wait(350); await capture('nested-diagnostics-light');
     nativeTheme.themeSource = 'dark'; await wait(350);
-    // Native summary activation must leave the ancestor open.
-    await click('.disclosure--subtle > summary');
-    if (!await win.webContents.executeJavaScript("document.querySelector('.quiet-details').open && !document.querySelector('.disclosure--subtle').open")) throw new Error('Nested toggle changed its parent');
-    await win.webContents.executeJavaScript("document.querySelector('.disclosure--subtle > summary').focus()");
+    // Candor child activation must leave the standalone parent disclosure open.
+    await click('.disclosure--subtle >>> summary'); await wait(80); // Native details toggle synchronizes the host asynchronously.
+    if (!await win.webContents.executeJavaScript("document.querySelector('.quiet-details').open && !document.querySelector('.disclosure--subtle').open")) throw new Error('Nested toggle changed its parent: ' + await win.webContents.executeJavaScript("JSON.stringify({parent: document.querySelector('.quiet-details').open, child: document.querySelector('.disclosure--subtle').open, native: document.querySelector('.disclosure--subtle').shadowRoot.querySelector('details').open})"));
+    await win.webContents.executeJavaScript("document.querySelector('.disclosure--subtle').shadowRoot.querySelector('summary').focus()");
     await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
     await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+    await wait(80);
     if (!await win.webContents.executeJavaScript("document.querySelector('.quiet-details').open && document.querySelector('.disclosure--subtle').open")) throw new Error('Nested keyboard toggle failed');
     await win.webContents.executeJavaScript("document.querySelectorAll('.quiet-details').forEach(el => el.open = false)");
     await win.webContents.executeJavaScript("document.querySelector('.settings-details').open = true");
@@ -227,7 +274,13 @@ app.whenReady().then(async () => {
     win.setSize(1100, 820);
     await win.webContents.executeJavaScript("document.querySelector('.app-container').scrollTop = 0");
     await win.webContents.executeJavaScript("document.querySelector('.settings-details').open = false");
-    await click('[data-action="record"]'); await capture('starting-again'); await waitForRecording(); failNext = true;
+    await win.webContents.executeJavaScript("window.RealAudioContext = window.AudioContext; window.AudioContext = class extends window.RealAudioContext { createMediaStreamSource() { throw new Error('Fixture analysis failure'); } }; void 0");
+    await click('[data-action="record"]'); await capture('starting-again'); await waitForRecording();
+    await capture('recording-display-unavailable');
+    win.setSize(360, 780); await capture('recording-display-unavailable-small'); win.setSize(1100, 820);
+    if (!await win.webContents.executeJavaScript("!!document.querySelector('.spectrum-fallback') && !document.querySelector('[data-action=stop]').disabled")) throw new Error('Display failure interrupted recording');
+    await win.webContents.executeJavaScript("window.AudioContext = window.RealAudioContext; void 0");
+    failNext = true;
     await win.webContents.executeJavaScript('window.advancePreviewClock()'); await wait(300);
     await click('[data-action="stop"]'); await wait(1100); await capture('retry');
     await click('#audio-file-tab'); await capture('audio-file');
@@ -261,6 +314,9 @@ app.whenReady().then(async () => {
       if (document.activeElement !== first) throw new Error('Main navigation Home failed');
     })()`);
     await click('#app-tab-models'); await capture('models');
+    await win.webContents.executeJavaScript("document.querySelector('.models-page tbody tr:last-child').scrollIntoView({ block: 'center' })");
+    await capture('models-added');
+    await win.webContents.executeJavaScript("document.querySelector('.app-container').scrollTop = 0");
     nativeTheme.themeSource = 'light'; await wait(350); await capture('models-light');
     nativeTheme.themeSource = 'dark'; await wait(350);
     win.setSize(360, 780); await capture('models-small');
@@ -297,6 +353,13 @@ app.whenReady().then(async () => {
     nativeTheme.themeSource = 'light'; await wait(350); await capture('history-light');
     nativeTheme.themeSource = 'dark'; await wait(350);
     win.setSize(360, 780); await capture('history-small');
+    // A build without the alternate runtime loads its own initial capability catalog.
+    alternateReady = false; win.setSize(1100, 820); nativeTheme.themeSource = 'dark';
+    await new Promise(resolve => { win.webContents.once('did-finish-load', resolve); win.webContents.reload(); });
+    await wait(500); await click('#app-tab-models');
+    await win.webContents.executeJavaScript("document.querySelector('.models-page tbody tr:last-child').scrollIntoView({ block: 'center' })");
+    await capture('models-runtime-unavailable');
+    if (!await win.webContents.executeJavaScript("document.querySelector('.models-page tbody tr:last-child button').disabled")) throw new Error('Unavailable engine offers an unusable download');
     await fs.writeFile(path.join(output, 'metrics.json'), JSON.stringify(metrics, null, 2));
     console.log('Visual review:', output);
     clearTimeout(watchdog);

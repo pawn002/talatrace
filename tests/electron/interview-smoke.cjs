@@ -15,6 +15,7 @@ if (fixtureProcess.status !== 0) throw new Error('Could not create sample audio 
 app.setAppPath(root);
 app.setPath('userData', profile);
 app.commandLine.appendSwitch('use-fake-device-for-media-stream');
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
 app.commandLine.appendSwitch('use-file-for-fake-audio-capture', fixture);
 // Exercise the packaged file:// loading path without starting the Angular dev server.
@@ -32,18 +33,28 @@ app.whenReady().then(async () => {
   timeout = setTimeout(() => { console.error('SMOKE FAILED: timed out'); app.exit(1); }, 120000);
   const win = BrowserWindow.getAllWindows()[0];
   win.hide();
+  win.webContents.setBackgroundThrottling(false);
   // Transcription must work without HTTP(S); model migration reads local files only.
   win.webContents.session.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, (_details, callback) => callback({ cancel: true }));
   try {
     if (win.webContents.isLoading()) await new Promise(resolve => win.webContents.once('did-finish-load', resolve));
+    win.webContents.debugger.attach('1.3');
+    await win.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true });
+    await win.webContents.executeJavaScript(`window.__smokeModel = ${JSON.stringify(process.env.WHISPER_SMOKE_MODEL || 'base')}`);
     const result = await win.webContents.executeJavaScript(`(async () => {
       const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
       const button = text => [...document.querySelectorAll('.transcription-card button')].find(el => el.textContent.includes(text));
       const requirePrimary = text => {
         const actions = [...document.querySelectorAll('.transcription-card button.button--primary')];
         if (actions.length !== 1 || !actions[0].textContent.includes(text)) throw new Error('Unclear primary action: ' + actions.map(el => el.textContent).join('; '));
       };
-      for (let i = 0; i < 100 && !document.querySelector('#model-select option'); i++) await wait(100);
+      for (let i = 0; i < 200 && ![...document.querySelectorAll('#model-select option')].some(option => option.value === window.__smokeModel); i++) await wait(100);
+      const modelSelect = document.querySelector('#model-select');
+      if (![...modelSelect.options].some(option => option.value === window.__smokeModel)) throw new Error('Smoke model is not installed: ' + window.__smokeModel);
+      modelSelect.value = window.__smokeModel;
+      modelSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      await wait(100);
       requirePrimary('Record answer');
       let stableControls = [...document.querySelectorAll('.workflow-controls button')];
       const assertStable = () => {
@@ -60,6 +71,10 @@ app.whenReady().then(async () => {
       if (button('Stop & transcribe')?.disabled) throw new Error(document.querySelector('.record-error')?.textContent || 'Recording did not start');
       requirePrimary('Stop & transcribe');
       assertStable();
+      await wait(1000);
+      if (document.querySelector('.spectrum-display')?.getAttribute('data-mode') !== 'spectrogram') throw new Error('Recorded microphone stream is not being analyzed');
+      const spectrum = document.querySelector('app-audio-spectrum canvas');
+      if (!spectrum.getContext('2d').getImageData(0, 0, spectrum.width, spectrum.height).data.some((value, index) => index % 4 === 3 && value > 0)) throw new Error('Real microphone audio produced no spectrum');
       if (!document.querySelector('#app-tab-models').disabled || !document.querySelector('#app-tab-history').disabled) throw new Error('Main navigation can hide an active recording');
       await wait(38000);
       const liveDuration = document.querySelector('[role="timer"]').textContent;
@@ -69,6 +84,7 @@ app.whenReady().then(async () => {
       assertStable();
       if (stableControls.some(button => !button.disabled)) throw new Error('Record, Stop and Copy must remain disabled while processing');
       const finalDuration = document.querySelector('[role="timer"]').textContent;
+      if (document.querySelector('.spectrum-display')?.getAttribute('data-mode') !== 'idle') throw new Error('Spectrum kept running after microphone stop');
       if (!/^\\d{2}:\\d{2}\\.\\d{3}$/.test(finalDuration)) throw new Error('Stopped duration should include milliseconds: ' + finalDuration);
       for (let i = 0; i < 900 && !document.querySelector('.result-section'); i++) {
         await wait(100);
@@ -77,6 +93,11 @@ app.whenReady().then(async () => {
       }
       const segment = document.querySelector('.segment__time')?.textContent;
       if (!segment) throw new Error('No timestamped speech returned');
+      const performanceSummary = document.querySelector('.performance-summary')?.textContent;
+      if (!performanceSummary?.includes('s audio') || !performanceSummary.includes('s processing')) throw new Error('Recording result omitted performance measurements');
+      const latest = (await window.electronAPI.getTranscriptionHistory())[0];
+      if (!(latest.audioDuration > 37 && latest.audioDuration < 43)) throw new Error('History omitted the full recording duration: ' + latest.audioDuration);
+      if (latest.result.duration !== latest.audioDuration || latest.result.processingTimeMs !== latest.transcriptionTime) throw new Error('Result and history disagree about performance');
       requirePrimary('Copy transcript');
       assertStable();
       if (document.querySelector('[role="timer"]').textContent !== finalDuration) throw new Error('Final duration changed during processing');
@@ -90,7 +111,7 @@ app.whenReady().then(async () => {
       const speechRows = [...document.querySelectorAll('.transcript-view .transcript-segment:not(.transcript-segment--pause)')];
       const speechTimes = speechRows.map(row => row.querySelector('.segment__time').textContent);
       if (!speechTimes.some(time => /^\\[00:00:3[3-6]\\./.test(time))) throw new Error('Resumed speech was not aligned to the known audio location: ' + speechTimes.join('; '));
-      if (speechTimes.some(time => /^\\[00:00:(?:0[4-9]|[12][0-9]|3[0-2])\\./.test(time))) throw new Error('A speech entry starts inside the known thirty-second silence: ' + speechTimes.join('; '));
+      if (speechTimes.some(time => /^\\[00:00:(?:0[4-9]|[12][0-9]|3[0-2])\\./.test(time))) throw new Error('A speech entry starts inside the known thirty-second silence: ' + speechRows.map(row => row.textContent).join('; '));
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach(track => track.stop());
       const visibleText = document.querySelector('.result-section').textContent;

@@ -3,7 +3,6 @@ import * as path from 'path';
 import isDev from 'electron-is-dev';
 import * as fs from 'fs/promises';
 import { TranscriptionService } from './services/transcription.service';
-import { WhisperService } from './services/whisper.service';
 import { storeRecording, removeStaleRecordings } from './services/recording-storage';
 import { pathToFileURL } from 'url';
 
@@ -12,7 +11,6 @@ const packageJson = require(path.join(__dirname, '../../package.json'));
 
 let mainWindow: BrowserWindow | null = null;
 let transcriptionService: TranscriptionService | null = null;
-let whisperService: WhisperService | null = null;
 
 // Helper function to format seconds to SRT timestamp (HH:MM:SS,mmm)
 function formatTimestampForSRT(seconds: number): string {
@@ -144,7 +142,6 @@ function createWindow() {
 
   // Initialize services immediately
   transcriptionService = new TranscriptionService(mainWindow);
-  whisperService = new WhisperService();
 
   console.log('[Main] Services initialized');
 
@@ -162,7 +159,6 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
     transcriptionService = null;
-    whisperService = null;
   });
 }
 
@@ -349,11 +345,11 @@ ipcMain.handle('save-transcript', async (event, resultData: any) => {
 
 ipcMain.handle('get-available-models', async () => {
   try {
-    if (!whisperService) {
-      console.error('[Main] WhisperService not initialized');
+    if (!transcriptionService) {
+      console.error('[Main] Transcription service not initialized');
       return [];
     }
-    return await whisperService.getAvailableModels();
+    return await transcriptionService.getAvailableModels();
   } catch (error: any) {
     console.error('[Main] Error fetching models:', error);
     return [];
@@ -362,14 +358,14 @@ ipcMain.handle('get-available-models', async () => {
 
 ipcMain.handle('download-model', async (event, modelName: string) => {
   try {
-    if (!whisperService) {
+    if (!transcriptionService) {
       return {
         success: false,
         message: 'Service not initialized',
       };
     }
 
-    await whisperService.downloadModel(modelName, (progress) => {
+    await transcriptionService.downloadModel(modelName, (progress) => {
       if (mainWindow) {
         mainWindow.webContents.send('model-download-progress', {
           modelName,

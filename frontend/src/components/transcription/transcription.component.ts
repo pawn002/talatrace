@@ -45,13 +45,7 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
   private modelsTimer?: ReturnType<typeof setInterval>;
   private destroyed = false;
 
-  availableModels = [
-    { id: 'tiny', name: 'Tiny (39 MB)', installed: false },
-    { id: 'base', name: 'Base (74 MB)', installed: true },
-    { id: 'small', name: 'Small (244 MB)', installed: false },
-    { id: 'medium', name: 'Medium (769 MB)', installed: false },
-    { id: 'large', name: 'Large (1.5 GB)', installed: false },
-  ];
+  availableModels: Array<{ id: string; name: string; installed: boolean; languages?: string[] }> = [];
 
   languages = [
     { code: 'auto', name: 'Auto Detect' },
@@ -128,10 +122,11 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
     try {
       const models = await this.electronService.getAvailableModels();
       this.availableModels = models
-        .filter((m: any) => m.installed) // Only show installed models
+        .filter((m: any) => m.installed && m.available !== false) // Only show installed models
         .map((m: any) => ({
           id: m.name,
-          name: `${m.name.charAt(0).toUpperCase() + m.name.slice(1)} (${m.size})`,
+          name: `${m.displayName || m.name} (${m.size})`,
+          languages: m.languages,
           installed: m.installed,
         }));
 
@@ -147,6 +142,15 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('Failed to load models:', error);
     }
+  }
+
+  get supportedLanguages() {
+    const allowed = this.availableModels.find(model => model.id === this.selectedModel)?.languages;
+    return this.languages.filter(language => language.code === 'auto' || !allowed || allowed.includes(language.code));
+  }
+
+  onModelChange() {
+    if (!this.supportedLanguages.some(language => language.code === this.selectedLanguage)) this.selectedLanguage = 'auto';
   }
 
   async selectAudioFile() {
@@ -513,14 +517,15 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
       const text = timeline.map(entry =>
         `${this.formatTimestampRange(entry.start, entry.end)} ${entry.text}`
       ).join('\n');
+      const unaligned = !result.segments?.length && result.text?.trim() ? `Recognition text (speech timing unavailable):\n${result.text}\n\n` : '';
       const hasPauses = timeline.some(entry => entry.kind !== 'speech');
-      const timing = result.timingMethod === 'whisper-dtw'
+      const timing = (result.timingMethod === 'whisper-dtw' || result.timingMethod === 'transducer-tokens')
         ? 'Speech ranges use audio-aligned token locations: estimates, not exact word boundaries.'
         : 'Speech times are approximate and may overlap pause regions.';
       const pauses = hasPauses || result.noSpeechIntervals !== undefined ? ` ${this.pauseDescription}` : '';
       const warnings = [result.alignmentWarning, result.speechDetectionWarning].filter(Boolean).join(' ');
-      return hasPauses || result.noSpeechIntervals !== undefined || result.timingMethod === 'whisper-dtw' || warnings
-        ? `Timeline ordered by start time. ${timing}${pauses}${warnings ? ' ' + warnings : ''}\n\n${text}` : text;
+      return hasPauses || result.noSpeechIntervals !== undefined || ['whisper-dtw', 'transducer-tokens'].includes(result.timingMethod) || warnings
+        ? `Timeline ordered by start time. ${timing}${pauses}${warnings ? ' ' + warnings : ''}\n\n${unaligned}${text}` : unaligned + text;
     }
     return result.text || '';
   }
@@ -529,8 +534,17 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
     return buildTranscriptTimeline(this.transcriptionResult || {});
   }
 
+  get performanceSummary(): string {
+    const { duration, processingTimeMs, modelName, model } = this.transcriptionResult || {};
+    if (!Number.isFinite(processingTimeMs) || processingTimeMs <= 0) return '';
+    const audio = Number.isFinite(duration) && duration > 0;
+    const seconds = processingTimeMs / 1000;
+    const speed = audio ? ` (${(duration / seconds).toFixed(1)}× real time)` : '';
+    return `${modelName || model || 'Transcription'} · ${audio ? duration.toFixed(2) + ' s audio · ' : ''}${seconds.toFixed(2)} s processing${speed}`;
+  }
+
   get timingDescription(): string {
-    return this.transcriptionResult?.timingMethod === 'whisper-dtw'
+    return ['whisper-dtw', 'transducer-tokens'].includes(this.transcriptionResult?.timingMethod)
       ? 'Speech ranges use audio-aligned token locations. They are estimates, not exact word boundaries.'
       : 'Speech times are approximate and may overlap pause regions.';
   }

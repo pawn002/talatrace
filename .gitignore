@@ -3,6 +3,9 @@
 **/dist
 dist
 whisper.cpp
+transcribe.cpp/
+transcribe-runtime/
+transcribe-runtime-*.tar.gz
 models
 ffmpeg
 release

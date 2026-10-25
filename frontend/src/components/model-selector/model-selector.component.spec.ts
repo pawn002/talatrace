@@ -20,7 +20,10 @@ describe('ModelSelectorComponent', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    electronStub.getAvailableModels.mockResolvedValue([]);
+    electronStub.getAvailableModels.mockResolvedValue([
+      { name: 'tiny', size: '75 MiB', sizeBytes: 77691713, speed: 'Fastest', accuracy: 'Lower', installed: false },
+      { name: 'base', size: '142 MiB', sizeBytes: 147951465, speed: 'Fast', accuracy: 'Good', installed: false },
+    ]);
 
     await TestBed.configureTestingModule({
       imports: [CommonModule, ModelSelectorComponent],
@@ -87,6 +90,17 @@ describe('ModelSelectorComponent', () => {
   // ─── loadModels ───────────────────────────────────────────────────────────
 
   describe('loadModels()', () => {
+    it('uses catalog metadata and explains a missing runtime beside its disabled download', async () => {
+      electronStub.getAvailableModels.mockResolvedValue([{ name: 'parakeet-tdt-0.6b-v3', displayName: 'Parakeet', size: '706 MiB', sizeBytes: 739508576, installed: false, available: false, unavailableReason: 'Runtime is not included.' }]);
+      await component.loadModels();
+      fixture.detectChanges();
+      expect(component.models).toHaveLength(1);
+      expect(component.models[0].size).toBe('706 MiB');
+      expect(fixture.nativeElement.textContent).toContain('Runtime is not included.');
+      expect(fixture.nativeElement.querySelector('tbody button').disabled).toBe(true);
+      await component.downloadModel(component.models[0]);
+      expect(electronStub.downloadModel).not.toHaveBeenCalled();
+    });
     it('marks a model as installed when found in the electron response', async () => {
       electronStub.getAvailableModels.mockResolvedValue([
         { name: 'base', installed: true },

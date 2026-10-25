@@ -11,6 +11,9 @@ export class AudioRecorderService {
   private generation = 0;
   private rejectStop?: (error: Error) => void;
 
+  /** Read-only tap of the captured stream; analysis never opens another microphone. */
+  get streamForAnalysis(): MediaStream | null { return this.stream; }
+
   async start(onLimit: () => void, onError: (message: string) => void): Promise<void> {
     this.discard();
     const generation = this.generation;

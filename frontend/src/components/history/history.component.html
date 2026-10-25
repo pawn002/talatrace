@@ -1,9 +1,9 @@
-<div class="card card--elevated card--padding-md history-card">
-  <div class="card__header">
-    <div class="card-header-row">
+<div class="history-page">
+  <div class="page-heading">
+    <div class="page-heading-row">
       <div>
         <h2>Recent transcripts</h2>
-        <p class="card-subtitle">Completed transcriptions from this session.</p>
+        <p class="page-subtitle">Completed transcriptions from this session.</p>
       </div>
       <candor-tooltip text="Refresh history" position="left"><button
         class="button button--ghost button--small button--icon"
@@ -16,7 +16,7 @@
     </div>
   </div>
 
-  <div class="card__body">
+  <div class="page-content">
     @if (isLoading) {
       <div class="loading-container">
         <p>Loading history...</p>

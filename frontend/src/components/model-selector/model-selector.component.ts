@@ -5,6 +5,10 @@ import { ElectronService } from "../../services/electron.service";
 import { ToastService } from "../../services/toast.service";
 
 interface WhisperModel {
+  displayName?: string;
+  description?: string;
+  available?: boolean;
+  unavailableReason?: string;
   name: string;
   size: string;
   sizeBytes: number;
@@ -23,48 +27,7 @@ interface WhisperModel {
   styleUrls: ["./model-selector.component.scss"],
 })
 export class ModelSelectorComponent implements OnInit {
-  models: WhisperModel[] = [
-    {
-      name: "tiny",
-      size: "39 MB",
-      sizeBytes: 39,
-      speed: "Fastest",
-      accuracy: "Lower",
-      installed: false,
-    },
-    {
-      name: "base",
-      size: "74 MB",
-      sizeBytes: 74,
-      speed: "Fast",
-      accuracy: "Good",
-      installed: false,
-    },
-    {
-      name: "small",
-      size: "244 MB",
-      sizeBytes: 244,
-      speed: "Medium",
-      accuracy: "Better",
-      installed: false,
-    },
-    {
-      name: "medium",
-      size: "769 MB",
-      sizeBytes: 769,
-      speed: "Slow",
-      accuracy: "Great",
-      installed: false,
-    },
-    {
-      name: "large",
-      size: "1550 MB",
-      sizeBytes: 1550,
-      speed: "Slowest",
-      accuracy: "Best",
-      installed: false,
-    },
-  ];
+  models: WhisperModel[] = [];
 
   isLoading = true;
 
@@ -82,13 +45,10 @@ export class ModelSelectorComponent implements OnInit {
     try {
       const installedModels = await this.electronService.getAvailableModels();
 
-      // Update installed status
-      this.models.forEach((model) => {
-        const found = installedModels.find((m: any) => m.name === model.name);
-        if (found) {
-          model.installed = found.installed || false;
-        }
-      });
+      this.models = installedModels.map((model: any) => ({ ...model,
+        speed: model.speed || 'Evaluate', accuracy: model.accuracy || 'Evaluate',
+        installed: !!model.installed,
+      }));
     } catch (error) {
       console.error("Failed to load models:", error);
       this.toastService.show("Failed to load models", "error");
@@ -98,7 +58,7 @@ export class ModelSelectorComponent implements OnInit {
   }
 
   async downloadModel(model: WhisperModel): Promise<void> {
-    if (model.downloading) return;
+    if (model.downloading || model.available === false) return;
 
     model.downloading = true;
     model.downloadProgress = 0;

@@ -9,6 +9,7 @@ import { HistoryComponent } from "./components/history/history.component";
 import { ModelSelectorComponent } from "./components/model-selector/model-selector.component";
 
 import { ElectronService } from "./services/electron.service";
+import { AudioSpectrumComponent } from './components/audio-spectrum/audio-spectrum.component';
 
 @NgModule({
   declarations: [AppComponent, TranscriptionComponent],
@@ -16,6 +17,7 @@ import { ElectronService } from "./services/electron.service";
     BrowserModule,
     HttpClientModule,
     FormsModule,
+    AudioSpectrumComponent,
     // Standalone components
     HistoryComponent,
     ModelSelectorComponent,

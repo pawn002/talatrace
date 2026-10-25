@@ -1,9 +1,11 @@
+import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { TranscriptionComponent } from './transcription.component';
 import { ElectronService } from '../../services/electron.service';
 import { ToastService } from '../../services/toast.service';
 import { AudioRecorderService } from '../../services/audio-recorder.service';
+import { AudioSpectrumComponent } from '../audio-spectrum/audio-spectrum.component';
 
 const electronStub = {
   getAvailableModels: jest.fn().mockResolvedValue([]),
@@ -24,13 +26,41 @@ describe('TranscriptionComponent', () => {
   let component: TranscriptionComponent;
   let fixture: ComponentFixture<TranscriptionComponent>;
 
+  it('reports comparable processing time and audio duration from the completed result', () => {
+    component.transcriptionResult = { duration: 38.52, processingTimeMs: 6420, modelName: 'Parakeet' };
+    expect(component.performanceSummary).toBe('Parakeet · 38.52 s audio · 6.42 s processing (6.0× real time)');
+    component.selectedModel = 'base';
+    expect(component.performanceSummary).toContain('Parakeet');
+    component.transcriptionResult = { processingTimeMs: 5000 };
+    expect(component.performanceSummary).not.toContain('real time');
+    component.transcriptionResult = { duration: 0, processingTimeMs: 0 };
+    expect(component.performanceSummary).toBe('');
+  });
+
+  it('preserves untimed recognition alongside independent pause metadata', () => {
+    component.transcriptionResult = { text: 'Keep the complete answer', noSpeechIntervals: [{ start: 2, end: 5 }], alignmentWarning: 'Timing unavailable' };
+    component.includeTimestamps = true;
+    expect(component.getTranscriptText()).toContain('Keep the complete answer');
+    expect(component.getTranscriptText()).toContain('No speech detected');
+  });
+
+  it('resets an unsupported language when selecting Parakeet', () => {
+    component.availableModels = [{ id: 'parakeet-tdt-0.6b-v3', name: 'Parakeet', installed: true, languages: ['en', 'fr'] }];
+    component.selectedModel = 'parakeet-tdt-0.6b-v3';
+    component.selectedLanguage = 'ja';
+    component.onModelChange();
+    expect(component.selectedLanguage).toBe('auto');
+    expect(component.supportedLanguages.map(language => language.code)).toEqual(['auto', 'en', 'fr']);
+  });
+
   beforeEach(async () => {
     jest.clearAllMocks();
     electronStub.getAvailableModels.mockResolvedValue([]);
 
     await TestBed.configureTestingModule({
       declarations: [TranscriptionComponent],
-      imports: [FormsModule],
+      schemas: [CUSTOM_ELEMENTS_SCHEMA],
+      imports: [FormsModule, AudioSpectrumComponent],
       providers: [
         { provide: ElectronService, useValue: electronStub },
         { provide: ToastService, useValue: toastStub },

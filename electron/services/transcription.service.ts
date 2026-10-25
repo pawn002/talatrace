@@ -1,21 +1,22 @@
 import { BrowserWindow } from 'electron';
-import { WhisperService } from './whisper.service';
+import { SpeechService } from './speech.service';
 import { TranscriptionJob, TranscriptionOptions, TranscriptionResult } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
+import { performance } from 'perf_hooks';
 
 export class TranscriptionService {
   private jobs: Map<string, TranscriptionJob> = new Map();
   private transcriptionHistory: TranscriptionJob[] = [];
-  private whisperService: WhisperService;
+  private whisperService: SpeechService;
   private mainWindow: BrowserWindow | null;
   private busy = false;
 
   constructor(mainWindow: BrowserWindow | null) {
     this.mainWindow = mainWindow;
-    this.whisperService = new WhisperService();
+    this.whisperService = new SpeechService();
     this.whisperService.initialize().catch((error) => {
-      console.error('[TranscriptionService] Failed to initialize WhisperService:', error);
+      console.error('[TranscriptionService] Failed to initialize SpeechService:', error);
     });
   }
 
@@ -49,8 +50,9 @@ export class TranscriptionService {
   private async processTranscriptionJob(job: TranscriptionJob, cleanup?: () => Promise<void>): Promise<void> {
     try {
       job.status = 'processing';
-      const processingStartTime = Date.now();
+      const processingStartTime = performance.now();
 
+      await this.whisperService.initialize();
       // Get audio duration before transcription
       job.audioDuration = await this.whisperService.getAudioDuration(job.filePath);
       const quietIntervals = job.options.detectQuietIntervals
@@ -83,7 +85,7 @@ export class TranscriptionService {
 
       this.emitProgress(job.id, 10, 'Loading model');
 
-      // Transcribe using WhisperService
+      // Transcribe using SpeechService
       const result = await this.whisperService.transcribe(
         job.filePath,
         whisperOptions,
@@ -99,11 +101,12 @@ export class TranscriptionService {
         }
       );
 
-      job.result = { ...result, ...speechActivity, ...(quietIntervals ? { quietIntervals } : {}) };
+      job.transcriptionTime = performance.now() - processingStartTime;
+      job.result = { ...result, ...speechActivity, ...(quietIntervals ? { quietIntervals } : {}),
+        duration: job.audioDuration, processingTimeMs: job.transcriptionTime };
       job.status = 'completed';
       job.completedAt = new Date();
       job.progress = 100;
-      job.transcriptionTime = Date.now() - processingStartTime;
 
       // Add to history
       this.transcriptionHistory.unshift(job);

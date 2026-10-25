@@ -1,18 +1,16 @@
-.history-card {
+.history-page {
   max-width: 1040px;
   margin: 0 auto;
-  background: transparent;
-  box-shadow: none;
-  overflow: visible;
 }
-.history-card .card__header { border: 0; padding: 0 0 var(--spacing-md); }
-.history-card h2 { font-size: var(--font-size-xl); letter-spacing: -.025em; }
-.history-card .card-subtitle { font-size: var(--font-size-md); font-weight: 400; margin-top: var(--spacing-xs); }
-.history-card .card__body { padding: var(--spacing-md); border: 1px solid var(--color-border-default); border-radius: var(--radius-md); background: var(--color-bg-page); }
-.history-card table { font-size: var(--font-size-sm); }
-.history-card .button { min-width: var(--hit-target-aaa); min-height: var(--hit-target-aaa); }
+.history-page .page-heading { padding-bottom: var(--spacing-md); }
+.history-page h2 { margin: 0; font-weight: var(--font-weight-semibold); font-size: var(--font-size-xl); letter-spacing: -.025em; }
+.history-page .page-subtitle { font-size: var(--font-size-md); font-weight: 400; color: var(--color-text-subtle); margin: var(--spacing-xs) 0 0; }
+.history-page .page-content { min-width: 0; }
+.history-page caption { text-align: left; }
+.history-page table { font-size: var(--font-size-sm); }
+.history-page .button { min-width: var(--hit-target-aaa); min-height: var(--hit-target-aaa); }
 
-.card-header-row {
+.page-heading-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -49,7 +47,6 @@
     color: var(--color-text-subtle);
   }
 }
-@media (max-width: 640px) { .history-card .card__body { padding: var(--spacing-sm); } }
 
 .table-container {
   width: 100%;

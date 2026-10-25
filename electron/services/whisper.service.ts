@@ -1,19 +1,17 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { spawn } from 'child_process';
-import * as https from 'https';
-import { createWriteStream } from 'fs';
+import { ModelStore } from './model-store';
+import { decodedAudioDuration } from './audio-duration';
+import { speechModel, SPEECH_MODELS } from './model-catalog';
+import { RecognitionEngine } from './recognition-engine';
 import { parseQuietIntervals, QuietInterval } from './quiet-intervals';
 import { alignmentPreset, parseWhisperTranscript } from './speech-alignment';
 import { parseSpeechActivity } from './speech-activity';
 import { app } from 'electron';
 import { TranscriptionOptions, TranscriptionResult } from './types';
 
-// Valid model names whitelist for security
-const VALID_MODEL_NAMES = ['tiny', 'base', 'small', 'medium', 'large'] as const;
-type ValidModelName = (typeof VALID_MODEL_NAMES)[number];
-
-export class WhisperService {
+export class WhisperService implements RecognitionEngine {
   private whisperPath: string;
   private whisperBinDir: string;
   private modelsPath: string;
@@ -21,22 +19,10 @@ export class WhisperService {
   private vadModelPath: string;
   private initialized: boolean = false;
   private ffmpegAvailable: boolean = false;
-  private availableModels = [
-    { name: 'tiny', size: '39 MB', description: 'Fastest, least accurate' },
-    { name: 'base', size: '74 MB', description: 'Fast, good accuracy' },
-    { name: 'small', size: '244 MB', description: 'Balanced speed/accuracy' },
-    { name: 'medium', size: '769 MB', description: 'Slower, better accuracy' },
-    { name: 'large', size: '1550 MB', description: 'Slowest, best accuracy' },
-  ];
+  private models!: ModelStore;
+  private initialization?: Promise<void>;
 
-  /**
-   * Validates that a model name is in the allowed list
-   */
-  private isValidModelName(name: string): name is ValidModelName {
-    return VALID_MODEL_NAMES.includes(name as ValidModelName);
-  }
-
-  constructor() {
+  constructor(store?: ModelStore) {
     // Determine base path based on environment
     const isDev = !app.isPackaged;
     const basePath = isDev ? app.getAppPath() : process.resourcesPath;
@@ -72,6 +58,7 @@ export class WhisperService {
 
     // Models stored in user data directory (writable location)
     this.modelsPath = path.join(app.getPath('userData'), 'models');
+    this.models = store || new ModelStore(this.modelsPath);
 
     console.log('[WhisperService] Whisper path:', this.whisperPath);
     console.log('[WhisperService] Models path:', this.modelsPath);
@@ -79,6 +66,12 @@ export class WhisperService {
   }
 
   async initialize(): Promise<void> {
+    if (this.initialized) return;
+    if (!this.initialization) this.initialization = this.initializeOnce().catch(error => { this.initialization = undefined; throw error; });
+    return this.initialization;
+  }
+
+  private async initializeOnce(): Promise<void> {
     // Ensure directories exist
     await this.ensureDirectories();
 
@@ -137,7 +130,7 @@ export class WhisperService {
         console.log('[WhisperService] Migrating models from old location...');
 
         const files = await fs.readdir(oldModelsPath);
-        const binFiles = files.filter(f => f.endsWith('.bin'));
+        const binFiles = files.filter(f => SPEECH_MODELS.some(model => model.filename === f));
 
         if (binFiles.length > 0) {
           await fs.mkdir(this.modelsPath, { recursive: true });
@@ -190,98 +183,14 @@ export class WhisperService {
     }
   }
 
-  async getAvailableModels(): Promise<any[]> {
-    const installed = await this.getInstalledModels();
-
-    return this.availableModels.map((model) => ({
-      ...model,
-      installed: installed.includes(model.name),
-      path: path.join(this.modelsPath, `ggml-${model.name}.bin`),
-    }));
-  }
+  async getAvailableModels() { return this.models.list(); }
 
   private async getInstalledModels(): Promise<string[]> {
-    try {
-      const files = await fs.readdir(this.modelsPath);
-      return files
-        .filter((file) => file.startsWith('ggml-') && file.endsWith('.bin'))
-        .map((file) => file.replace('ggml-', '').replace('.bin', ''))
-        .filter(name => this.isValidModelName(name));
-    } catch {
-      return [];
-    }
+    return (await this.models.list()).filter(model => model.installed).map(model => model.name);
   }
 
-  async downloadModel(
-    modelName: string,
-    progressCallback?: (progress: number) => void
-  ): Promise<void> {
-    // Validate model name against whitelist to prevent path injection
-    if (!this.isValidModelName(modelName)) {
-      throw new Error(
-        `Invalid model name: ${modelName}. Valid models are: ${VALID_MODEL_NAMES.join(', ')}`
-      );
-    }
-
-    const modelUrl = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-${modelName}.bin`;
-    const modelPath = path.join(this.modelsPath, `ggml-${modelName}.bin`);
-
-    // Ensure models directory exists
-    await fs.mkdir(this.modelsPath, { recursive: true });
-
-    return new Promise((resolve, reject) => {
-      const file = createWriteStream(modelPath);
-
-      const downloadFile = (url: string) => {
-        https
-          .get(url, (response) => {
-            // Follow redirects
-            if (response.statusCode === 301 || response.statusCode === 302) {
-              const redirectUrl = response.headers.location;
-              if (redirectUrl) {
-                console.log(`[WhisperService] Following redirect to: ${redirectUrl}`);
-                downloadFile(redirectUrl);
-                return;
-              }
-            }
-
-            const totalSize = parseInt(
-              response.headers['content-length'] || '0',
-              10
-            );
-            let downloadedSize = 0;
-
-            console.log(
-              `[WhisperService] Downloading ${modelName} model (${(totalSize / 1024 / 1024).toFixed(2)} MB)...`
-            );
-
-            response.on('data', (chunk) => {
-              downloadedSize += chunk.length;
-              if (progressCallback && totalSize > 0) {
-                const progress = (downloadedSize / totalSize) * 100;
-                progressCallback(progress);
-              }
-            });
-
-            response.pipe(file);
-
-            file.on('finish', () => {
-              file.close();
-              console.log(`[WhisperService] Model ${modelName} downloaded successfully`);
-              resolve();
-            });
-          })
-          .on('error', async (err) => {
-            file.close();
-            try {
-              await fs.unlink(modelPath);
-            } catch {}
-            reject(err);
-          });
-      };
-
-      downloadFile(modelUrl);
-    });
+  async downloadModel(modelName: string, progress?: (progress: number) => void): Promise<void> {
+    return this.models.download(modelName, progress);
   }
 
   async transcribe(
@@ -295,16 +204,13 @@ export class WhisperService {
 
     // Validate model name against whitelist
     const modelName = options.model || 'base';
-    if (!this.isValidModelName(modelName)) {
-      throw new Error(
-        `Invalid model name: ${modelName}. Valid models are: ${VALID_MODEL_NAMES.join(', ')}`
-      );
-    }
+    const definition = speechModel(modelName);
+    if (definition.engine !== 'whisper.cpp') throw new Error('This model requires the alternate speech engine');
 
     // Canonicalize audio path to prevent path traversal
     const resolvedAudioPath = path.resolve(audioPath);
 
-    const modelPath = path.join(this.modelsPath, `ggml-${modelName}.bin`);
+    const modelPath = this.models.path(modelName);
 
     // Check if model exists
     try {
@@ -501,18 +407,27 @@ export class WhisperService {
       const ffmpegProcess = spawn(this.ffmpegPath, [
         '-i',
         resolvedAudioPath,
+        '-vn',
+        '-progress',
+        'pipe:1',
+        '-nostats',
         '-f',
         'null',
         '-',
       ]);
 
       let errorOutput = '';
+      let progressOutput = '';
+      ffmpegProcess.stdout.on('data', data => { progressOutput += data.toString(); });
 
       ffmpegProcess.stderr.on('data', (data) => {
         errorOutput += data.toString();
       });
 
-      ffmpegProcess.on('close', () => {
+      ffmpegProcess.on('close', (code) => {
+        if (code !== 0) { resolve(undefined); return; }
+        const decoded = decodedAudioDuration(progressOutput);
+        if (decoded !== undefined) { resolve(decoded); return; }
         // Parse duration from ffmpeg output: "Duration: HH:MM:SS.mmm"
         const durationMatch = errorOutput.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2}\.\d{2})/);
 
