@@ -2,7 +2,7 @@
 
 Recorded: 26 October 2026.
 
-Status: deferred while app iteration continues. This document records the proposed sequence; it does not initiate a repository rename, version bump, tag, push or release.
+Status: release preparation started on 26 October 2026. The local checkpoint and candidate below are complete; repository rename, merge, final version bump/tag and publication remain pending.
 
 ## Recommended approach
 
@@ -34,3 +34,18 @@ The app's display name is already TalaTrace. Internal package identifiers and th
 - Capture the exact blog destination before validating redirects; it has not been supplied in this plan.
 - Reassess release tooling, integrations and platform coverage at execution time.
 - No remote repository rename or release has been performed by recording this plan.
+
+## Preparation results — 26 October 2026
+
+- Tested app checkpoint: commit `4ac30ed`, tag `checkpoint/before-talatrace-release-2026-10-26`. All 130 frontend and 40 Electron tests passed at that checkpoint. The latest workflow visual review passes 126 states with the documented extreme-zoom navigation gap.
+- GitHub audit: current repository is public, its default branch is main, the connected account has admin permission, and Pages is disabled. No `.github` workflow or hosted action is present in this checkout. The target repository URL returned 404 when checked; recheck immediately before renaming. GitHub's current rename guidance still confirms repository and Git redirects, excluding Pages/action references.
+- Release tooling now synchronizes package manifests and both root lockfile metadata fields without changing dependency versions; preserves curated Unreleased notes when making a release section; excludes checkpoint tags from previous-release discovery; includes lockfiles in the release commit and rollback; and requires main for the release wizard. Two new regression tests pass (42 Electron/release-tooling tests total).
+- Per the repository's release policy, the feature branch's package versions remain unchanged. Root package-lock.json's pre-existing 1.2.0 mismatch will be resolved by version synchronization on main. Local packaging uses an `extraMetadata.version=1.2.0-rc.1` override and `--publish never`.
+- Windows x64 candidate built in `release/talatrace-rc1/`: `TalaTrace Setup 1.2.0-rc.1.exe` and `TalaTrace-1.2.0-rc.1-win.zip`. Both are unsigned. Windows resource editing remains enabled. A workspace-local electron-builder tool cache, extracted from the already-downloaded tool archive without preserving macOS symlinks, avoids this host's symlink-privilege failure. No administrator terminal was needed for this candidate.
+- Installer SHA-256: `EE307F2465B8190A84CB0D4E94125CF0AF52AEA0E01A08BF62A73A4A3D4BAF70`.
+- ZIP SHA-256: `DBDB1FFC4D34790D834B6C74E9BFFD24260562F2FC345010B17C4E05FEA8A2D4`.
+- `node tests/electron/packaged-release-smoke.cjs` tests the actual packaged EXE. A debugger isolates appData before application code executes, with no production test hook. Both Whisper Base and Parakeet recognize the bundled reference sample with HTTP(S) blocked, returning duration/processing/timing data. A temporary legacy profile and marker survive, model selection persists over restart, and a clean profile launches. Temporary test profiles are retained for inspection. This does not install the app or validate NSIS upgrade behavior.
+- Static installer-identity review: the app ID remains `com.yourcompany.whisper-electron`, as in 1.1.5; electron-builder derives its NSIS GUID from that ID. Product/executable names change. This supports continuity but does not substitute for an installed upgrade test.
+- Reviewable release notes: [1.2.0 draft](releases/1.2.0-draft.md).
+
+Next gate: test clean install and 1.1.5 → candidate upgrade on a disposable Windows machine/VM, checking the executable and shortcuts, one uninstall entry, downloaded weights, preferences and uninstall/rollback behavior. Windows Sandbox is unavailable on this host; no existing Whisper/TalaTrace per-user uninstall entry was found. The real installed-user workflow has not been exercised. The exact blog URL is requested so its actual destination can be checked after rename. Repository rename and public release wait for these checks.

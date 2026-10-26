@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const readline = require('readline');
+const { syncVersions } = require('./sync-version');
 
 // ============================================================================
 // Utility Functions
@@ -149,25 +150,15 @@ function prependChangelog(entry, version) {
     fs.writeFileSync(changelogPath, lines.join('\n'), 'utf8');
   } else {
     const unreleasedEnd = changelog.indexOf('\n', unreleasedIndex);
+    const nextSection = changelog.indexOf('\n## [', unreleasedEnd);
     const before = changelog.slice(0, unreleasedEnd + 1);
-    const after = changelog.slice(unreleasedEnd + 1);
+    const after = nextSection === -1 ? '' : changelog.slice(nextSection + 1);
     fs.writeFileSync(changelogPath, before + '\n' + entry + '\n' + after, 'utf8');
   }
 }
 
 function updatePackageVersions(version) {
-  const rootPkgPath = path.join(process.cwd(), 'package.json');
-  const frontendPkgPath = path.join(process.cwd(), 'frontend', 'package.json');
-
-  const rootPkg = JSON.parse(fs.readFileSync(rootPkgPath, 'utf8'));
-  rootPkg.version = version;
-  fs.writeFileSync(rootPkgPath, JSON.stringify(rootPkg, null, 2) + '\n', 'utf8');
-
-  if (fs.existsSync(frontendPkgPath)) {
-    const frontendPkg = JSON.parse(fs.readFileSync(frontendPkgPath, 'utf8'));
-    frontendPkg.version = version;
-    fs.writeFileSync(frontendPkgPath, JSON.stringify(frontendPkg, null, 2) + '\n', 'utf8');
-  }
+  syncVersions(process.cwd(), version);
 }
 
 function checkGitStatus() {
@@ -231,6 +222,8 @@ async function openEditor(filePath) {
 
 async function step1_validateGit() {
   console.log('\n🔍 Step 1: Validating git status...');
+  const branch = execCommand('git branch --show-current', { silent: true }).stdout.trim();
+  if (branch !== 'main') throw new Error('Run the release wizard on main after merging the feature PR.');
   const status = checkGitStatus();
   if (!status.clean) {
     console.error('\n❌ Git working tree is not clean.');
@@ -283,7 +276,7 @@ async function step2_selectVersion() {
 async function step3_prepareChangelog(version) {
   console.log('\n📋 Step 3: Preparing CHANGELOG entry...');
 
-  const lastTagResult = execCommand('git describe --tags --abbrev=0', { silent: true, ignoreError: true });
+  const lastTagResult = execCommand('git describe --tags --match "v[0-9]*" --abbrev=0', { silent: true, ignoreError: true });
   const lastTag = lastTagResult.success ? lastTagResult.stdout.trim() : null;
 
   const commits = getCommitsSince(lastTag);
@@ -298,7 +291,11 @@ async function step3_prepareChangelog(version) {
     }
   }
 
-  const entry = generateChangelogEntry(version, commits);
+  const existing = fs.readFileSync(path.join(process.cwd(), 'CHANGELOG.md'), 'utf8');
+  const unreleased = extractVersionSection(existing, 'Unreleased').replace(/^## \[Unreleased\][^\n]*\n?/, '').trim();
+  const entry = unreleased
+    ? `## [${version}] - ${new Date().toISOString().split('T')[0]}\n\n${unreleased}\n`
+    : generateChangelogEntry(version, commits);
   const tempFile = path.join(process.cwd(), '.changelog-temp.md');
   fs.writeFileSync(tempFile, entry, 'utf8');
 
@@ -391,7 +388,8 @@ async function step6_commit(version) {
     return false;
   }
 
-  execCommand('git add package.json frontend/package.json CHANGELOG.md');
+  const versionFiles = ['package.json', 'package-lock.json', 'frontend/package.json', 'frontend/package-lock.json', 'backend/package.json', 'backend/package-lock.json', 'CHANGELOG.md'].filter(file => fs.existsSync(file));
+  execCommand('git add ' + versionFiles.join(' '));
 
   const commitMsg = `chore: release v${version}`;
   const tempMsgFile = path.join(process.cwd(), '.commit-msg-temp.txt');
@@ -565,6 +563,8 @@ async function main() {
   const originalPkg = fs.readFileSync(pkgPath, 'utf8');
   const originalFrontendPkg = fs.existsSync(frontendPkgPath) ? fs.readFileSync(frontendPkgPath, 'utf8') : null;
   const originalChangelog = fs.existsSync(changelogPath) ? fs.readFileSync(changelogPath, 'utf8') : null;
+  const otherVersionFiles = ['package-lock.json', 'frontend/package-lock.json', 'backend/package.json', 'backend/package-lock.json']
+    .filter(file => fs.existsSync(file)).map(file => [file, fs.readFileSync(file, 'utf8')]);
 
   let committed = false;
   let tagged = false;
@@ -590,6 +590,7 @@ async function main() {
       console.log('\n🔄 Rolling back file changes...');
       fs.writeFileSync(pkgPath, originalPkg, 'utf8');
       if (originalFrontendPkg !== null) fs.writeFileSync(frontendPkgPath, originalFrontendPkg, 'utf8');
+      for (const [file, contents] of otherVersionFiles) fs.writeFileSync(file, contents, 'utf8');
       if (originalChangelog !== null) {
         fs.writeFileSync(changelogPath, originalChangelog, 'utf8');
       } else if (fs.existsSync(changelogPath)) {
@@ -608,7 +609,8 @@ async function main() {
   }
 }
 
-main()
+module.exports = { extractVersionSection, prependChangelog };
+if (require.main === module) main()
   .then(() => process.exit(0))
   .catch((error) => {
     console.error('Fatal error:', error);
