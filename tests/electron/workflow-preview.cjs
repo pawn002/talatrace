@@ -22,8 +22,25 @@ fixture.text = fixture.segments.map(segment => segment.text).join(' ');
 fixture.originalSegments = fixture.segments;
 const { SPEECH_MODELS, modelSize } = require('../../dist/electron/services/model-catalog');
 let alternateReady = true;
-ipcMain.handle('get-available-models', () => SPEECH_MODELS.map(model => ({ ...model, size: modelSize(model.sizeBytes), installed: model.name === 'base', available: model.engine !== 'transcribe.cpp' || alternateReady, unavailableReason: 'Parakeet runtime is not included in this build.' })));
-ipcMain.handle('download-model', () => new Promise(resolve => setTimeout(() => resolve({ success: true }), 1500)));
+const installedModels = new Set(['base']);
+let deletionBlocked = false;
+let failDelete = false;
+let finishDiscovery;
+const initialDiscovery = new Promise(resolve => { finishDiscovery = resolve; });
+ipcMain.handle('get-available-models', async () => {
+  await initialDiscovery;
+  return SPEECH_MODELS.map(model => ({ ...model, size: modelSize(model.sizeBytes), installed: installedModels.has(model.name), deletionBlocked, available: model.engine !== 'transcribe.cpp' || alternateReady, unavailableReason: 'Parakeet runtime is not included in this build.' }));
+});
+let finishDownload;
+ipcMain.handle('download-model', (_event, name) => new Promise(resolve => {
+  finishDownload = () => { installedModels.add(name); resolve({ success: true }); };
+}));
+ipcMain.handle('delete-model', async (_event, name) => {
+  if (deletionBlocked) throw new Error('Finish transcription before deleting a model.');
+  await new Promise(resolve => setTimeout(resolve, 500));
+  if (failDelete) { failDelete = false; throw new Error('Could not remove model file.'); }
+  installedModels.delete(name); return { success: true };
+});
 ipcMain.handle('get-system-info', () => ({ platform: process.platform, version: '1.1.5' }));
 let history = [];
 let historyDelay = 0;
@@ -43,12 +60,54 @@ function transcribe(event) {
 ipcMain.handle('transcribe-recording', transcribe);
 ipcMain.handle('transcribe-audio', transcribe);
 app.whenReady().then(async () => {
-  const watchdog = setTimeout(() => { console.error('Visual review timed out'); app.exit(1); }, 90000);
+  const watchdog = setTimeout(() => { console.error('Visual review timed out'); app.exit(1); }, 120000);
   const win = new BrowserWindow({ width: 1100, height: 820, show: false, webPreferences: {
     offscreen: true, backgroundThrottling: false, preload: path.join(root, 'dist/electron/preload.js'),
   } });
   const metrics = [];
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  // Exercise native scrollbars through their transparent grab area, not DOM scroll assignments.
+  const checkScrollbar = async (selector, horizontal = false) => {
+    await win.webContents.executeJavaScript(`(() => {
+      const el = document.querySelector(${JSON.stringify(selector)});
+      el.scrollTop = el.scrollLeft = 0;
+      el.scrollIntoView({ block: ${horizontal ? "'end'" : "'center'"} });
+      if (${horizontal}) {
+        const panel = document.querySelector('.app-container');
+        panel.scrollTop += Math.max(0, el.getBoundingClientRect().bottom - Math.min(innerHeight, panel.getBoundingClientRect().bottom) + 32);
+      }
+    })()`);
+    await wait(150); // Let the compositor update hit testing after moving a tall table into view.
+    const point = await win.webContents.executeJavaScript(`(() => {
+      const el = document.querySelector(${JSON.stringify(selector)});
+      const r = el.getBoundingClientRect(), s = getComputedStyle(el);
+      const bar = getComputedStyle(el, '::-webkit-scrollbar');
+      const thumb = getComputedStyle(el, '::-webkit-scrollbar-thumb');
+      if (parseFloat(bar.width) !== 24 || parseFloat(bar.height) !== 24 || thumb.backgroundClip !== 'padding-box') throw new Error('Candor scrollbar construction missing: ' + ${JSON.stringify(selector)});
+      const horizontal = ${horizontal};
+      const visible = horizontal ? el.clientWidth : el.clientHeight;
+      const total = horizontal ? el.scrollWidth : el.scrollHeight;
+      if (total <= visible) throw new Error('Scrollbar fixture does not overflow: ' + ${JSON.stringify(selector)});
+      const margin = 6; // Current --radius-md track-end inset; grab stays well within the thumb.
+      const center = margin + (visible - 2 * margin) * visible / total / 2;
+      // Three pixels into the transparent content-side border: outside the visible 6px bar.
+      return horizontal
+        ? { x: r.left + center, y: r.bottom - parseFloat(s.borderBottomWidth || 0) - 21 }
+        : { x: r.right - parseFloat(s.borderRightWidth || 0) - 21, y: r.top + center };
+    })()`);
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point });
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', button: 'left', buttons: 1, x: point.x + (horizontal ? 70 : 0), y: point.y + (horizontal ? 0 : 70) });
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, x: point.x + (horizontal ? 70 : 0), y: point.y + (horizontal ? 0 : 70) });
+    await wait(100);
+    if (!await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(selector)}).${horizontal ? 'scrollLeft' : 'scrollTop'} > 0`)) throw new Error('Transparent scrollbar grab area did not drag: ' + selector + ' at ' + JSON.stringify(point));
+    await win.webContents.executeJavaScript(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); el.scrollTop = el.scrollLeft = 0; (el.matches('.app-container') ? el.querySelector('button:not(:disabled)') : el).focus(); })()`);
+    const key = horizontal ? { key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 } : { key: 'PageDown', code: 'PageDown', windowsVirtualKeyCode: 34 };
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', ...key });
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', ...key });
+    await wait(200);
+    if (!await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(selector)}).${horizontal ? 'scrollLeft' : 'scrollTop'} > 0`)) throw new Error('Native keyboard scrolling failed: ' + selector);
+  };
   const click = async selector => {
     const point = await win.webContents.executeJavaScript(`(() => {
       const el = ${JSON.stringify(selector)}.split(' >>> ').reduce((root, part, i) => (i ? root.shadowRoot : root).querySelector(part), document);
@@ -73,6 +132,8 @@ app.whenReady().then(async () => {
     throw new Error('Preview recording did not start');
   };
   async function capture(name) {
+    // Flush newly changed roles/fonts before settling transitions in the hidden renderer.
+    await win.webContents.executeJavaScript("(async () => { for (const el of document.querySelectorAll('.button, .input')) void getComputedStyle(el).color; await document.fonts.ready; await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); })()");
     await wait(250); // Let the 200ms control colour transitions settle before sampling.
     await fs.writeFile(path.join(output, `${name}.png`), (await win.webContents.capturePage()).toPNG());
     metrics.push(await win.webContents.executeJavaScript(`(() => {
@@ -89,7 +150,7 @@ app.whenReady().then(async () => {
         const choice = el.closest('.theme-choice');
         if (choice && rgba(getComputedStyle(choice).backgroundColor)[3] === 0) return getComputedStyle(choice.closest('.theme-track'), '::before').backgroundColor;
         const chain = []; for (let parent = el; parent; parent = parent.parentElement) chain.unshift(parent);
-        const rgb = chain.reduce((back, item) => blend(rgba(getComputedStyle(item.localName === 'candor-card' ? item.shadowRoot.querySelector('.card') : item).backgroundColor), back), [255, 255, 255]);
+        const rgb = chain.reduce((back, item) => blend(rgba(getComputedStyle(item.localName === 'candor-card' ? item.shadowRoot.querySelector('.card') : item.localName === 'candor-modal' ? item.shadowRoot.querySelector('.modal__panel') : item).backgroundColor), back), [255, 255, 255]);
         return 'rgb(' + rgb.map(Math.round).join(', ') + ')';
       };
       const luminance = rgb => rgb.map(v => v / 255).map(v => v <= .04045 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4)).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
@@ -103,6 +164,10 @@ app.whenReady().then(async () => {
       }).map(el => ({ text: el.textContent.trim().slice(0, 80), size: getComputedStyle(el).fontSize }));
       if (smallText.length) throw new Error('Readable text below 14px: ' + JSON.stringify(smallText));
       const colourPairs = [];
+      for (const el of document.querySelectorAll('.app-container, .transcript-view, .table-container')) {
+        if (!el.checkVisibility() || (el.scrollHeight <= el.clientHeight && el.scrollWidth <= el.clientWidth)) continue;
+        colourPairs.push({ selector: 'scrollbar ' + el.className, foreground: getComputedStyle(el, '::-webkit-scrollbar-thumb').backgroundColor, background: resolvedBackground(el), nonText: true });
+      }
       const iconMetrics = [...document.querySelectorAll('i.ph, i.ph-fill, i.ph-bold')].filter(el => el.checkVisibility({ checkVisibilityCSS: true })).map(el => {
         const style = getComputedStyle(el);
         const weights = ['ph', 'ph-fill', 'ph-bold'].filter(weight => el.classList.contains(weight));
@@ -113,14 +178,14 @@ app.whenReady().then(async () => {
         if (!el.closest('button:disabled')) colourPairs.push({ selector: 'icon ' + el.className, foreground: style.color, background: resolvedBackground(el), nonText: true });
         return { classes: el.className, size: parseFloat(style.fontSize), width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height };
       });
-      for (const host of document.querySelectorAll('.settings-details, .timing-details')) {
+      for (const host of document.querySelectorAll('.timing-details')) {
         const label = host.shadowRoot?.querySelector('[part=label]');
         if (!label?.checkVisibility()) continue;
         const icon = getComputedStyle(label, '::before');
-        if (icon.maskImage === 'none' || parseFloat(icon.width) !== 16) throw new Error('Disclosure icon is absent or incorrectly sized');
+        if (icon.maskImage === 'none' || parseFloat(icon.width) !== parseFloat(getComputedStyle(label).fontSize)) throw new Error('Disclosure icon is absent or incorrectly sized');
         colourPairs.push({ selector: host.classList.contains('timing-details') ? 'timing help mask' : 'settings gear mask', foreground: icon.backgroundColor, background: resolvedBackground(host), nonText: true });
       }
-      for (const selector of ['.file-name', '.file-size', '.model-name', '.model-repository a', '.models-page .info-alert a', '.source-help', '.action-reason', '#history-refresh-status', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
+      for (const selector of ['.file-name', '.file-size', '.model-name', '.transcript-metadata dt', '.transcript-metadata dd', '.model-repository a', '.sort-header', '.models-page .info-alert a', '.spectrum-placeholder-label', '.spectrum-live-label', '.action-reason', '#history-refresh-status', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
         for (const el of document.querySelectorAll(selector)) {
           if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
@@ -133,25 +198,25 @@ app.whenReady().then(async () => {
         const style = getComputedStyle(link);
         colourPairs.push({ selector: 'repository visited token pairing', foreground: style.getPropertyValue('--color-link-visited').trim(), background: resolvedBackground(link), size: parseFloat(style.fontSize), weight: parseInt(style.fontWeight), text: link.textContent.trim() });
       }
-      for (const selector of ['.input', '.button:focus-visible', '.model-repository a:focus-visible', '.status-text i', '.local-badge--recording i', '.workflow-connector', '.spectrum-display canvas']) {
+      for (const selector of ['.input', '.button:focus-visible', '.sort-header:focus-visible', '.model-repository a:focus-visible', '.status-text i', '.local-badge--recording i', '.workflow-connector', '.spectrum-display canvas', '.spectrum-bars span']) {
         for (const el of document.querySelectorAll(selector)) {
           if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
           let parent = el.matches('.workflow-connector') ? el.closest('.workflow-panel') : el.parentElement;
           const background = resolvedBackground(parent);
-          colourPairs.push({ selector, foreground: el.matches('i, canvas') ? style.color : el.matches(':focus-visible') ? style.outlineColor : style.borderTopColor, background, nonText: true });
+          colourPairs.push({ selector, foreground: el.matches('.spectrum-bars span') ? style.backgroundColor : el.matches('i, canvas') ? style.color : el.matches(':focus-visible') ? style.outlineColor : style.borderTopColor, background, nonText: true });
         }
       }
       for (const el of document.querySelectorAll('.theme-option input:checked + .theme-choice')) {
         colourPairs.push({ selector: 'theme selected border', foreground: getComputedStyle(el).borderTopColor, background: getComputedStyle(el.closest('.theme-track'), '::before').backgroundColor, nonText: true });
         if (el.previousElementSibling.matches(':focus-visible')) colourPairs.push({ selector: 'theme focus ring', foreground: getComputedStyle(el).outlineColor, background: resolvedBackground(document.querySelector('.app-header')), nonText: true });
       }
-      for (const host of document.querySelectorAll('candor-tooltip, candor-toast, candor-disclosure, candor-accordion-item')) {
-        for (const el of host.shadowRoot?.querySelectorAll('.tooltip__bubble, .toast__message, .disclosure__trigger, .accordion-item__title, .select') || []) {
-          if (!host.checkVisibility() || !el.checkVisibility({ checkVisibilityCSS: true })) continue;
+      for (const host of document.querySelectorAll('candor-tooltip, candor-toast, candor-disclosure, candor-accordion-item, candor-modal')) {
+        for (const el of host.shadowRoot?.querySelectorAll('.tooltip__bubble, .toast__message, .disclosure__trigger, .accordion-item__title, .select, .modal__title, .modal__close') || []) {
+          if ((!host.matches('candor-modal') && !host.checkVisibility()) || !el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
           const box = el.closest('.toast') || el;
-          colourPairs.push({ selector: host.localName + ' ' + el.className, foreground: style.color, background: host.matches('candor-select') ? getComputedStyle(el).backgroundColor : host.matches('candor-disclosure, candor-accordion-item') ? resolvedBackground(host) : getComputedStyle(box).backgroundColor, size: parseFloat(style.fontSize), weight: parseInt(style.fontWeight) });
+          colourPairs.push({ selector: host.localName + ' ' + el.className, foreground: style.color, background: host.matches('candor-modal') ? resolvedBackground(el) : host.matches('candor-select') ? getComputedStyle(el).backgroundColor : host.matches('candor-disclosure, candor-accordion-item') ? resolvedBackground(host) : getComputedStyle(box).backgroundColor, size: parseFloat(style.fontSize), weight: parseInt(style.fontWeight), nonText: el.matches('.modal__close'), supplementary: host.matches('.timing-details') && el.matches('.disclosure__trigger') });
         }
       }
       for (const selector of ['.workflow-status h3', '#workflow-help', '.segment__time', '.segment__text', '.workflow-controls .button--primary']) {
@@ -162,7 +227,7 @@ app.whenReady().then(async () => {
         const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
         contrasts[selector] = Math.round((values[0] + .05) / (values[1] + .05) * 100) / 100;
       }
-      const readingMeasures = [...document.querySelectorAll('.disclosure--inline, .settings-details, .explanation-prose, .segment__text, .record-hint:not(.performance-summary)')]
+      const readingMeasures = [...document.querySelectorAll('.disclosure--inline, .explanation-prose, .segment__text, .record-hint:not(.performance-summary)')]
         .filter(el => el.checkVisibility({ checkVisibilityCSS: true })).map(el => {
           const style = getComputedStyle(el);
           context.font = style.fontSize + ' ' + style.fontFamily;
@@ -184,6 +249,18 @@ app.whenReady().then(async () => {
     await win.loadFile(path.join(root, 'frontend/dist/index.html'));
     await wait(600);
     await win.webContents.executeJavaScript("document.fonts.load('16px \"Noto Sans\"').then(() => true)");
+    // Attach after the renderer exists. Offscreen windows have no OS focus;
+    // renderer emulation lets trusted keys exercise real :focus-visible rules.
+    win.webContents.debugger.attach('1.3');
+    await win.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true });
+    await capture('models-checking');
+    if (!await win.webContents.executeJavaScript(`document.querySelector('.workflow-status').textContent.includes('Checking local models') && !document.querySelector('.workflow-panel').textContent.includes('Download a model')`)) throw new Error('Pending discovery incorrectly offers a download');
+    win.setSize(360, 780); await capture('models-checking-small'); win.setSize(1100, 820);
+    nativeTheme.themeSource = 'light'; await wait(250); await capture('models-checking-light'); nativeTheme.themeSource = 'dark';
+    await click('#app-tab-models'); await capture('models-initial-loading');
+    finishDiscovery(); await wait(300);
+    await capture('models-initial-loaded');
+    await click('#app-tab-transcription');
     await win.webContents.executeJavaScript(`(async () => {
       await customElements.whenDefined('candor-card');
       for (const card of document.querySelectorAll('candor-card')) {
@@ -194,10 +271,6 @@ app.whenReady().then(async () => {
       }
     })()`);
     if (await win.webContents.executeJavaScript("!!document.querySelector('[title]')")) throw new Error('Native title tooltip found; use Candor tooltip');
-    // Attach after the renderer exists. Offscreen windows have no OS focus;
-    // renderer emulation lets trusted keys exercise real :focus-visible rules.
-    win.webContents.debugger.attach('1.3');
-    await win.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true });
     await win.webContents.executeJavaScript(`(() => {
       const realNow = performance.now.bind(performance); let offset = 0;
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); // Offscreen fixture represents a foreground recorder.
@@ -221,32 +294,71 @@ app.whenReady().then(async () => {
       // Use the real MediaRecorder so the generated stream is consumed like a microphone.
     })()`);
     await capture('ready');
+    if (process.env.WHISPER_SCROLLBAR_TABLE_ONLY) {
+      await click('#app-tab-models'); win.setSize(360, 780); await wait(150);
+      await checkScrollbar('#app-panel-models .table-container', true); await capture('scrollbar-models-smoke');
+      console.log('Native table scrollbar drag and keyboard check passed.');
+      clearTimeout(watchdog); app.quit(); return;
+    }
+    const placeholderMatches = () => win.webContents.executeJavaScript("getComputedStyle(document.querySelector('.spectrum-placeholder-label')).color === getComputedStyle(document.querySelector('.spectrum-bars span')).backgroundColor");
+    if (!await placeholderMatches()) throw new Error('Dark placeholder text and marks have different colours');
+    const placeholderBounds = await win.webContents.executeJavaScript("(() => { const r = document.querySelector('.spectrum-bars').getBoundingClientRect(); return JSON.stringify([r.x,r.y,r.width,r.height]); })()");
+    if (process.env.WHISPER_MODAL_DISMISS_ONLY) {
+      const assertClosed = async label => {
+        await wait(80);
+        if (!await win.webContents.executeJavaScript("!document.querySelector('.settings-modal').open && !document.querySelector('.settings-modal').shadowRoot.querySelector('dialog').open && document.activeElement.matches('[data-action=settings]')")) throw new Error(label + ' failed to close and restore trigger focus');
+      };
+      await click('[data-action=settings]'); await click('.settings-modal >>> button[aria-label=Close]'); await assertClosed('Close button');
+      await click('[data-action=settings]'); await click('.settings-modal [slot=footer] button'); await assertClosed('Done');
+      await click('[data-action=settings]');
+      await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, x: 2, y: 2 });
+      await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, x: 2, y: 2 });
+      await assertClosed('Backdrop');
+      console.log('Modal close, Done and backdrop restore trigger focus.');
+      clearTimeout(watchdog); app.quit(); return;
+    }
+    if (!await win.webContents.executeJavaScript("document.querySelector('.spectrum-placeholder-label').textContent === 'Audio spectrum' && getComputedStyle(document.querySelector('.spectrum-bars')).animationName === 'none' && !document.querySelector('#source-help')")) throw new Error('Idle spectrum placeholder or clean source switcher missing');
+    win.setSize(360, 780);
+    await win.webContents.executeJavaScript("document.querySelector('.record-actions').scrollIntoView({ block: 'center' })"); await capture('workflow-options-small');
+    win.setSize(1100, 820); await win.webContents.executeJavaScript("document.querySelector('.app-container').scrollTop = 0");
     nativeTheme.themeSource = 'light'; await wait(350); await capture('ready-light');
+    if (!await placeholderMatches()) throw new Error('Light placeholder text and marks have different colours');
     nativeTheme.themeSource = 'dark'; await wait(350);
     if (!await win.webContents.executeJavaScript(`(() => {
       const actions = document.querySelector('.record-actions');
-      return actions.querySelectorAll('button').length === 1 && !!actions.querySelector('.copy-option')
+      return actions.querySelectorAll('button').length === 2 && !!actions.querySelector('.copy-option')
         && !document.querySelector('[data-action=transcribe]') && !actions.textContent.includes('Discard')
-        && document.querySelector('.settings-details').label === 'Transcription settings';
+        && actions.querySelector('[data-action=settings]').textContent.includes('Transcription settings');
     })()`)) throw new Error('Ready secondary actions are not simplified');
 
-    win.setSize(1024, 680); await capture('ready-short'); win.setSize(1100, 820);
+    win.setSize(1024, 500); await wait(150);
+    await checkScrollbar('.app-container'); await capture('scrollbar-page-dark');
+    nativeTheme.themeSource = 'light'; await wait(350); await checkScrollbar('.app-container'); await capture('scrollbar-page-light');
+    await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'forced-colors', value: 'active' }] });
+    await capture('scrollbar-forced-colours');
+    await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
+    nativeTheme.themeSource = 'dark';
+    win.setSize(1024, 680); await capture('ready-short'); win.setSize(1100, 820); await wait(150);
+    await win.webContents.executeJavaScript("document.querySelector('.app-container').scrollTop = 0");
     const stopPosition = () => win.webContents.executeJavaScript("(() => { const r = document.querySelector('[data-action=stop]').getBoundingClientRect(); return JSON.stringify([r.x,r.y,r.width,r.height]); })()");
     const readyStopPosition = await stopPosition();
     await click('[data-action="record"]'); await capture('starting'); await waitForRecording();
     await wait(1000);
     const bandCenter = async () => win.webContents.executeJavaScript(`(() => {
       const canvas = document.querySelector('app-audio-spectrum canvas');
-      const pixels = canvas.getContext('2d').getImageData(canvas.width - 2, 0, 2, canvas.height).data;
+      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
       let total = 0, weighted = 0;
-      for (let y = 0; y < canvas.height; y++) { const alpha = pixels[(y * 2) * 4 + 3]; total += alpha; weighted += y * alpha; }
-      if (!total) return { error: 'No spectrum at newest edge', mode: document.querySelector('.spectrum-display').getAttribute('data-mode'), width: canvas.width, height: canvas.height, hidden: document.hidden, audio: window.previewTone.context.state, peak: window.previewFftPeak, state: window.previewFftState, sampleTime: window.previewFftTime, sourceTime: window.previewTone.context.currentTime, streamActive: window.previewGain.context.state };
+      for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) {
+        const alpha = pixels[(y * canvas.width + x) * 4 + 3]; total += alpha; weighted += x * alpha;
+      }
+      if (!total) return { error: 'No frequency bars', mode: document.querySelector('.spectrum-display').dataset.mode, peak: window.previewFftPeak };
       return weighted / total;
     })()`);
     await capture('recording-low-tone');
+    if (!await win.webContents.executeJavaScript(`(() => { const r = document.querySelector('app-audio-spectrum canvas').getBoundingClientRect(); return JSON.stringify([r.x,r.y,r.width,r.height]) === ${JSON.stringify(placeholderBounds)}; })()`)) throw new Error('Live frequency bars do not occupy the placeholder geometry');
     await chooseTheme('light'); await capture('theme-recording-light');
     await chooseTheme('dark'); await capture('theme-recording-dark');
-    if (!await win.webContents.executeJavaScript("document.querySelector('.spectrum-display').dataset.mode === 'spectrogram' && !document.querySelector('[data-action=stop]').disabled")) throw new Error('Theme switching interrupted live recording');
+    if (!await win.webContents.executeJavaScript("document.querySelector('.spectrum-display').dataset.mode === 'frequency-bars' && !document.querySelector('[data-action=stop]').disabled")) throw new Error('Theme switching interrupted live recording');
     await chooseTheme('system');
     const lowBand = await bandCenter();
     if (typeof lowBand !== 'number') throw new Error(JSON.stringify(lowBand));
@@ -255,17 +367,37 @@ app.whenReady().then(async () => {
     await capture('recording-high-tone');
     const highBand = await bandCenter();
     if (typeof highBand !== 'number') throw new Error(JSON.stringify(highBand));
-    if (highBand >= lowBand - 3) throw new Error('Spectrum did not follow the change in real input frequency');
+    if (highBand <= lowBand + 5) throw new Error('Spectrum did not follow the change in real input frequency');
+    const speechSample = await fs.readFile(path.join(root, 'whisper.cpp/samples/jfk.wav')).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+    if (speechSample) {
+    await win.webContents.executeJavaScript(`(async () => {
+      const bytes = Uint8Array.from(atob(${JSON.stringify(speechSample.toString('base64'))}), character => character.charCodeAt(0));
+      const context = window.previewTone.context;
+      const speech = context.createBufferSource(); speech.buffer = await context.decodeAudioData(bytes.buffer); speech.loop = true;
+      window.previewTone.disconnect(); speech.connect(window.previewGain); window.previewGain.gain.value = 0.8;
+      speech.start(); window.previewSpeech = speech;
+    })()`);
+    await wait(1500); await capture('recording-speech');
+    nativeTheme.themeSource = 'light'; await capture('recording-speech-light');
+    win.setSize(360, 780); await capture('recording-speech-small'); win.setSize(1100, 820); nativeTheme.themeSource = 'dark';
+    await win.webContents.executeJavaScript("document.querySelector('.app-container').scrollTop = 0");
+    await win.webContents.executeJavaScript("window.previewSpeech.stop(); window.previewSpeech.disconnect(); window.previewTone.connect(window.previewGain); window.previewGain.gain.value = 0.2;");
+    }
     await win.webContents.executeJavaScript('window.advancePreviewClock()'); await wait(300);
     await capture('recording');
-    if (await stopPosition() !== readyStopPosition) throw new Error('Stop moved when recording started');
+    if (await stopPosition() !== readyStopPosition) throw new Error('Stop moved when recording started: ' + readyStopPosition + ' -> ' + await stopPosition());
     win.setSize(360, 780); await capture('recording-small'); win.setSize(1100, 820);
     nativeTheme.themeSource = 'light'; await wait(200); await capture('recording-light'); nativeTheme.themeSource = 'dark';
     await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
     await wait(300); await capture('recording-reduced-motion');
-    if (await win.webContents.executeJavaScript("document.querySelector('.spectrum-display').getAttribute('data-mode')") !== 'levels') throw new Error('Reduced motion still scrolls the spectrum');
+    if (await win.webContents.executeJavaScript("document.querySelector('.spectrum-display').getAttribute('data-mode')") !== 'bars-reduced-motion') throw new Error('Reduced motion still scrolls the spectrum');
+    await win.webContents.executeJavaScript("window.previewGain.gain.value = 0"); await wait(350); await capture('recording-reduced-motion-quiet');
+    if (!await win.webContents.executeJavaScript("(() => { const canvas = document.querySelector('app-audio-spectrum canvas'); return !canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value, index) => index % 4 === 3 && value > 0); })()")) throw new Error('Reduced-motion bars retained stale audio in silence');
+    await win.webContents.executeJavaScript("window.previewGain.gain.value = 0.2");
     await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
+    await wait(400);
     await win.webContents.executeJavaScript("window.previewGain.gain.value = 0"); await wait(500); await capture('recording-quiet');
+    if (!await win.webContents.executeJavaScript("(() => { const canvas = document.querySelector('app-audio-spectrum canvas'); const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data; return !pixels.some((value, index) => index % 4 === 3 && value > 0); })()")) throw new Error('Frequency bars did not settle to silence');
     if (!await win.webContents.executeJavaScript("document.querySelector('.workflow-status h3').textContent.includes('Recording') && document.querySelector('.local-badge').textContent.includes('Recording') && !document.querySelector('.spectrum-label')")) throw new Error('Quiet input lost the main recording status or retained a redundant spectrum label');
     await win.webContents.executeJavaScript("window.previewGain.gain.value = 0.2");
     await win.webContents.executeJavaScript(`(() => {
@@ -276,7 +408,7 @@ app.whenReady().then(async () => {
     })()`);
     await capture('history-during-recording');
     await click('#app-tab-transcription');
-    if (!await win.webContents.executeJavaScript("!document.querySelector('[data-action=stop]').disabled && document.querySelector('#audio-file-tab').disabled && !document.querySelector('#record-audio-tab').disabled && document.querySelector('#source-help').textContent.includes('switch sources')")) throw new Error('Recording or source guard lost after navigating back');
+    if (!await win.webContents.executeJavaScript("!document.querySelector('[data-action=stop]').disabled && document.querySelector('#audio-file-tab').disabled && !document.querySelector('#record-audio-tab').disabled && !document.querySelector('#source-help') && document.querySelector('#workflow-help').textContent.includes('switch audio source')")) throw new Error('Recording or source guard lost after navigating back');
     await click('[data-action="stop"]'); await capture('processing');
     await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
     if (await win.webContents.executeJavaScript("getComputedStyle(document.querySelector('.status-spinner')).animationName") !== 'none') throw new Error('Reduced motion preference was ignored');
@@ -284,7 +416,11 @@ app.whenReady().then(async () => {
     await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
     await wait(1000);
     await capture('result');
-    if (!await win.webContents.executeJavaScript("document.querySelector('[data-action=record]').textContent.includes('Record another') && !document.querySelector('#source-help').textContent.trim() && !document.querySelector('#record-audio-tab').hasAttribute('aria-describedby')")) throw new Error('Completed recording lacks repeat action or retains idle filler');
+    win.webContents.send('transcription-completed', { ...fixture, alignmentWarning: 'Some word boundaries could not be aligned precisely.', speechDetectionWarning: 'Speech detection was unavailable for this recording.' });
+    await win.webContents.executeJavaScript("document.querySelector('.result-section').scrollIntoView({ block: 'start' })"); await capture('transcript-warnings');
+    if (!await win.webContents.executeJavaScript("!document.querySelector('.timing-details').open && [...document.querySelectorAll('.transcript-content [role=status]')].filter(el => el.checkVisibility()).length === 2")) throw new Error('Warnings are hidden behind transcript details');
+    win.webContents.send('transcription-completed', fixture); await wait(80);
+    if (!await win.webContents.executeJavaScript("document.querySelector('[data-action=record]').textContent.includes('Record another') && !document.querySelector('#source-help') && !document.querySelector('#record-audio-tab').hasAttribute('aria-describedby')")) throw new Error('Completed recording lacks repeat action or retains idle filler');
     await click('.copy-option');
     if (await win.webContents.executeJavaScript("document.querySelector('.copy-option input').checked")) throw new Error('Timing checkbox label did not toggle the native input');
     await click('.copy-option');
@@ -301,8 +437,15 @@ app.whenReady().then(async () => {
     await click('[data-action="copy"]');
     win.setSize(480, 820); await capture('result-narrow');
     win.setSize(360, 780); await capture('result-small');
-    await win.webContents.executeJavaScript("document.querySelector('.performance-summary').scrollIntoView({ block: 'center' })");
-    await capture('performance-small');
+    win.webContents.send('transcription-completed', { ...fixture, segments: Array.from({ length: 60 }, (_, i) => ({ start: i * 2, end: i * 2 + 1, text: 'A longer transcript exercises native scrolling and focus.' })) });
+    await wait(100); await checkScrollbar('.transcript-view'); await capture('scrollbar-transcript-dark');
+    nativeTheme.themeSource = 'light'; await wait(350); await checkScrollbar('.transcript-view'); await capture('scrollbar-transcript-light');
+    nativeTheme.themeSource = 'dark'; win.webContents.send('transcription-completed', fixture); await wait(100);
+    if (!await win.webContents.executeJavaScript("!document.querySelector('.timing-details').open && document.querySelector('.transcript-heading').textContent.trim() === 'Your transcript'")) throw new Error('Transcript header still contains technical metadata or details start open');
+    await click('.timing-details >>> button');
+    await win.webContents.executeJavaScript("document.querySelector('.transcript-metadata').scrollIntoView({ block: 'center' })");
+    await capture('transcript-details-small');
+    await click('.timing-details >>> button');
     win.setSize(1100, 820);
     await win.webContents.executeJavaScript("document.querySelector('.disclosure--inline').shadowRoot.querySelector('button').focus(); document.querySelector('.disclosure--inline').scrollIntoView({ block: 'center' })");
     if (!await win.webContents.executeJavaScript("!!document.querySelector('.transcript-output').shadowRoot.querySelector('.card__footer:not([hidden])') && document.querySelector('.disclosure--inline').parentElement.slot === 'footer'")) throw new Error('Timing disclosure is not in the Card footer');
@@ -311,6 +454,9 @@ app.whenReady().then(async () => {
     await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
     if (!await win.webContents.executeJavaScript("document.querySelector('.disclosure--inline').open")) throw new Error('Timing disclosure keyboard toggle failed');
     await capture('timing-disclosure-open');
+    await win.webContents.executeJavaScript("document.querySelector('.transcript-metadata').scrollIntoView({ block: 'start' })"); await capture('transcript-details');
+    nativeTheme.themeSource = 'light'; await capture('transcript-details-light');
+    nativeTheme.themeSource = 'dark';
     await win.webContents.executeJavaScript("document.querySelectorAll('.quiet-details').forEach(el => el.open = true); document.querySelector('.quiet-details').scrollIntoView({ block: 'start' })");
     await capture('nested-diagnostics');
     win.setSize(360, 780);
@@ -330,17 +476,36 @@ app.whenReady().then(async () => {
     await wait(80);
     if (!await win.webContents.executeJavaScript("document.querySelector('.quiet-details').open && document.querySelector('.disclosure--subtle').open")) throw new Error('Nested keyboard toggle failed');
     await win.webContents.executeJavaScript("document.querySelectorAll('.quiet-details').forEach(el => el.open = false)");
-    await win.webContents.executeJavaScript("document.querySelector('.settings-details').open = true");
+    await click('[data-action=settings]');
     await capture('settings');
+    if (!await win.webContents.executeJavaScript("document.querySelector('.settings-modal').shadowRoot.querySelector('dialog').matches(':modal') && document.activeElement === document.querySelector('#model-select')")) throw new Error('Settings did not open as a modal with initial model focus');
+    for (let index = 0; index < 7; index++) {
+      await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+      await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+      if (!await win.webContents.executeJavaScript("(() => { const modal = document.querySelector('.settings-modal'); let active = document.activeElement; while (active.shadowRoot?.activeElement) active = active.shadowRoot.activeElement; return modal.contains(active) || modal.shadowRoot.contains(active); })()")) throw new Error('Tab escaped the settings modal at ' + index + ': ' + await win.webContents.executeJavaScript("(() => { let active = document.activeElement; while (active.shadowRoot?.activeElement) active = active.shadowRoot.activeElement; return JSON.stringify({ tag: active.tagName, id: active.id, className: active.className, dialog: document.querySelector('.settings-modal').shadowRoot.querySelector('dialog').open }); })()"));
+    }
+    await win.webContents.executeJavaScript("document.querySelector('.settings-modal').shadowRoot.querySelector('dialog button').focus()");
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 });
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers: 8 });
+    if (!await win.webContents.executeJavaScript("document.activeElement === document.querySelector('.settings-modal [slot=footer] button')")) throw new Error('Reverse Tab did not wrap inside settings');
     await win.webContents.executeJavaScript("document.querySelector('#model-select').classList.add('input--error'); document.querySelector('#model-select').focus()");
     await capture('input-error-focus');
     await win.webContents.executeJavaScript("document.querySelector('#model-select').classList.remove('input--error')");
     win.setSize(360, 780);
-    await win.webContents.executeJavaScript("document.querySelector('.settings-details').scrollIntoView({ block: 'end' })");
+    await win.webContents.executeJavaScript("document.querySelector('.settings-modal .options-section').scrollIntoView({ block: 'center' })");
     await capture('settings-small');
+    win.setSize(480, 420); await capture('settings-short');
+    win.webContents.setZoomFactor(2); await capture('settings-zoom');
+    if (!await win.webContents.executeJavaScript("(() => { const r = document.querySelector('.settings-modal [slot=footer] button').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && r.right <= innerWidth; })()")) throw new Error('Zoom clips the modal closing action');
+    win.webContents.setZoomFactor(1);
     win.setSize(1100, 820);
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+    await wait(80);
+    if (!await win.webContents.executeJavaScript("!document.querySelector('.settings-modal').open && document.activeElement.matches('[data-action=settings]')")) throw new Error('Escape did not restore settings trigger focus');
+    await click('[data-action=settings]'); await capture('settings-reopened');
     await win.webContents.executeJavaScript("document.querySelector('.app-container').scrollTop = 0");
-    await win.webContents.executeJavaScript("document.querySelector('.settings-details').open = false");
+    await win.webContents.executeJavaScript("document.querySelector('.settings-modal [slot=footer] button').click()");
     await win.webContents.executeJavaScript("window.RealAudioContext = window.AudioContext; window.AudioContext = class extends window.RealAudioContext { createMediaStreamSource() { throw new Error('Fixture analysis failure'); } }; void 0");
     await click('[data-action="record"]'); await capture('starting-again'); await waitForRecording();
     await capture('recording-display-unavailable');
@@ -378,9 +543,9 @@ app.whenReady().then(async () => {
     await click('#record-audio-tab');
     if (await win.webContents.executeJavaScript("!!document.querySelector('.record-actions [data-action=transcribe]')")) throw new Error('Retry is visible after success');
     nativeTheme.themeSource = 'light'; await wait(200); await capture('result-light');
-    await win.webContents.executeJavaScript("document.querySelector('.settings-details').open = true; document.querySelector('#model-select').classList.add('input--error'); document.querySelector('#model-select').focus(); document.querySelector('#model-select').scrollIntoView({ block: 'center' })");
+    await win.webContents.executeJavaScript("document.querySelector('[data-action=settings]').click(); document.querySelector('#model-select').classList.add('input--error'); document.querySelector('#model-select').focus(); document.querySelector('#model-select').scrollIntoView({ block: 'center' })");
     await capture('input-error-focus-light');
-    await win.webContents.executeJavaScript("document.querySelector('#model-select').classList.remove('input--error'); document.querySelector('.settings-details').open = false; document.querySelector('.app-container').scrollTop = 0");
+    await win.webContents.executeJavaScript("document.querySelector('#model-select').classList.remove('input--error'); document.querySelector('.settings-modal [slot=footer] button').click(); document.querySelector('.app-container').scrollTop = 0");
     nativeTheme.themeSource = 'dark'; await wait(350);
     win.webContents.setZoomFactor(2); await wait(200); await capture('result-zoom');
     win.webContents.setZoomFactor(1);
@@ -393,6 +558,23 @@ app.whenReady().then(async () => {
       if (document.activeElement !== first) throw new Error('Main navigation Home failed');
     })()`);
     await click('#app-tab-models'); await capture('models');
+    const modelOrder = () => win.webContents.executeJavaScript("[...document.querySelectorAll('.models-page tbody tr')].map(row => row.dataset.model)");
+    const sortPoint = await win.webContents.executeJavaScript("(() => { const r=document.querySelector('[data-sort=name]').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()");
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', ...sortPoint });
+    await capture('models-sort-hover');
+    await click('[data-sort=size]'); await capture('models-sort-size');
+    if (JSON.stringify(await modelOrder()) !== JSON.stringify(['tiny','base','small','large-v3-turbo-q5_0','parakeet-tdt-0.6b-v3','medium','large'])) throw new Error('Size sorting is not numeric');
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+    if ((await modelOrder())[0] !== 'large') throw new Error('Enter did not reverse size sorting');
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32, text: ' ' });
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
+    await capture('models-sort-keyboard');
+    if (!await win.webContents.executeJavaScript("document.activeElement === document.querySelector('[data-sort=size]') && document.activeElement.matches(':focus-visible') && document.querySelectorAll('th[aria-sort]').length === 1 && document.querySelector('[data-sort=size]').closest('th').getAttribute('aria-sort') === 'ascending'")) throw new Error('Sort focus or aria-sort was lost');
+    await click('[data-sort=speed]'); await capture('models-sort-speed');
+    if ((await modelOrder())[0] !== 'tiny') throw new Error('Speed sorting did not start fastest first');
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
     await win.webContents.executeJavaScript("[...document.querySelectorAll('#app-panel-models tbody button')].at(-2).focus()");
     await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
     await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
@@ -429,6 +611,7 @@ app.whenReady().then(async () => {
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 10, y: 200 });
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, x: 10, y: 200 });
     win.setSize(360, 780); await capture('models-small');
+    await checkScrollbar('#app-panel-models .table-container', true); await capture('scrollbar-models-dark');
     await win.webContents.executeJavaScript("document.querySelector('#app-panel-models .table-container').scrollLeft = 300");
     await capture('models-metrics-small');
     await win.webContents.executeJavaScript("document.querySelector('#app-panel-models .table-container').scrollLeft = 0");
@@ -445,14 +628,14 @@ app.whenReady().then(async () => {
     if (!await win.webContents.executeJavaScript("document.querySelector('#app-panel-models .table-container').tabIndex === 0")) throw new Error('Overflowing table is not keyboard reachable');
     win.setSize(1100, 820); await wait(150);
     if (await win.webContents.executeJavaScript("document.querySelector('#app-panel-models .table-container').hasAttribute('tabindex')")) throw new Error('Fitting table adds an unnecessary tab stop');
-    await click('#app-panel-models .button'); await capture('model-download');
+    await click('#app-panel-models [data-model=tiny] .button'); await capture('model-download');
     if (!await win.webContents.executeJavaScript("document.querySelector('#app-panel-models [role=progressbar]').getAttribute('aria-label').includes('tiny')")) throw new Error('Download progress lacks a model label');
     await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
     await capture('model-download-reduced-motion');
     if (!await win.webContents.executeJavaScript("getComputedStyle(document.querySelector('#app-panel-models .progress-bar__fill')).animationName === 'none'")) throw new Error('Download progress ignores reduced motion');
     await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
-    await wait(1600);
-    await win.webContents.executeJavaScript("document.querySelectorAll('candor-toast').forEach(el => el.shadowRoot.querySelector('[aria-label=Dismiss]').click())");
+    finishDownload(); await wait(300);
+    await win.webContents.executeJavaScript("Promise.all([...document.querySelectorAll('candor-toast')].map(async el => { await el.updateComplete; el.shadowRoot.querySelector('[aria-label=Dismiss]')?.click(); }))");
     await click('#app-tab-history'); await capture('history');
     history = [{ id: 'fixture', status: 'completed', fileName: 'Recorded answer', options: { model: 'base' }, audioDuration: 38.6, transcriptionTime: 1450, startedAt: '2026-10-24T21:30:00.000Z', result: fixture }];
     await click('#app-panel-history [aria-label="Refresh history"]'); await wait(100); await capture('history-populated');
@@ -468,6 +651,16 @@ app.whenReady().then(async () => {
     await wait(850); historyDelay = 0; await capture('history-unavailable');
     if (!await win.webContents.executeJavaScript("[...document.querySelectorAll('.history-action button:disabled')].length === 5 && [...document.querySelectorAll('.history-action button:disabled')].every(el => !!document.getElementById(el.getAttribute('aria-describedby'))?.textContent)")) throw new Error('Disabled history actions lack adjacent reasons');
     if (!await win.webContents.executeJavaScript("['check-circle', 'waveform', 'x-circle', 'check-circle', 'hourglass', 'prohibit'].every((glyph, index) => document.querySelectorAll('#app-panel-history tbody .status-text i')[index].classList.contains('ph-' + glyph))")) throw new Error('History states do not have distinct outcome shapes');
+    await click('[data-history-sort=date]'); await capture('history-sort-date');
+    if (!await win.webContents.executeJavaScript("document.querySelector('#app-panel-history tbody tr').dataset.historyId === 'cancelled' && document.querySelectorAll('#app-panel-history th[aria-sort]').length === 1")) throw new Error('History date sorting failed');
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+    await capture('history-sort-keyboard');
+    if (!await win.webContents.executeJavaScript("document.querySelector('#app-panel-history tbody tr').dataset.historyId === 'fixture' && document.activeElement.matches('[data-history-sort=date]:focus-visible')")) throw new Error('History keyboard sort/focus failed');
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32, text: ' ' });
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
+    if (!await win.webContents.executeJavaScript("document.querySelector('#app-panel-history tbody tr').dataset.historyId === 'cancelled'")) throw new Error('History Space did not sort');
+    await click('[data-history-sort=date]');
     await win.webContents.executeJavaScript("document.querySelector('#app-panel-history tbody tr:last-child').scrollIntoView({ block: 'nearest' })");
     await capture('history-outcome-shapes');
     await win.webContents.executeJavaScript("document.querySelector('#app-panel-history').scrollIntoView({ block: 'start' })");
@@ -497,13 +690,14 @@ app.whenReady().then(async () => {
     nativeTheme.themeSource = 'light'; await wait(350); await capture('history-light');
     nativeTheme.themeSource = 'dark'; await wait(350);
     win.setSize(360, 780); await capture('history-small');
+    await checkScrollbar('#app-panel-history .table-container', true); await capture('scrollbar-history-dark');
     // A build without the alternate runtime loads its own initial capability catalog.
     alternateReady = false; win.setSize(1100, 820); nativeTheme.themeSource = 'dark';
     await new Promise(resolve => { win.webContents.once('did-finish-load', resolve); win.webContents.reload(); });
     await wait(500); await click('#app-tab-models');
-    await win.webContents.executeJavaScript("document.querySelector('.models-page tbody tr:last-child').scrollIntoView({ block: 'center' })");
+    await win.webContents.executeJavaScript("document.querySelector('.models-page [data-model=\"parakeet-tdt-0.6b-v3\"]').scrollIntoView({ block: 'center' })");
     await capture('models-runtime-unavailable');
-    if (!await win.webContents.executeJavaScript("document.querySelector('.models-page tbody tr:last-child button').disabled")) throw new Error('Unavailable engine offers an unusable download');
+    if (!await win.webContents.executeJavaScript("document.querySelector('.models-page [data-model=\"parakeet-tdt-0.6b-v3\"] button').disabled")) throw new Error('Unavailable engine offers an unusable download');
     // Native single-choice radios -> Angular preference, with OS changes and reload.
     await click('#app-tab-transcription');
     const pageColour = () => win.webContents.executeJavaScript('getComputedStyle(document.body).backgroundColor');
@@ -563,6 +757,27 @@ app.whenReady().then(async () => {
     const themeBubblePoint = await win.webContents.executeJavaScript("(() => { const bubble = document.querySelector('#theme-control input[value=system]').closest('candor-tooltip').shadowRoot.querySelector('.tooltip__bubble'); const r=bubble.getBoundingClientRect(); if (bubble.getAttribute('aria-hidden') !== 'true' || r.left<0 || r.right>innerWidth || r.top<0 || r.bottom>innerHeight || document.querySelector('#theme-control input[value=system]').hasAttribute('aria-describedby')) throw new Error('Theme tooltip contract/placement failed'); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()");
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', ...themeBubblePoint }); await wait(100);
     if (!await themeBubbleVisible()) throw new Error('Theme tooltip disappears on pointer entry');
+    win.setSize(1100, 820); alternateReady = true;
+    await click('#app-tab-models');
+    await click('[data-model=base] [data-model-action]'); await capture('model-deleting');
+    await wait(600); await capture('model-deleted');
+    if (!await win.webContents.executeJavaScript("document.querySelector('[data-model=base] [data-model-action]').textContent.includes('Download') && document.activeElement === document.querySelector('[data-model=base] [data-model-action]')")) throw new Error('Delete did not restore Download with focus');
+    installedModels.add('parakeet-tdt-0.6b-v3');
+    await new Promise(resolve => { win.webContents.once('did-finish-load', resolve); win.webContents.reload(); }); await wait(350);
+    await win.webContents.executeJavaScript("document.querySelector('[data-action=settings]').click(); const select = document.querySelector('#model-select'); select.value = 'parakeet-tdt-0.6b-v3'; select.dispatchEvent(new Event('change', { bubbles: true }));");
+    await new Promise(resolve => { win.webContents.once('did-finish-load', resolve); win.webContents.reload(); }); await wait(350);
+    if (!await win.webContents.executeJavaScript("document.querySelector('#model-select').value === 'parakeet-tdt-0.6b-v3'")) throw new Error('Model preference was not restored');
+    await click('[data-action=settings]'); await capture('model-preference-restored'); await click('.settings-modal [slot=footer] button');
+    await click('#app-tab-models');
+    failDelete = true; await click('[data-model="parakeet-tdt-0.6b-v3"] [data-model-action]'); await wait(600); await capture('model-delete-failed');
+    if (!await win.webContents.executeJavaScript("document.querySelector('[data-model=\"parakeet-tdt-0.6b-v3\"] [data-model-action]').textContent.includes('Delete')")) throw new Error('Failed deletion lost installed status');
+    deletionBlocked = true;
+    await new Promise(resolve => { win.webContents.once('did-finish-load', resolve); win.webContents.reload(); }); await wait(350);
+    await click('#app-tab-models'); await capture('model-delete-blocked');
+    if (!await win.webContents.executeJavaScript("document.querySelector('[data-model=\"parakeet-tdt-0.6b-v3\"] [data-model-action]').disabled && document.getElementById('model-action-status').textContent.includes('Finish transcription')")) throw new Error('Blocked deletion lacks a visible reason');
+    nativeTheme.themeSource = 'light'; await wait(250); win.setSize(360, 780);
+    await win.webContents.executeJavaScript("const scroller = document.querySelector('.models-page .table-container'); scroller.scrollLeft = scroller.scrollWidth;");
+    await capture('model-delete-blocked-small-light');
     await fs.writeFile(path.join(output, 'metrics.json'), JSON.stringify(metrics, null, 2));
     console.log('Visual review:', output);
     clearTimeout(watchdog);

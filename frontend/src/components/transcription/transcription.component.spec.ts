@@ -37,6 +37,41 @@ describe('TranscriptionComponent', () => {
     expect(component.performanceSummary).toBe('');
   });
 
+  it('keeps technical metadata in footer details and preserves copied text and visible warnings', () => {
+    component.transcriptionResult = {
+      modelName: 'Parakeet', duration: 38.52, processingTimeMs: 6420, timingMethod: 'transducer-tokens',
+      text: 'The answer.', segments: [{ start: 1.234, end: 5.678, text: 'The answer.' }],
+      alignmentWarning: 'Timing is approximate.', speechDetectionWarning: 'Speech detection unavailable.',
+    };
+    const before = component.getTranscriptText();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.transcript-heading').textContent.trim()).toBe('Your transcript');
+    const details = fixture.nativeElement.querySelector('.timing-details');
+    expect(details.getAttribute('label')).toBe('Transcript details');
+    expect(details.hasAttribute('open')).toBe(false);
+    expect(details.closest('[slot=footer]')).not.toBeNull();
+    expect([...details.querySelectorAll('dt')].map((item: any) => item.textContent)).toEqual(['Model', 'Audio length', 'Processing', 'Speed']);
+    expect([...details.querySelectorAll('dd')].map((item: any) => item.textContent)).toEqual(['Parakeet', '38.52 s', '6.42 s', '6.0× real time']);
+    const content = fixture.nativeElement.querySelector('.transcript-content');
+    expect(content.textContent).toContain('Timing is approximate.');
+    expect(content.textContent).toContain('Speech detection unavailable.');
+    expect([...content.querySelectorAll('.segment__stamp')].map((item: any) => item.textContent)).toEqual(['00:00:01.234', '→ 00:00:05.678']);
+    details.open = true; component.selectedModel = 'base'; fixture.detectChanges();
+    expect(component.getTranscriptText()).toBe(before);
+    expect(before).toContain('[00:00:01.234 → 00:00:05.678]');
+    expect(before).not.toContain('6.0× real time');
+    expect(component.transcriptMetadata[0].value).toBe('Parakeet');
+  });
+
+  it('omits missing metadata and impossible speed values while keeping valid zero measurements', () => {
+    component.transcriptionResult = {};
+    expect(component.transcriptMetadata).toEqual([]);
+    component.transcriptionResult = { duration: 0, processingTimeMs: 0 };
+    expect(component.transcriptMetadata).toEqual([{ label: 'Audio length', value: '0.00 s' }, { label: 'Processing', value: '0.00 s' }]);
+    component.transcriptionResult = { duration: NaN, processingTimeMs: Infinity };
+    expect(component.transcriptMetadata).toEqual([]);
+  });
+
   it('preserves untimed recognition alongside independent pause metadata', () => {
     component.transcriptionResult = { text: 'Keep the complete answer', noSpeechIntervals: [{ start: 2, end: 5 }], alignmentWarning: 'Timing unavailable' };
     component.includeTimestamps = true;
@@ -55,6 +90,7 @@ describe('TranscriptionComponent', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    localStorage.clear();
     electronStub.getAvailableModels.mockResolvedValue([]);
 
     await TestBed.configureTestingModule({
@@ -73,6 +109,78 @@ describe('TranscriptionComponent', () => {
   });
 
   // ─── formatFileSize ───────────────────────────────────────────────────────
+
+  it('places a named modal settings trigger beside the timing option and blocks changes while busy', () => {
+    component.availableModels = [{ id: 'base', name: 'Base', installed: true }];
+    fixture.detectChanges();
+    const trigger = fixture.nativeElement.querySelector('[data-action=settings]');
+    expect(trigger.closest('.workflow-options').querySelector('.copy-option')).not.toBeNull();
+    expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(trigger.getAttribute('aria-controls')).toBe('transcription-settings');
+    trigger.click(); fixture.detectChanges();
+    expect(component.settingsOpen).toBe(true);
+    expect(fixture.nativeElement.querySelector('candor-modal').getAttribute('heading')).toBe('Transcription settings');
+    fixture.nativeElement.querySelector('candor-modal').dispatchEvent(new Event('close'));
+    fixture.detectChanges(); expect(component.settingsOpen).toBe(false);
+    component.isRecording = true; fixture.detectChanges();
+    expect(trigger.disabled).toBe(true);
+    component.openSettings(); expect(component.settingsOpen).toBe(false);
+  });
+
+  it('shows a static audio placeholder before recording and no icon for an empty file choice', () => {
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.spectrum-placeholder-label').textContent).toContain('Audio spectrum');
+    component.switchWorkflow('file'); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.file-name').textContent.trim()).toBe('No file selected');
+    expect(fixture.nativeElement.querySelector('.file-name i')).toBeNull();
+    component.selectedFilePath = '/answer.wav'; fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.file-name i')).not.toBeNull();
+  });
+
+  it('remembers a selected model across component sessions and replaces an unavailable preference', async () => {
+    component.availableModels = [{ id: 'parakeet', name: 'Parakeet', installed: true }];
+    component.selectedModel = 'parakeet';
+    component.onModelChange();
+    const nextSession = TestBed.createComponent(TranscriptionComponent);
+    expect(nextSession.componentInstance.selectedModel).toBe('parakeet');
+    electronStub.getAvailableModels.mockResolvedValue([{ name: 'base', size: '142 MiB', installed: true }]);
+    await nextSession.componentInstance.loadAvailableModels();
+    expect(nextSession.componentInstance.selectedModel).toBe('base');
+    expect(localStorage.getItem('talatrace.model')).toBe('base');
+    nextSession.destroy();
+  });
+
+  it('keeps initial model discovery distinct from missing models and avoids overlapping polls', async () => {
+    let finish!: (models: any[]) => void;
+    electronStub.getAvailableModels.mockImplementationOnce(() => new Promise(resolve => finish = resolve));
+    component.modelsLoading = true;
+    const request = component.loadAvailableModels();
+    await component.loadAvailableModels();
+    fixture.detectChanges();
+    expect(electronStub.getAvailableModels).toHaveBeenCalledTimes(2); // Initial setup plus this pending request.
+    expect(component.workflowTitle).toBe('Checking local models');
+    expect(component.workflowHint).not.toContain('Download');
+    expect(fixture.nativeElement.textContent).not.toContain('Download a model');
+    expect(fixture.nativeElement.querySelector('[data-action=record]').disabled).toBe(true);
+    finish([{ name: 'base', displayName: 'Whisper Base', installed: true, size: '142 MiB' }]);
+    await request;
+    fixture.detectChanges();
+    expect(component.workflowTitle).toBe('Ready to record');
+    expect(fixture.nativeElement.querySelector('[data-action=record]').disabled).toBe(false);
+  });
+
+  it('does not turn a discovery failure into download guidance and recovers on retry', async () => {
+    electronStub.getAvailableModels.mockRejectedValueOnce(new Error('IPC unavailable'));
+    await component.loadAvailableModels();
+    fixture.detectChanges();
+    expect(component.workflowTitle).toBe('Could not check local models');
+    expect(component.workflowHint).toContain('Retrying automatically');
+    expect(fixture.nativeElement.textContent).not.toContain('Download a model');
+    await component.loadAvailableModels();
+    fixture.detectChanges();
+    expect(component.modelsLoadError).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('Download a model');
+  });
 
   describe('formatFileSize()', () => {
     it('returns "0 Bytes" for 0', () => {
@@ -216,7 +324,7 @@ describe('TranscriptionComponent', () => {
       expect(record.disabled).toBe(false);
       expect(stop.disabled).toBe(true);
       expect(copy.disabled).toBe(true);
-      expect(component.sourceHint).toBe('');
+      expect(fixture.nativeElement.querySelector('#source-help')).toBeNull();
       component.isRecording = true;
       fixture.detectChanges();
       expect(record.disabled).toBe(true);
@@ -294,7 +402,7 @@ describe('TranscriptionComponent', () => {
       component.selectedFilePath = '/audio/answer.wav';
       component.selectedFileSize = 0;
       fixture.detectChanges();
-      const primary = fixture.nativeElement.querySelectorAll('button.button--primary');
+      const primary = fixture.nativeElement.querySelectorAll('.workflow-panel button.button--primary');
       expect(primary).toHaveLength(1);
       expect(primary[0].textContent).toContain('Transcribe file');
       expect(fixture.nativeElement.textContent).toContain('answer.wav');
@@ -362,7 +470,8 @@ describe('TranscriptionComponent', () => {
         fixture.detectChanges();
         expect(fixture.nativeElement.querySelector('#audio-file-tab').disabled).toBe(true);
         expect(fixture.nativeElement.querySelector('#record-audio-tab').disabled).toBe(false);
-        expect(fixture.nativeElement.querySelector('#source-help').textContent).toContain('switch sources');
+        expect(fixture.nativeElement.querySelector('#source-help')).toBeNull();
+        expect(fixture.nativeElement.querySelector('#workflow-help').textContent).toContain('switch audio source');
         component.switchWorkflow('file');
         expect(component.inputMode).toBe('record');
         component[flag] = false;

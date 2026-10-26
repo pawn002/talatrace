@@ -35,6 +35,46 @@ describe('HistoryComponent', () => {
 
   // ─── formatDuration ───────────────────────────────────────────────────────
 
+  it('sorts numeric durations and processing times with stable ties and missing values last', () => {
+    component.history = [
+      { id: 'unknown', status: 'failed', startedAt: 'invalid' },
+      { id: 'long', status: 'completed', startedAt: '2026-10-02', audioDuration: 120, transcriptionTime: 10000 },
+      { id: 'short', status: 'completed', startedAt: '2026-10-01', audioDuration: 9, transcriptionTime: 900 },
+      { id: 'tie', status: 'completed', startedAt: '2026-10-01', audioDuration: 9, transcriptionTime: 900 },
+      { id: 'zero', status: 'completed', startedAt: '2026-09-30', audioDuration: 0, transcriptionTime: 0 },
+    ];
+    component.sortBy('duration');
+    expect(component.sortedHistory.map(item => item.id)).toEqual(['zero','short','tie','long','unknown']);
+    component.sortBy('duration');
+    expect(component.sortedHistory.map(item => item.id)).toEqual(['long','short','tie','zero','unknown']);
+    component.sortBy('time');
+    expect(component.sortedHistory.map(item => item.id)).toEqual(['zero','short','tie','long','unknown']);
+    component.sortBy('date');
+    expect(component.sortedHistory.map(item => item.id)).toEqual(['long','short','tie','zero','unknown']);
+    expect(component.history[0].id).toBe('unknown');
+  });
+
+  it('uses natural text order, exposes one sorted header and retains it through refresh', async () => {
+    component.history = [
+      { id: 'ten', fileName: 'Answer 10', status: 'failed', startedAt: '2026-10-02' },
+      { id: 'two', fileName: 'Answer 2', status: 'completed', startedAt: '2026-10-01' },
+    ];
+    component.isLoading = false;
+    component.sortBy('file'); fixture.detectChanges();
+    expect(component.sortedHistory.map(item => item.id)).toEqual(['two', 'ten']);
+    expect(fixture.nativeElement.querySelectorAll('th[aria-sort]')).toHaveLength(1);
+    expect(fixture.nativeElement.querySelector('[data-history-sort=file]').getAttribute('aria-label')).toContain('descending');
+    const button = fixture.nativeElement.querySelector('[data-history-sort=file]');
+    let finish!: (items: any[]) => void;
+    (electronStub.getTranscriptionHistory as jest.Mock).mockImplementationOnce(() => new Promise(resolve => finish = resolve));
+    const request = component.loadHistory(); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-history-sort=file]')).toBe(button);
+    expect(fixture.nativeElement.querySelector('.table-container').getAttribute('aria-busy')).toBe('true');
+    finish(component.history); await request; fixture.detectChanges();
+    expect(component.sortKey).toBe('file');
+    expect(fixture.nativeElement.querySelector('[data-history-sort=file]')).toBe(button);
+  });
+
   describe('formatDuration()', () => {
     it('returns "N/A" for undefined', () => {
       expect(component.formatDuration(undefined)).toBe('N/A');

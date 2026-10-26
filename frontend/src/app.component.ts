@@ -11,7 +11,7 @@ import { ToastService } from "./services/toast.service";
   standalone: false,
 })
 export class AppComponent implements OnInit {
-  title = "Whisper Transcription";
+  title = "TalaTrace";
   systemInfo: any = null;
   activeTab = 0;
   themePreference = readThemePreference();

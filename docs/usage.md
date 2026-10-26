@@ -1,6 +1,6 @@
 # Usage Guide
 
-Complete guide to using the Whisper Electron App for audio transcription.
+Complete guide to using the TalaTrace for audio transcription.
 
 ## Table of Contents
 
@@ -22,21 +22,21 @@ npm run dev
 ```
 
 **Production Mode** (end users):
-- **Windows**: Double-click `Whisper Transcription.exe`
-- **macOS**: Open `Whisper Transcription.app`
-- **Linux**: Run `./whisper-transcription`
+- **Windows**: Double-click `TalaTrace.exe`
+- **macOS**: Open `TalaTrace.app`
+- **Linux**: Run `./TalaTrace.AppImage`
 
 The application starts instantly with no delay - all processing is handled natively by Electron services.
 
 ## Recording Interview Answers
 
-1. Open **Transcription → Record audio**. Defaults are ready to use; expand **Transcription settings** to change the model or language. If no model is installed, **Download a model** opens Models.
-2. Click **Record answer** and allow microphone access when your operating system asks. The persistent status shows **Recording · microphone on**, with a whole-second timer. A live spectrogram above Stop uses the same microphone stream: higher frequencies appear toward the top, brightness reflects energy, and recent audio scrolls from right to left. Silence leaves the **Recording** label visible. With reduced motion enabled, the display uses slowly updating frequency levels without scrolling. The display stops with the microphone and never plays audio through the speakers; a display failure leaves recording usable.
+1. Open **Transcription → Record audio**. Defaults are ready to use; open **Transcription settings** beside **Include timing and pauses** in the workflow card to change the model or language in a modal dialog. Changes apply immediately; **Done**, Escape or the close button dismisses it. If no model is installed, **Download a model** opens Models.
+2. Click **Record answer** and allow microphone access when your operating system asks. The persistent status shows **Recording · microphone on**, with a whole-second timer. Beneath **Stop & transcribe**, 14 live frequency bars use the same microphone stream: bass is on the left, treble on the right, and taller bars indicate stronger sound in that band. The bars respond smoothly and quickly settle in silence; the **Recording** label remains visible. Reduced motion uses discrete readings four times a second. The display stops with the microphone and never plays audio through the speakers; a display failure leaves recording usable. Before recording, a static illustration uses the same bar geometry with a quieter label.
 3. Click **Stop & transcribe**. The microphone is released immediately and the status switches to **Transcribing · microphone off**. The final duration remains visible to milliseconds (for example, `00:30.527`), measured when Stop was pressed; processing time is excluded. FFmpeg/Whisper process the recording locally.
 4. When **Your transcript is ready** appears, **Copy transcript** becomes available in its usual position. **Copied — ready to paste** confirms success; paste into your AI chat or TUI. Uncheck **Include timing and pauses** for plain text. **Save transcript…** offers TXT, SRT, VTT and JSON; TXT saves the same readable text as Copy.
 5. Click **Record answer** again to start the next recording. If transcription fails, **Retry transcription** uses the retained recording; **Discard recording** lets you start over.
 
-Record, Stop and Copy remain visible in stable positions throughout the recording workflow. Unavailable actions are disabled, and nearby guidance explains the next step. To use an existing recording, open **Transcription → Audio file**, choose **Choose audio file…**, then **Transcribe file**. Each subtab retains its own input and transcript when switching. Switching is disabled during recording, file selection, or transcription. Use Left/Right arrows, Home or End when focused on a subtab to navigate. Timing explanations and original measurements remain under **About timing and pause detection** below each preview.
+Record, Stop and Copy remain visible in stable positions throughout the recording workflow. Unavailable actions are disabled, and nearby guidance explains the next step. To use an existing recording, open **Transcription → Audio file**, choose **Choose audio file…**, then **Transcribe file**. Each subtab retains its own input and transcript when switching. Switching is disabled during recording, file selection, or transcription. Use Left/Right arrows, Home or End when focused on a subtab to navigate. The transcript header contains only its title. Model, audio length, processing time, speed, timing explanations and original measurements are available in the collapsed **Transcript details** footer. Visible time ranges use a quieter, narrower gutter and retain milliseconds; copied/exported timing precision is unchanged. Timing or speech-detection warnings remain visible above the transcript.
 
 Example copied answer:
 
@@ -201,6 +201,8 @@ View platform and app version in the footer (visible from any tab).
 
 ## History Management
 
+Click a column heading to sort by file, model, status, audio duration, processing time or date; click again to reverse it. Date starts with newest first. Durations and processing times sort by their numeric values, with missing values last in either direction. Tab to a heading and press Enter or Space to sort with the keyboard. Sorting remains selected when history refreshes. Each available transcript has a ghost **Copy** action.
+
 ### Viewing Past Transcriptions
 
 1. Navigate to the **History** tab
@@ -359,7 +361,7 @@ Currently, the app uses standard system shortcuts:
 
 While recording or transcribing, you can visit Models or History and return to Transcription without interrupting the operation. The header continues to show recording/transcription status. The recording/file source switch stays locked until the operation finishes; its explanation appears beneath the source tabs. Workflow hints explain when Stop, Copy and Save become available. History shows a reason beside unavailable Copy actions.
 
-After an answer, **Record another** starts a new recording in the same workflow. Once a file is selected, **Choose another file…** lets you select the next recording; cancelling the picker keeps the current file and transcript. The transcript footer's question icon opens **About timing and pause detection**.
+After an answer, **Record another** starts a new recording in the same workflow. Once a file is selected, **Choose another file…** lets you select the next recording; cancelling the picker keeps the current file and transcript. The transcript footer's question icon opens **Transcript details**.
 
 The **Choose** card shows the selected audio filename and size beneath the picker button, including while transcription is running. Long filenames wrap so the complete name remains readable.
 

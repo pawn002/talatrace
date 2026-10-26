@@ -4,8 +4,15 @@ import { AudioRecorderService } from '../../services/audio-recorder.service';
 @Component({
   selector: 'app-audio-spectrum', standalone: true,
   template: `
-    <div class="spectrum-display" [attr.data-mode]="active && available ? (reducedMotion ? 'levels' : 'spectrogram') : 'idle'">
+    <div class="spectrum-display" [attr.data-mode]="active && available ? (reducedMotion ? 'bars-reduced-motion' : 'frequency-bars') : 'idle'">
       <canvas #spectrum aria-hidden="true"></canvas>
+      @if (active && available) { <span class="spectrum-live-label">Audio spectrum</span> }
+      @if (!active) {
+        <div class="spectrum-placeholder">
+          <span class="spectrum-bars" aria-hidden="true">@for (height of placeholderBars; track $index) { <span [style.height.%]="height"></span> }</span>
+          <span class="spectrum-placeholder-label">Audio spectrum</span>
+        </div>
+      }
       @if (active && unavailable) { <span class="spectrum-fallback">Audio display unavailable</span> }
     </div>
   `,
@@ -13,6 +20,7 @@ import { AudioRecorderService } from '../../services/audio-recorder.service';
 })
 export class AudioSpectrumComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input() active = false;
+  readonly placeholderBars = [20, 35, 60, 85, 50, 30, 65, 95, 70, 40, 55, 80, 45, 25];
   @ViewChild('spectrum', { static: true }) canvas!: ElementRef<HTMLCanvasElement>;
   available = false;
   unavailable = false;
@@ -26,9 +34,10 @@ export class AudioSpectrumComponent implements AfterViewInit, OnChanges, OnDestr
   private generation = 0;
   private preference?: MediaQueryList;
   private lastFrame = 0;
-  private signalColour = '';
+  private levels = new Float32Array(this.placeholderBars.length);
   private onPreference = () => {
     this.reducedMotion = !!this.preference?.matches;
+    if (this.analyser) this.analyser.smoothingTimeConstant = this.reducedMotion ? 0 : 0.35;
     this.clearCanvas();
   };
 
@@ -64,7 +73,7 @@ export class AudioSpectrumComponent implements AfterViewInit, OnChanges, OnDestr
       analyser.fftSize = 2048;
       analyser.minDecibels = -90;
       analyser.maxDecibels = -15;
-      analyser.smoothingTimeConstant = 0.5;
+      analyser.smoothingTimeConstant = this.reducedMotion ? 0 : 0.35;
       source.connect(analyser);
       // Keep Chromium's graph pulling samples, with the output muted before connection.
       const muted = context.createGain();
@@ -83,7 +92,7 @@ export class AudioSpectrumComponent implements AfterViewInit, OnChanges, OnDestr
           if (!document.hidden && now - this.lastFrame >= (this.reducedMotion ? 250 : 50)) {
             try {
               analyser.getByteFrequencyData(data);
-              this.draw(data, context.sampleRate, analyser.fftSize);
+              this.draw(data, context.sampleRate, analyser.fftSize, this.lastFrame ? now - this.lastFrame : 50);
               this.lastFrame = now;
             } catch { this.zone.run(() => this.fail()); return; }
           }
@@ -96,7 +105,7 @@ export class AudioSpectrumComponent implements AfterViewInit, OnChanges, OnDestr
     }
   }
 
-  private draw(data: Uint8Array, sampleRate: number, fftSize: number): void {
+  private draw(data: Uint8Array, sampleRate: number, fftSize: number, elapsed: number): void {
     const canvas = this.canvas.nativeElement;
     const painter = canvas.getContext('2d');
     if (!painter) throw new Error('Canvas unavailable');
@@ -104,35 +113,31 @@ export class AudioSpectrumComponent implements AfterViewInit, OnChanges, OnDestr
     const width = Math.max(1, Math.round(canvas.clientWidth * scale));
     const height = Math.max(1, Math.round(canvas.clientHeight * scale));
     if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
-    const colour = getComputedStyle(canvas).color;
-    if (colour !== this.signalColour) {
-      painter.clearRect(0, 0, width, height);
-      this.signalColour = colour;
-    }
-    const step = Math.max(1, Math.round(width / 120)); // Approximately six seconds at 20 fps.
-    if (this.reducedMotion) painter.clearRect(0, 0, width, height);
-    else {
-      painter.globalCompositeOperation = 'copy';
-      painter.drawImage(canvas, -step, 0);
-      painter.globalCompositeOperation = 'source-over';
-      painter.clearRect(width - step, 0, step, height);
-    }
-    painter.fillStyle = colour;
-    const rows = 40;
+    painter.clearRect(0, 0, width, height);
+    painter.fillStyle = getComputedStyle(canvas).color;
+    const count = this.levels.length;
+    const barWidth = 3 * scale;
+    const gap = 2 * scale;
+    const offset = (width - (count * barWidth + (count - 1) * gap)) / 2;
     const maxFrequency = Math.min(8000, sampleRate / 2);
-    for (let row = 0; row < rows; row++) {
-      const low = 80 * (maxFrequency / 80) ** ((rows - row - 1) / rows);
-      const high = 80 * (maxFrequency / 80) ** ((rows - row) / rows);
+    for (let index = 0; index < count; index++) {
+      // Logarithmic frequency bands: bass on the left, treble on the right.
+      const low = 80 * (maxFrequency / 80) ** (index / count);
+      const high = 80 * (maxFrequency / 80) ** ((index + 1) / count);
       const first = Math.max(1, Math.floor(low * fftSize / sampleRate));
       const last = Math.min(data.length - 1, Math.max(first, Math.ceil(high * fftSize / sampleRate)));
       let energy = 0;
       for (let bin = first; bin <= last; bin++) energy = Math.max(energy, data[bin] / 255);
-      if (energy < 0.08) continue;
-      painter.globalAlpha = 0.2 + 0.8 * energy ** 1.5;
-      const y = Math.floor(row * height / rows);
-      painter.fillRect(this.reducedMotion ? 0 : width - step, y, this.reducedMotion ? width * energy : step, Math.ceil(height / rows));
+      const target = Math.max(0, (energy - 0.08) / 0.92);
+      const previous = this.levels[index];
+      const response = 1 - Math.exp(-elapsed / (target > previous ? 50 : 120));
+      // Reduced motion uses discrete readings at 4 Hz, without easing or scrolling.
+      this.levels[index] = this.reducedMotion ? target : previous + (target - previous) * response;
+      if (this.levels[index] < 0.01) { this.levels[index] = 0; continue; }
+      const barHeight = Math.round(height * this.levels[index]);
+      if (barHeight === 0) continue;
+      painter.fillRect(offset + index * (barWidth + gap), (height - barHeight) / 2, barWidth, barHeight);
     }
-    painter.globalAlpha = 1;
   }
 
   private clearCanvas(): void {
@@ -144,6 +149,7 @@ export class AudioSpectrumComponent implements AfterViewInit, OnChanges, OnDestr
 
   private release(): void {
     this.generation++;
+    this.levels.fill(0);
     if (this.animation !== undefined) cancelAnimationFrame(this.animation);
     this.animation = undefined;
     try { this.source?.disconnect(); } catch { /* Already disconnected. */ }

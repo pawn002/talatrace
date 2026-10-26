@@ -2,13 +2,13 @@
   <div class="page-heading">
     <div class="page-heading-row">
       <div>
-        <h2>Recent transcripts</h2>
-        <p id="history-refresh-status" class="page-subtitle" role="status" aria-atomic="true">{{ isLoading ? 'Refreshing history. Refresh becomes available when this finishes.' : 'Transcriptions from this session.' }}</p>
+        <h2 id="history-heading">Recent transcripts</h2>
+        <p id="history-refresh-status" class="page-subtitle" role="status" aria-atomic="true">{{ isRefreshing ? 'Refreshing history. Refresh becomes available when this finishes.' : 'Transcriptions from this session.' }}</p>
       </div>
       <candor-tooltip text="Refresh history" position="left"><button
         class="button button--ghost button--small button--icon"
         (click)="loadHistory()"
-        [disabled]="isLoading"
+        [disabled]="isRefreshing"
         aria-label="Refresh history"
         aria-describedby="history-refresh-status"
         >
@@ -18,6 +18,7 @@
   </div>
 
   <div class="page-content">
+    <p class="sort-status" role="status" aria-live="polite" aria-atomic="true">{{ sortAnnouncement }}</p>
 
     @if (!isLoading && history.length === 0) {
       <div class="empty-state">
@@ -29,24 +30,24 @@
 
     @if (!isLoading && history.length > 0) {
       <div
-        class="table-host table-container" appTableScroll aria-label="Transcripts table"
+        class="table-host table-container" appTableScroll aria-label="Transcripts table" [attr.aria-busy]="isRefreshing"
         >
-        <table>
-          <caption>Transcripts from this session</caption>
+        <table aria-labelledby="history-heading">
           <thead>
             <tr>
-              <th>File</th>
-              <th>Model</th>
-              <th>Status</th>
-              <th class="cell--numeric">Audio Duration</th>
-              <th class="cell--numeric">Processing Time</th>
-              <th class="cell--mono">Date</th>
-              <th>Actions</th>
+              @for (column of columns; track column.key) {
+                <th scope="col" [class.cell--numeric]="column.numeric" [class.cell--mono]="column.mono" [attr.aria-sort]="sortKey === column.key ? sortDirection : null">
+                  <button type="button" class="sort-header" [attr.data-history-sort]="column.key" [class.is-sorted]="sortKey === column.key" (click)="sortBy(column.key)" [attr.aria-label]="'Sort by ' + column.label + ', ' + nextSortDirection(column.key)">
+                    <span>{{ column.label }}</span><i class="ph-bold" [class.ph-arrows-down-up]="sortKey !== column.key" [class.ph-arrow-up]="sortKey === column.key && sortDirection === 'ascending'" [class.ph-arrow-down]="sortKey === column.key && sortDirection === 'descending'" aria-hidden="true"></i>
+                  </button>
+                </th>
+              }
+              <th scope="col">Actions</th>
             </tr>
           </thead>
           <tbody>
-            @for (item of history; track item; let rowIndex = $index) {
-              <tr>
+            @for (item of sortedHistory; track item.id; let rowIndex = $index) {
+              <tr [attr.data-history-id]="item.id">
                 <td class="file-cell">{{ item.fileName || "Unknown" }}</td>
                 <td>{{ item.options?.model || "base" }}</td>
                 <td><span class="status-text status-text--{{ getStatusVariant(item.status) }}"><i [class]="'ph-bold ph-' + getStatusIcon(item.status)" aria-hidden="true"></i>{{ item.status }}</span></td>
@@ -55,13 +56,13 @@
                 <td class="cell--mono">{{ formatTimestamp(item.startedAt) }}</td>
                 <td class="history-action">
                   <candor-tooltip text="Copy transcript" position="left"><button
-                    class="button button--ghost button--small button--icon"
+                    class="button button--ghost button--small"
                     (click)="copyTranscript(item)"
                     [disabled]="!!copyUnavailableReason(item)"
                     [attr.aria-describedby]="copyUnavailableReason(item) ? 'history-copy-reason-' + rowIndex : null"
                     aria-label="Copy transcript"
                     >
-                    <i class="ph-fill ph-copy" aria-hidden="true"></i>
+                    <i class="ph-fill ph-copy" aria-hidden="true"></i> Copy
                   </button></candor-tooltip>
                   @if (copyUnavailableReason(item)) { <p class="action-reason" [id]="'history-copy-reason-' + rowIndex">{{ copyUnavailableReason(item) }}</p> }
                 </td>

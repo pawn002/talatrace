@@ -516,7 +516,7 @@ async function step9_release(version) {
 // ============================================================================
 
 async function main() {
-  console.log('🚀 Whisper Electron App - Interactive Release Script');
+  console.log('🚀 TalaTrace - Interactive Release Script');
   console.log('=====================================================\n');
 
   // Check git is available before doing anything else

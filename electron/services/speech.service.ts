@@ -32,6 +32,8 @@ export class SpeechService implements RecognitionEngine {
     return this.models.download(name, progress);
   }
 
+  deleteModel(name: string) { return this.models.delete(name); }
+
   async transcribe(input: string, options: TranscriptionOptions, progress?: (progress: number) => void, context?: RecognitionContext): Promise<TranscriptionResult> {
     await this.initialize();
     const model = speechModel(options.model);

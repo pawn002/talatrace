@@ -1,3 +1,4 @@
+@use '../../styles/sortable-table';
 .models-page {
   max-width: 1040px;
   margin: 0 auto;
@@ -10,6 +11,7 @@
 .models-page .cell--numeric, .models-page .status-text { white-space: nowrap; }
 .models-page .cell--mono { white-space: nowrap; }
 .models-page .button { min-height: var(--hit-target-aaa); padding: var(--spacing-xs) var(--spacing-sm); font-size: var(--font-size-sm); }
+
 
 .loading-container {
   display: flex;
@@ -26,7 +28,6 @@
 .info-alert { margin: 0; }
 .info-alert .alert__message { max-width: 65ch; }
 .download-note { margin-top: var(--spacing-sm); }
-.cell--numeric .badge { font-variant-numeric: tabular-nums; }
 .model-identity { min-width: 14rem; max-width: 16rem; }
 .model-name { display: block; font: var(--font-weight-bold) var(--font-size-md)/var(--line-height-normal) var(--font-family-accessible); }
 .model-repository, .info-alert {

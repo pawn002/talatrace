@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Open transcription settings in a Candor modal from the workflow card footer, beside the timing option.
+- Delete downloaded models from Models to reclaim disk space, with protection against deletion during transcription or an active download.
+- Remember the last selected model between sessions and select an available fallback if it is removed.
+- Sort History by file, model, status, audio duration, processing time or date, with keyboard controls and numeric comparisons.
+
+### Changed
+- Show Parakeet engine diagnostics and transcription start, completion timing and failures in the terminal, keeping transcript JSON separate from logging.
+- Apply Candor's theme-aware native scrollbar construction to the page, transcript and table scroll areas, with a 6px visible bar inside a 24px grab area.
+- Simplify the transcript header, move technical metadata into a collapsed Transcript details footer and quiet the timestamp gutter while preserving visible warnings and copied timing precision.
+- Replace the scrolling recording spectrogram with live frequency bars matching the idle illustration, and reduce the placeholder bars and label to the same near-minimum contrast in both themes.
+- Rename **Whisper Transcription** to **TalaTrace** across the app header, window title, packaged application and documentation. The model-neutral name reflects support for both Whisper and Parakeet, while retaining private, on-device transcription and timing context.
+- Preserve the existing application data directory and installer identity through the rename so downloaded models, history and preferences remain available.
+- Replace the divider above recording feedback and selected-file metadata with more spacing, and align History's Copy actions with Models' ghost button style.
+- Keep an empty model library after deletion instead of automatically downloading Tiny on startup.
+- Show a static, themed audio-spectrum placeholder before recording, remove the hint beneath the workflow switcher and the empty file choice's icon, and display model reference measurements as plain values.
+
+### Fixed
+- Discover installed models without checksum-scanning every model at startup or during catalog refreshes. Keep full integrity verification on download and before recognition, and distinguish pending or failed discovery from an empty installation so startup does not incorrectly prompt a download.
+
 ## [1.1.5] - 2026-05-02
 
 ### Added

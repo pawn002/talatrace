@@ -1,6 +1,6 @@
 # Development Guide
 
-Guide for developers who want to contribute to the Whisper Electron App or understand the development workflow.
+Guide for developers who want to contribute to the TalaTrace or understand the development workflow.
 
 ## Table of Contents
 

@@ -8,16 +8,33 @@ import { SPEECH_MODELS, speechModel, modelSize, SpeechModel } from './model-cata
 
 export class ModelStore {
   private downloads = new Map<string, Promise<void>>();
+  private deleting = new Set<string>();
   private verification = new Map<string, { stamp: string; valid: boolean }>();
   constructor(readonly directory: string) {}
   path(name: string): string { return path.join(this.directory, speechModel(name).filename); }
+
+  private stamp(model: SpeechModel, stat: import('fs').BigIntStats): string {
+    return `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeNs}:${stat.ctimeNs}:${model.sha256}`;
+  }
+
+  /** Discover complete files without reading gigabytes on startup or every UI poll.
+   * Download publication and engine use still require full checksum verification.
+   */
+  private async present(model: SpeechModel): Promise<boolean> {
+    try {
+      const stat = await fs.stat(this.path(model.name), { bigint: true });
+      if (!stat.isFile() || stat.size !== BigInt(model.sizeBytes)) return false;
+      const cached = this.verification.get(model.name);
+      return cached?.stamp === this.stamp(model, stat) ? cached.valid : true;
+    } catch { return false; }
+  }
 
   async installed(model: SpeechModel): Promise<boolean> {
     try {
       const file = this.path(model.name);
       const before = await fs.stat(file, { bigint: true });
       if (!before.isFile() || before.size !== BigInt(model.sizeBytes)) return false;
-      const stamp = `${before.dev}:${before.ino}:${before.size}:${before.mtimeNs}:${before.ctimeNs}:${model.sha256}`;
+      const stamp = this.stamp(model, before);
       const cached = this.verification.get(model.name);
       if (cached?.stamp === stamp) return cached.valid;
       const hash = createHash('sha256');
@@ -34,16 +51,28 @@ export class ModelStore {
 
   async list() {
     return Promise.all(SPEECH_MODELS.map(async model => ({ ...model, size: modelSize(model.sizeBytes),
-      installed: await this.installed(model), downloading: this.downloads.has(model.name), path: this.path(model.name) })));
+      installed: await this.present(model), downloading: this.downloads.has(model.name), path: this.path(model.name) })));
   }
 
   download(name: string, progress?: (progress: number) => void): Promise<void> {
     const model = speechModel(name);
+    if (this.deleting.has(name)) return Promise.reject(new Error('Wait for model deletion to finish before downloading it.'));
     const pending = this.downloads.get(name);
     if (pending) return pending;
     const task = this.fetch(model, progress).finally(() => this.downloads.delete(name));
     this.downloads.set(name, task);
     return task;
+  }
+
+  async delete(name: string): Promise<void> {
+    const target = this.path(name); // Catalog IDs only; renderer paths are never accepted.
+    if (this.downloads.has(name)) throw new Error('Wait for this model download to finish before deleting it.');
+    if (this.deleting.has(name)) throw new Error('Model deletion is already in progress.');
+    this.deleting.add(name);
+    try {
+      await fs.unlink(target).catch(error => { if (error.code !== 'ENOENT') throw error; });
+      this.verification.delete(name);
+    } finally { this.deleting.delete(name); }
   }
 
   private async fetch(model: SpeechModel, progress?: (progress: number) => void): Promise<void> {

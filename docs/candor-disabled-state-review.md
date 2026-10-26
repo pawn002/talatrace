@@ -26,7 +26,7 @@ The field hints demonstrate useful specificity: a fixed username cannot be chang
 - [Tooltip's supplementary-only contract](https://github.com/pawn002/candor/blob/a4d27af8edc503aa801b7b336e1e23b41287c9e5/src/web-components/components/tooltip/candor-tooltip.stories.ts#L19-L35)
 - [Consumer responsibilities](https://github.com/pawn002/candor/blob/a4d27af8edc503aa801b7b336e1e23b41287c9e5/docs/ACCESSIBILITY-CONFORMANCE.md#consumer-responsibilities), [label disabled cells/items](https://github.com/pawn002/candor/blob/a4d27af8edc503aa801b7b336e1e23b41287c9e5/.github/PULL_REQUEST_TEMPLATE.md#L66)
 
-## Relevance to Whisper Transcription
+## Relevance to TalaTrace
 
 The findings below come from the current Angular templates, workflow-state getters, styles and model capability handling. Suggested wording and the grouping strategy are app recommendations, not quotations or additional Candor requirements.
 

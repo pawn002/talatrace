@@ -1,0 +1,48 @@
+// Candor 6.0.0 utils/scrollbar.ts construction for application-owned native scrollers.
+// The package does not expose its helper through a public export.
+@mixin app-scrollbars {
+  :where(html, .app-container, .transcript-view, .table-container) {
+    --app-scrollbar-half: calc(var(--scrollbar-thumb-size) / 2);
+    --app-scrollbar-inner: calc(var(--scrollbar-size) - var(--scrollbar-thumb-size) - var(--scrollbar-inset-outer));
+
+    &::-webkit-scrollbar { width: var(--scrollbar-size); height: var(--scrollbar-size); }
+    &::-webkit-scrollbar-track { background: transparent; }
+    &::-webkit-scrollbar-track:vertical { margin: var(--radius-md) 0; }
+    &::-webkit-scrollbar-track:horizontal { margin: 0 var(--radius-md); }
+    &::-webkit-scrollbar-button { display: none; }
+    &::-webkit-scrollbar-corner { background: transparent; }
+    &::-webkit-scrollbar-thumb {
+      background-color: var(--color-border-control);
+      background-clip: padding-box;
+      border: 0 solid transparent;
+    }
+    &::-webkit-scrollbar-thumb:hover,
+    &::-webkit-scrollbar-thumb:active { background-color: var(--color-text-subtle); }
+    &::-webkit-scrollbar-thumb:horizontal {
+      border-width: var(--app-scrollbar-inner) 0 var(--scrollbar-inset-outer);
+      border-radius: var(--app-scrollbar-half) / calc(var(--app-scrollbar-inner) + var(--app-scrollbar-half)) calc(var(--app-scrollbar-inner) + var(--app-scrollbar-half)) calc(var(--scrollbar-inset-outer) + var(--app-scrollbar-half)) calc(var(--scrollbar-inset-outer) + var(--app-scrollbar-half));
+    }
+    &::-webkit-scrollbar-thumb:vertical {
+      border-width: 0 var(--scrollbar-inset-outer) 0 var(--app-scrollbar-inner);
+      border-radius: calc(var(--app-scrollbar-inner) + var(--app-scrollbar-half)) calc(var(--scrollbar-inset-outer) + var(--app-scrollbar-half)) calc(var(--scrollbar-inset-outer) + var(--app-scrollbar-half)) calc(var(--app-scrollbar-inner) + var(--app-scrollbar-half)) / var(--app-scrollbar-half);
+    }
+    &:dir(rtl)::-webkit-scrollbar-thumb:vertical {
+      border-width: 0 var(--app-scrollbar-inner) 0 var(--scrollbar-inset-outer);
+      border-radius: calc(var(--scrollbar-inset-outer) + var(--app-scrollbar-half)) calc(var(--app-scrollbar-inner) + var(--app-scrollbar-half)) calc(var(--app-scrollbar-inner) + var(--app-scrollbar-half)) calc(var(--scrollbar-inset-outer) + var(--app-scrollbar-half)) / var(--app-scrollbar-half);
+    }
+  }
+  // Setting scrollbar-color in Chromium would disable its wider grab-area rules.
+  @supports not selector(::-webkit-scrollbar) {
+    :where(html, .app-container, .transcript-view, .table-container) { scrollbar-color: var(--color-border-control) transparent; }
+  }
+  @media (forced-colors: active) {
+    :where(html, .app-container, .transcript-view, .table-container)::-webkit-scrollbar-thumb {
+      // Only this mark opts out of colour substitution, using system colours exclusively.
+      forced-color-adjust: none;
+      background-color: CanvasText;
+      // Forced colours replaces transparent borders; keep the inset in the canvas colour.
+      border-color: Canvas;
+      &:hover, &:active { background-color: CanvasText; }
+    }
+  }
+}

@@ -41,6 +41,22 @@ test('recording job uses structured local timestamps and cleans up before publis
   assert.equal(job.result.processingTimeMs, job.transcriptionTime);
 });
 
+test('deletion cannot race transcription and releases its lock after failure', async () => {
+  const h = harness(async () => ({ text: 'Answer' }));
+  h.service.busy = true;
+  await assert.rejects(h.service.deleteModel('base'), /Finish transcription/);
+  h.service.busy = false;
+  let finish;
+  h.service.whisperService.deleteModel = () => new Promise(resolve => { finish = resolve; });
+  const deletion = h.service.deleteModel('base');
+  await assert.rejects(h.service.processAudio('/answer.wav', { model: 'base' }), /wait/);
+  finish(); await deletion;
+  assert.equal(h.service.busy, false);
+  h.service.whisperService.deleteModel = async () => { throw new Error('Disk error'); };
+  await assert.rejects(h.service.deleteModel('base'), /Disk error/);
+  assert.equal(h.service.busy, false);
+});
+
 test('failed transcription also cleans up temporary audio and releases the job lock', async () => {
   let cleaned = false;
   const h = harness(async () => { throw new Error('Model unavailable'); });

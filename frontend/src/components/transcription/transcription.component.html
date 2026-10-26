@@ -5,10 +5,10 @@
       <p class="page-subtitle">{{ inputMode === 'record' ? 'Keep the words, the pauses, and the context.' : 'Turn a local recording into text you can use anywhere.' }}</p>
     </div>
     <div class="source-selector"><div class="tabs__list workflow-tabs" role="tablist" aria-label="Audio source">
-      <button #recordTab id="record-audio-tab" role="tab" class="tabs__tab" [attr.aria-selected]="inputMode === 'record'" [attr.tabindex]="inputMode === 'record' ? 0 : -1" aria-controls="transcription-workflow-panel" [disabled]="busy && inputMode !== 'record'" [attr.aria-describedby]="busy ? 'source-help' : null" (click)="switchWorkflow('record')" (keydown)="onWorkflowTabKeydown($event)">Record audio</button>
-      <button #fileTab id="audio-file-tab" role="tab" class="tabs__tab" [attr.aria-selected]="inputMode === 'file'" [attr.tabindex]="inputMode === 'file' ? 0 : -1" aria-controls="transcription-workflow-panel" [disabled]="busy && inputMode !== 'file'" [attr.aria-describedby]="busy ? 'source-help' : null" (click)="switchWorkflow('file')" (keydown)="onWorkflowTabKeydown($event)">Audio file</button>
+      <button #recordTab id="record-audio-tab" role="tab" class="tabs__tab" [attr.aria-selected]="inputMode === 'record'" [attr.tabindex]="inputMode === 'record' ? 0 : -1" aria-controls="transcription-workflow-panel" [disabled]="busy && inputMode !== 'record'" [attr.aria-describedby]="busy ? 'workflow-help' : null" (click)="switchWorkflow('record')" (keydown)="onWorkflowTabKeydown($event)">Record audio</button>
+      <button #fileTab id="audio-file-tab" role="tab" class="tabs__tab" [attr.aria-selected]="inputMode === 'file'" [attr.tabindex]="inputMode === 'file' ? 0 : -1" aria-controls="transcription-workflow-panel" [disabled]="busy && inputMode !== 'file'" [attr.aria-describedby]="busy ? 'workflow-help' : null" (click)="switchWorkflow('file')" (keydown)="onWorkflowTabKeydown($event)">Audio file</button>
     </div>
-    <p id="source-help" class="source-help">{{ sourceHint }}</p></div>
+    </div>
   </div>
 
   <div class="page-content">
@@ -33,7 +33,7 @@
         } @else {
           <li class="workflow-control workflow-control--source" [attr.aria-current]="currentStep === 1 ? 'step' : null"><candor-card class="step-card" variant="default" padding="none"><div class="workflow-step-content"><span class="workflow-number" aria-hidden="true"><b>1</b> Choose</span>
           <button data-action="choose-file" class="button button--medium" [class.button--primary]="!busy && !selectedFilePath && !transcriptionResult" [class.button--ghost]="busy || selectedFilePath || transcriptionResult" (click)="selectAudioFile()" [disabled]="busy" aria-describedby="selected-audio-file workflow-help"><i class="ph-fill ph-folder-open" aria-hidden="true"></i> {{ selectedFilePath ? 'Choose another file…' : 'Choose audio file…' }}</button>
-          <div id="selected-audio-file" class="file-info"><p class="file-name"><i class="ph ph-file-audio" aria-hidden="true"></i>{{ selectedFilePath ? getFileName() : 'No file selected' }}</p>@if (selectedFilePath && selectedFileSize != null) { <p class="file-size">{{ formatFileSize(selectedFileSize) }}</p> }</div>
+          <div id="selected-audio-file" class="file-info"><p class="file-name">@if (selectedFilePath) { <i class="ph ph-file-audio" aria-hidden="true"></i> }{{ selectedFilePath ? getFileName() : 'No file selected' }}</p>@if (selectedFilePath && selectedFileSize != null) { <p class="file-size">{{ formatFileSize(selectedFileSize) }}</p> }</div>
           </div></candor-card><i class="ph-bold ph-arrow-right workflow-connector" aria-hidden="true"></i></li>
           <li class="workflow-control" [attr.aria-current]="currentStep === 2 ? 'step' : null"><candor-card class="step-card" variant="default" padding="none"><div class="workflow-step-content"><span class="workflow-number" aria-hidden="true"><b>2</b> Transcribe</span>
           <button data-action="transcribe" class="button button--medium" [class.button--primary]="hasInstalledModel && !busy && !!selectedFilePath && !transcriptionResult" [class.button--ghost]="!hasInstalledModel || busy || !selectedFilePath || transcriptionResult" (click)="startTranscription()" [disabled]="busy || !hasInstalledModel || !selectedFilePath" aria-describedby="workflow-help"><i class="ph-bold ph-waveform" aria-hidden="true"></i> Transcribe file</button>
@@ -51,9 +51,12 @@
           <button data-action="transcribe" class="button button--primary button--small" (click)="startTranscription()" [disabled]="!hasInstalledModel" aria-describedby="workflow-help"><i class="ph-bold ph-arrow-clockwise" aria-hidden="true"></i> Retry transcription</button>
         }
         <button class="button button--ghost button--small" (click)="exportTranscript()" [disabled]="!transcriptionResult || busy" aria-describedby="workflow-help"><i class="ph-fill ph-floppy-disk" aria-hidden="true"></i> Save transcript…</button>
-      <label class="copy-option"><input class="checkbox-input" type="checkbox" [(ngModel)]="includeTimestamps" (ngModelChange)="copied = false"><span class="checkbox-box" aria-hidden="true"></span><span>Include timing and pauses</span></label>
+      <div class="workflow-options">
+        <button type="button" data-action="settings" class="button button--ghost button--small" (click)="openSettings()" [disabled]="busy || !hasInstalledModel" aria-haspopup="dialog" aria-controls="transcription-settings" aria-describedby="workflow-help"><i class="ph-fill ph-gear" aria-hidden="true"></i> Transcription settings</button>
+        <label class="copy-option"><input class="checkbox-input" type="checkbox" [(ngModel)]="includeTimestamps" (ngModelChange)="copied = false"><span class="checkbox-box" aria-hidden="true"></span><span>Include timing and pauses</span></label>
       </div>
-      @if (!hasInstalledModel && !busy) { <button class="button button--primary button--medium" (click)="manageModels.emit()"><i class="ph-fill ph-download-simple" aria-hidden="true"></i> Download a model</button> }
+      </div>
+      @if (!hasInstalledModel && !modelsLoading && !modelsLoadError && !busy) { <button class="button button--primary button--medium" (click)="manageModels.emit()"><i class="ph-fill ph-download-simple" aria-hidden="true"></i> Download a model</button> }
 
       @if (copyError) { <div role="alert" class="alert alert--error record-error"><i class="ph-bold ph-x-circle alert__icon" aria-hidden="true"></i><div class="alert__content"><p class="alert__message">{{ copyError }}</p></div></div> }
       @if (recordingError) { <div role="alert" class="alert alert--error record-error"><i class="ph-bold ph-x-circle alert__icon" aria-hidden="true"></i><div class="alert__content"><p class="alert__message">{{ recordingError }}</p></div></div> }
@@ -62,8 +65,7 @@
       <section class="result-section" aria-label="Transcript preview">
         <candor-card class="transcript-output" variant="outlined" padding="none">
         <div slot="header" class="transcript-heading">
-        <div class="result-heading"><h3>Your transcript</h3><span>{{ includeTimestamps && hasTiming ? 'Timing & pauses included' : 'Plain text copy' }}</span></div>
-        @if (performanceSummary) { <p class="record-hint performance-summary">{{ performanceSummary }}</p> }
+        <h3>Your transcript</h3>
         </div>
         <div class="transcript-content">
         @if (transcriptionResult?.alignmentWarning) { <p role="status" class="record-hint">{{ transcriptionResult.alignmentWarning }}</p> }
@@ -73,7 +75,7 @@
           @if (timelineEntries.length) {
             @for (entry of timelineEntries; track $index) {
               <p class="transcript-segment" [class.transcript-segment--pause]="entry.kind !== 'speech'">
-                <span class="segment__time">{{ formatTimestampRange(entry.start, entry.end) }}</span>
+                <span class="segment__time"><span class="segment__stamp">{{ formatTimestamp(entry.start) }}</span><span class="segment__stamp">→ {{ formatTimestamp(entry.end) }}</span></span>
                 <span class="segment__text">{{ entry.text }}</span>
               </p>
             }
@@ -81,7 +83,12 @@
         </div>
         </div>
         <div slot="footer" class="transcript-footer">
-        <candor-disclosure class="quiet-details disclosure--inline timing-details" label="About timing and pause detection">
+        <candor-disclosure class="quiet-details disclosure--inline timing-details" label="Transcript details">
+          @if (transcriptMetadata.length) {
+            <dl class="transcript-metadata">
+              @for (item of transcriptMetadata; track item.label) { <dt>{{ item.label }}</dt><dd>{{ item.value }}</dd> }
+            </dl>
+          }
           <p class="explanation-prose">{{ timingDescription }} {{ pauseDescription }}</p>
           @if (performanceSummary) { <p class="explanation-prose">Processing time includes audio preparation, model loading, transcription and timing analysis. Real-time speed is audio duration divided by processing time; higher is faster.</p> }
           @if (transcriptionResult?.originalSegments?.length) {
@@ -104,12 +111,11 @@
         </candor-card>
       </section>
     }
-    @if (!busy && hasInstalledModel) {
-      <candor-disclosure class="settings-details" label="Transcription settings">
+      <candor-modal id="transcription-settings" class="settings-modal" heading="Transcription settings" size="sm" [open]="settingsOpen" (close)="settingsOpen = false" (keydown)="onSettingsKeydown($event)">
         <div class="options-section">
           <div class="input-wrapper">
             <label class="input-label" for="model-select">Model</label>
-            <div class="select-control"><select id="model-select" class="input" [(ngModel)]="selectedModel" (ngModelChange)="onModelChange()">
+            <div class="select-control"><select id="model-select" class="input" autofocus [(ngModel)]="selectedModel" (ngModelChange)="onModelChange()">
               @for (model of availableModels; track model.id) { <option [value]="model.id">{{ model.name }}</option> }
             </select><i class="ph-bold ph-caret-down select-caret" aria-hidden="true"></i></div>
           </div>
@@ -121,8 +127,8 @@
           </div>
         </div>
         <p class="record-hint">These settings apply to your next transcription.</p>
-      </candor-disclosure>
-    }
+        <div slot="footer"><button type="button" class="button button--primary button--small" (click)="settingsOpen = false">Done</button></div>
+      </candor-modal>
     </div>
   </div>
 </div>

@@ -1,7 +1,7 @@
 {
   "name": "whisper-electron-app",
   "version": "1.1.5",
-  "description": "Offline Speech-to-Text Electron App with Whisper.cpp",
+  "description": "TalaTrace — private audio transcription with local Whisper and Parakeet models",
   "main": "dist/electron/main.js",
   "scripts": {
     "test": "npm --prefix frontend test -- --runInBand && npm run test:electron",
@@ -69,7 +69,7 @@
   },
   "build": {
     "appId": "com.yourcompany.whisper-electron",
-    "productName": "Whisper Transcription",
+    "productName": "TalaTrace",
     "electronCompile": false,
     "directories": {
       "output": "release"

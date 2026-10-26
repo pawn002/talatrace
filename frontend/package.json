@@ -1,7 +1,7 @@
 {
   "name": "whisper-frontend",
   "version": "1.1.5",
-  "description": "Frontend UI for Whisper Electron App",
+  "description": "Frontend UI for TalaTrace private audio transcription",
   "scripts": {
     "start": "ng serve",
     "build": "ng build",

@@ -96,12 +96,7 @@ export class WhisperService implements RecognitionEngine {
       );
     }
 
-    // Check for at least one model
-    const models = await this.getInstalledModels();
-    if (models.length === 0) {
-      console.log('[WhisperService] No models found, downloading tiny model...');
-      await this.downloadModel('tiny');
-    }
+    // Models are downloaded explicitly from Models; an empty library is intentional.
 
     this.initialized = true;
     console.log('[WhisperService] Initialization complete');
@@ -184,10 +179,6 @@ export class WhisperService implements RecognitionEngine {
   }
 
   async getAvailableModels() { return this.models.list(); }
-
-  private async getInstalledModels(): Promise<string[]> {
-    return (await this.models.list()).filter(model => model.installed).map(model => model.name);
-  }
 
   async downloadModel(modelName: string, progress?: (progress: number) => void): Promise<void> {
     return this.models.download(modelName, progress);

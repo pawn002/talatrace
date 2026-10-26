@@ -1,3 +1,4 @@
+@use './styles/scrollbars';
 @import '@fontsource-variable/roboto-flex/index.css';
 @import '@fontsource/roboto-mono/index.css';
 @import '@phosphor-icons/web/fill/style.css';
@@ -7,6 +8,8 @@
 @import '@fontsource/atkinson-hyperlegible/700.css';
 @import '@fontsource/noto-sans/400.css';
 @import '@candor-design/tokens/candor-tokens.css';
+
+@include scrollbars.app-scrollbars;
 
 // ─── Base ───────────────────────────────────────────────────────────────────
 html, body { height: 100%; }
@@ -25,7 +28,7 @@ body {
 }
 
 // Native semantic headings follow Candor Heading's scale and variable-font recipe.
-.page-heading h2, .result-heading h3 {
+.page-heading h2, .transcript-heading h3 {
   margin: 0;
   font-family: var(--font-family-display);
   font-weight: var(--font-weight-bold);
@@ -33,7 +36,7 @@ body {
   letter-spacing: var(--letter-spacing-tight);
 }
 .page-heading h2 { font-size: var(--font-size-h2); line-height: var(--line-height-display); }
-.result-heading h3 { font-size: var(--font-size-h3); line-height: var(--line-height-snug); }
+.transcript-heading h3 { font-size: var(--font-size-h3); line-height: var(--line-height-snug); }
 
 // ─── Phosphor Icons ──────────────────────────────────────────────────────────
 i:is(.ph, .ph-fill, .ph-bold) {
@@ -539,7 +542,6 @@ select.input {
 @media (prefers-reduced-motion: reduce) { .progress-bar__fill--indeterminate, .spinner, .spinner__arc { animation: none; } }
 
 // Official Phosphor fill icons: decorative beside Candor's named disclosure triggers.
-.settings-details { --disclosure-icon: url('./assets/icons/phosphor-gear.svg'); }
 .timing-details { --disclosure-icon: url('./assets/icons/phosphor-question.svg'); }
-:is(.settings-details, .timing-details)::part(label) { display: flex; align-items: center; gap: var(--spacing-xs); }
-:is(.settings-details, .timing-details)::part(label)::before { content: ''; flex: 0 0 var(--font-size-md); width: var(--font-size-md); height: var(--font-size-md); background: currentColor; mask: var(--disclosure-icon) center / contain no-repeat; }
+.timing-details::part(label) { display: flex; align-items: center; gap: var(--spacing-xs); }
+.timing-details::part(label)::before { content: ''; flex: 0 0 var(--font-size-md); width: var(--font-size-md); height: var(--font-size-md); background: currentColor; mask: var(--disclosure-icon) center / contain no-repeat; }

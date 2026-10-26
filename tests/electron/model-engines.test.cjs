@@ -18,6 +18,8 @@ test('reference badges distinguish measurements from an unknown model and do not
   assert.deepEqual(referencePerformance('not-evaluated'), { speed: 'Not measured', accuracy: 'Not measured' });
   assert.equal(referencePerformance('base').accuracy, referencePerformance('small').accuracy);
   assert.equal(referencePerformance('tiny').speed, '4.4× real time');
+  assert.ok(referencePerformance('tiny').speedRatio > 4.4);
+  assert.equal(referencePerformance('tiny').wordErrorRate, 13/265);
   assert.equal(referencePerformance('parakeet-tdt-0.6b-v3').accuracy, '1.9% errors');
 });
 
@@ -28,6 +30,54 @@ test('alternate engine rejects unsupported languages and translation before touc
   await assert.rejects(engine.transcribe('/answer.wav', { model, language: 'ja' }), /language is not supported/);
   await assert.rejects(engine.transcribe('/answer.wav', { model, translate: true }), /does not translate/);
   assert.equal(converted, false);
+});
+
+test('Parakeet logs lifecycle and native diagnostics without mixing transcript JSON into logs', async () => {
+  const processes = require('node:child_process');
+  const chunks = require('../../dist/electron/services/parakeet-chunks');
+  for (const exitCode of [0, 7]) {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'parakeet-log-test-'));
+    const wav = path.join(directory, 'normalized.wav');
+    const logs = [], errors = [];
+    const log = mock.method(console, 'log', (...args) => logs.push(args.join(' ')));
+    const errorLog = mock.method(console, 'error', (...args) => errors.push(args.join(' ')));
+    const prepare = mock.method(chunks, 'prepareParakeetChunks', async () => [{ file: wav, start: 0, end: 1 }]);
+    const spawn = mock.method(processes, 'spawn', (_binary, args) => {
+      assert.ok(!args.includes('-q') && !args.includes('--quiet'));
+      assert.ok(args.includes('--batch-jsonl'));
+      const child = new EventEmitter();
+      child.stdout = new PassThrough(); child.stderr = new PassThrough();
+      queueMicrotask(() => {
+        child.stderr.end('Native backend diagnostic\n');
+        const json = JSON.stringify({ file: wav, text: 'Private answer.', token_segments: [{ text: 'Private answer.', t0_ms: 0, t1_ms: 1000 }] });
+        child.stdout.write(json.slice(0, 20)); child.stdout.end(json.slice(20) + '\n');
+        child.emit('close', exitCode);
+      });
+      return child;
+    });
+    try {
+      const engine = new TranscribeEngine('/runtime', { installed: async () => true, path: () => '/model.gguf' }, async () => wav);
+      engine.available = async () => true;
+      const result = engine.transcribe('/answer.wav', { model: 'parakeet-tdt-0.6b-v3' });
+      if (exitCode === 0) {
+        assert.equal((await result).text, 'Private answer.');
+        assert.ok(logs.some(line => /Completed in [\d.]+ s/.test(line)));
+        assert.equal(errors.length, 0);
+      } else {
+        await assert.rejects(result, /exit 7.*Native backend diagnostic/);
+        assert.ok(errors.some(line => line.includes('[Parakeet] Failed:')));
+        assert.ok(!logs.some(line => line.includes('Completed')));
+      }
+      assert.ok(logs.some(line => line.includes('[Parakeet] Preparing audio:')));
+      assert.ok(logs.some(line => line.includes('[Parakeet] Starting local engine:')));
+      assert.ok(logs.some(line => line.includes('Native backend diagnostic')));
+      assert.ok(!logs.join('\n').includes('Private answer.'));
+      await assert.rejects(fs.access(directory), { code: 'ENOENT' });
+    } finally {
+      spawn.mock.restore(); prepare.mock.restore(); log.mock.restore(); errorLog.mock.restore();
+      await fs.rm(directory, { recursive: true, force: true });
+    }
+  }
 });
 
 test('catalog uses pinned HTTPS artifacts, hashes and controlled IDs; Turbo has its actual alignment preset', () => {
@@ -107,6 +157,58 @@ test('downloads publish only verified artifacts and failed replacements preserve
     assert.deepEqual(await fs.readdir(directory), ['ggml-tiny.bin']);
     assert.equal((await store.list()).find(model => model.name === 'tiny').installed, false);
   } finally { response.mock.restore(); await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test('catalog discovery reads metadata only, excludes incomplete files and remembers verified corruption', async () => {
+  const model = speechModel('tiny');
+  const store = new ModelStore('/metadata-only');
+  let size = BigInt(model.sizeBytes);
+  let changed = 0n;
+  let isFile = true;
+  const stat = mock.method(fs, 'stat', async file => {
+    if (file !== store.path(model.name)) throw new Error('Missing');
+    return { isFile: () => isFile, size, dev: 1n, ino: 2n, mtimeNs: changed, ctimeNs: changed };
+  });
+  const reads = mock.method(require('node:fs'), 'createReadStream', () => {
+    const stream = new PassThrough(); stream.end('corrupt'); return stream;
+  });
+  const listed = async () => (await store.list()).find(entry => entry.name === model.name).installed;
+  try {
+    assert.equal(await listed(), true);
+    assert.equal(await listed(), true);
+    assert.equal(reads.mock.callCount(), 0, 'Opening either page must not read model contents');
+    assert.equal(await store.installed(model), false, 'Engine integrity check still rejects corrupt weights');
+    assert.equal(reads.mock.callCount(), 1);
+    assert.equal(await listed(), false, 'Known corrupt file is excluded on the next refresh');
+    changed++;
+    assert.equal(await listed(), true, 'Replaced file is discoverable for a new integrity check');
+    size--;
+    assert.equal(await listed(), false);
+    size++; isFile = false;
+    assert.equal(await listed(), false);
+    assert.equal(reads.mock.callCount(), 1);
+  } finally { stat.mock.restore(); reads.mock.restore(); }
+});
+
+test('model deletion accepts catalog IDs only, preserves other files and excludes active downloads', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'speech-delete-test-'));
+  const store = new ModelStore(directory);
+  try {
+    await fs.writeFile(store.path('tiny'), 'tiny weights');
+    await fs.writeFile(store.path('base'), 'base weights');
+    await fs.writeFile(path.join(directory, 'history.json'), 'keep history');
+    await assert.rejects(store.delete('../base'), /Unknown speech model/);
+    await store.delete('tiny');
+    await assert.rejects(fs.access(store.path('tiny')), /ENOENT/);
+    assert.equal(await fs.readFile(store.path('base'), 'utf8'), 'base weights');
+    assert.equal(await fs.readFile(path.join(directory, 'history.json'), 'utf8'), 'keep history');
+    await store.delete('tiny'); // Already absent is a successful delete.
+    let finish;
+    store.fetch = () => new Promise(resolve => { finish = resolve; });
+    const download = store.download('tiny');
+    await assert.rejects(store.delete('tiny'), /download to finish/);
+    finish(); await download;
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
 
 test('installed verification rejects same-size corruption and invalidates cached results after replacement', async () => {

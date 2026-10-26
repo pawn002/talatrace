@@ -3,11 +3,13 @@ import { ElectronService } from '../../services/electron.service';
 import { ToastService } from '../../services/toast.service';
 import { AudioRecorderService, MAX_RECORDING_SECONDS } from '../../services/audio-recorder.service';
 import { buildTranscriptTimeline, groupQuietIntervals, TimelineEntry } from '../../utils/transcript-timeline';
+import { readModelPreference, saveModelPreference } from '../../model-preference';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-transcription',
   templateUrl: './transcription.component.html',
-  styleUrls: ['./transcription.component.scss'],
+  styleUrls: ['./transcription.component.scss', './transcript-output.scss'],
   standalone: false,
 })
 export class TranscriptionComponent implements OnInit, OnDestroy {
@@ -28,7 +30,8 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
   transcriptionProgress = 0;
   progressMessage = '';
   transcriptionResult: any = null;
-  selectedModel = 'base';
+  selectedModel = readModelPreference();
+  private modelChanges?: Subscription;
   selectedLanguage = 'auto';
   isRecording = false;
   isStartingRecording = false;
@@ -40,12 +43,35 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
   private recordingStartedAt?: number;
   recordingError = '';
   includeTimestamps = true;
+  settingsOpen = false;
+
+  openSettings(): void {
+    if (!this.busy && this.hasInstalledModel) this.settingsOpen = true;
+  }
+
+  onSettingsKeydown(event: KeyboardEvent): void {
+    if (!this.settingsOpen || event.key !== 'Tab') return;
+    const modal = event.currentTarget as HTMLElement;
+    const first = modal.shadowRoot?.querySelector<HTMLButtonElement>('dialog button');
+    const last = modal.querySelector<HTMLButtonElement>('[slot="footer"] button');
+    if (!first || !last) return;
+    // Chromium can yield to browser chrome after the last dialog control.
+    // Keep the desktop app's Tab cycle inside Candor's native modal instead.
+    if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault(); first.focus();
+    } else if (event.shiftKey && modal.shadowRoot?.activeElement === first) {
+      event.preventDefault(); last.focus();
+    }
+  }
   recordedAudio: Blob | null = null;
   private recordingTimer?: ReturnType<typeof setInterval>;
   private modelsTimer?: ReturnType<typeof setInterval>;
   private destroyed = false;
 
   availableModels: Array<{ id: string; name: string; installed: boolean; languages?: string[] }> = [];
+  modelsLoading = true;
+  modelsLoadError = false;
+  private loadingModels = false;
 
   languages = [
     { code: 'auto', name: 'Auto Detect' },
@@ -71,6 +97,7 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.loadAvailableModels();
+    this.modelChanges = this.electronService.modelsChanged?.subscribe(() => this.loadAvailableModels());
 
     // Set up event listeners
     this.electronService.onTranscriptionProgress((data) => {
@@ -111,6 +138,7 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.destroyed = true;
+    this.modelChanges?.unsubscribe();
     this.audioRecorder.discard();
     clearInterval(this.recordingTimer);
     clearInterval(this.modelsTimer);
@@ -119,8 +147,12 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
   }
 
   async loadAvailableModels() {
+    if (this.loadingModels) return;
+    this.loadingModels = true;
     try {
       const models = await this.electronService.getAvailableModels();
+      if (this.destroyed) return;
+      this.modelsLoadError = false;
       this.availableModels = models
         .filter((m: any) => m.installed && m.available !== false) // Only show installed models
         .map((m: any) => ({
@@ -136,11 +168,16 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
           (m) => m.id === this.selectedModel
         );
         if (!currentModelInstalled) {
-          this.selectedModel = this.availableModels[0].id;
+          this.selectedModel = this.availableModels.find(model => model.id === 'base')?.id || this.availableModels[0].id;
         }
+        this.onModelChange();
       }
     } catch (error) {
+      this.modelsLoadError = true;
       console.error('Failed to load models:', error);
+    } finally {
+      this.modelsLoading = false;
+      this.loadingModels = false;
     }
   }
 
@@ -151,6 +188,7 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
 
   onModelChange() {
     if (!this.supportedLanguages.some(language => language.code === this.selectedLanguage)) this.selectedLanguage = 'auto';
+    saveModelPreference(this.selectedModel);
   }
 
   async selectAudioFile() {
@@ -298,6 +336,8 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
     if (this.isStartingRecording) return 'Starting your microphone';
     if (this.isRecording) return 'Recording · microphone on';
     if (this.transcriptionResult) return this.copied ? 'Copied — ready to paste' : 'Your transcript is ready';
+    if (!this.hasInstalledModel && this.modelsLoading) return 'Checking local models';
+    if (!this.hasInstalledModel && this.modelsLoadError) return 'Could not check local models';
     if (!this.hasInstalledModel) return 'Set up local transcription';
     if (this.recordedAudio) return 'Your recording is ready to retry';
     if (this.selectedFilePath) return 'Ready to transcribe your file';
@@ -315,25 +355,21 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
   }
 
   get workflowHint(): string {
-    if (this.isSelectingFile) return 'Choose a file in the dialog, or cancel to return here.';
-    if (this.isRecording) return 'Stop & transcribe turns off the microphone and starts transcription. Copy and Save become available when it finishes.';
-    if (this.isTranscribing || this.isStoppingRecording) return `${this.progressMessage || 'Processing audio on this device…'} Copy and Save become available when transcription finishes.`;
-    if (this.isStartingRecording) return 'Allow microphone access if prompted. Recording will begin automatically.';
+    if (this.isSelectingFile) return 'Choose a file or cancel the dialog to change settings or switch audio source.';
+    if (this.isRecording) return 'Stop & transcribe turns off the microphone and starts transcription. Finish transcription to copy, save, change settings or switch audio source.';
+    if (this.isTranscribing || this.isStoppingRecording) return `${this.progressMessage || 'Processing audio on this device…'} Finish transcription to copy, save, change settings or switch audio source.`;
+    if (this.isStartingRecording) return 'Allow microphone access if prompted. Recording will begin automatically; stop and transcribe to change settings or switch audio source.';
     if (this.transcriptionResult) return this.copied
       ? `Copied ${this.includeTimestamps && this.hasTiming ? 'with timing and pauses' : 'as plain text'}. Paste into your chat or terminal.`
       : `Ready to copy ${this.includeTimestamps && this.hasTiming ? 'with timing and pauses' : 'as plain text'}.`;
-    if (!this.hasInstalledModel) return 'Download a speech model to enable Record, Transcribe and Retry. Copy and Save require a completed transcript.';
+    if (!this.hasInstalledModel && this.modelsLoading) return 'Checking models on this device. Record and Transcribe become available when this check finishes.';
+    if (!this.hasInstalledModel && this.modelsLoadError) return 'The model check failed. Retrying automatically; your downloaded models have not been removed.';
+    if (!this.hasInstalledModel) return 'Download a speech model to enable recording, transcription and settings. Copy and Save require a completed transcript.';
     if (this.recordedAudio) return `Your recording is retained. Choose Retry transcription, or ${this.recordActionLabel} to start again.`;
-    if (this.selectedFilePath) return 'Your file is ready. Transcribe file to enable Copy and Save; adjust settings below if needed.';
+    if (this.selectedFilePath) return 'Your file is ready. Transcribe file to enable Copy and Save; open Transcription settings to adjust the model or language.';
     return this.inputMode === 'record'
       ? 'Start recording (up to 30 minutes) to enable Stop & transcribe. Copy and Save become available after transcription.'
       : 'Choose an audio file to enable Transcribe file. Copy and Save become available after transcription.';
-  }
-
-  get sourceHint(): string {
-    if (this.isSelectingFile) return 'Close the file dialog to switch sources.';
-    if (this.isRecording || this.isStartingRecording) return 'Stop and transcribe to switch sources.';
-    return this.busy ? 'Finish transcription to switch sources.' : '';
   }
 
   get recordActionLabel(): string {
@@ -479,7 +515,7 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
     return `[${this.formatTimestamp(start)} → ${this.formatTimestamp(end)}]`;
   }
 
-  private formatTimestamp(seconds: number): string {
+  formatTimestamp(seconds: number): string {
     const milliseconds = Math.round(Math.max(0, seconds) * 1000);
     const hours = Math.floor(milliseconds / 3600000);
     const minutes = Math.floor((milliseconds % 3600000) / 60000);
@@ -542,6 +578,18 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
 
   get timelineEntries(): TimelineEntry[] {
     return buildTranscriptTimeline(this.transcriptionResult || {});
+  }
+
+  get transcriptMetadata(): Array<{ label: string; value: string }> {
+    const { duration, processingTimeMs, modelName, model } = this.transcriptionResult || {};
+    const rows: Array<{ label: string; value: string }> = [];
+    if (modelName || model) rows.push({ label: 'Model', value: modelName || model });
+    if (Number.isFinite(duration) && duration >= 0) rows.push({ label: 'Audio length', value: `${duration.toFixed(2)} s` });
+    if (Number.isFinite(processingTimeMs) && processingTimeMs >= 0) rows.push({ label: 'Processing', value: `${(processingTimeMs / 1000).toFixed(2)} s` });
+    if (duration > 0 && Number.isFinite(duration) && processingTimeMs > 0 && Number.isFinite(processingTimeMs)) {
+      rows.push({ label: 'Speed', value: `${(duration / (processingTimeMs / 1000)).toFixed(1)}× real time` });
+    }
+    return rows;
   }
 
   get performanceSummary(): string {

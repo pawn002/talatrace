@@ -13,10 +13,12 @@ export const REFERENCE_BENCHMARKS: Readonly<Record<string, { processingMs: numbe
   'parakeet-tdt-0.6b-v3': { processingMs: 28423.1972, errors: 5 },
 };
 
-export function referencePerformance(name: string): { speed: string; accuracy: string } {
+export function referencePerformance(name: string): { speed: string; accuracy: string; speedRatio?: number; wordErrorRate?: number } {
   const measurement = REFERENCE_BENCHMARKS[name];
   return measurement ? {
     speed: `${(99.93 * 1000 / measurement.processingMs).toFixed(1)}× real time`,
     accuracy: `${(measurement.errors / 265 * 100).toFixed(1)}% errors`,
+    speedRatio: 99.93 * 1000 / measurement.processingMs,
+    wordErrorRate: measurement.errors / 265,
   } : { speed: 'Not measured', accuracy: 'Not measured' };
 }

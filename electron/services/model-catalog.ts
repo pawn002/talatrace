@@ -16,6 +16,8 @@ export interface SpeechModel {
   languages?: readonly string[];
   speed: string;
   accuracy: string;
+  speedRatio?: number;
+  wordErrorRate?: number;
   description: string;
 }
 

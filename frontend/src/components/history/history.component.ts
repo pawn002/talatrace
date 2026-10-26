@@ -17,6 +17,9 @@ interface TranscriptionHistoryItem {
   options?: any;
 }
 
+type SortKey = 'file' | 'model' | 'status' | 'duration' | 'time' | 'date';
+type SortDirection = 'ascending' | 'descending';
+
 @Component({
   selector: "app-history",
   standalone: true,
@@ -28,6 +31,48 @@ interface TranscriptionHistoryItem {
 export class HistoryComponent implements OnInit, OnDestroy {
   history: TranscriptionHistoryItem[] = [];
   isLoading = true;
+  isRefreshing = false;
+  sortKey: SortKey | null = null;
+  sortDirection: SortDirection = 'ascending';
+  sortAnnouncement = '';
+  readonly columns: ReadonlyArray<{ key: SortKey; label: string; numeric?: boolean; mono?: boolean }> = [
+    { key: 'file', label: 'File' }, { key: 'model', label: 'Model' }, { key: 'status', label: 'Status' },
+    { key: 'duration', label: 'Audio duration', numeric: true },
+    { key: 'time', label: 'Processing time', numeric: true }, { key: 'date', label: 'Date', mono: true },
+  ];
+  private readonly collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+
+  get sortedHistory(): TranscriptionHistoryItem[] {
+    if (!this.sortKey) return this.history;
+    const key = this.sortKey;
+    const direction = this.sortDirection === 'ascending' ? 1 : -1;
+    return [...this.history].sort((a, b) => {
+      const left = this.sortValue(a, key), right = this.sortValue(b, key);
+      if (left === null) return right === null ? 0 : 1;
+      if (right === null) return -1;
+      return direction * (typeof left === 'number' && typeof right === 'number'
+        ? left - right : this.collator.compare(String(left), String(right)));
+    });
+  }
+
+  private sortValue(item: TranscriptionHistoryItem, key: SortKey): string | number | null {
+    if (key === 'file') return item.fileName || null;
+    if (key === 'model') return item.options?.model || 'base';
+    if (key === 'status') return item.status || null;
+    const value = key === 'date' ? Date.parse(item.startedAt) : key === 'duration' ? item.audioDuration : item.transcriptionTime;
+    return typeof value === 'number' && Number.isFinite(value) && (key === 'date' || value >= 0) ? value : null;
+  }
+
+  nextSortDirection(key: SortKey): SortDirection {
+    return this.sortKey === key ? (this.sortDirection === 'ascending' ? 'descending' : 'ascending')
+      : key === 'date' ? 'descending' : 'ascending';
+  }
+
+  sortBy(key: SortKey): void {
+    this.sortDirection = this.nextSortDirection(key);
+    this.sortKey = key;
+    this.sortAnnouncement = `Sorted by ${this.columns.find(column => column.key === key)!.label}, ${this.sortDirection}. Missing values are last.`;
+  }
 
   constructor(
     private electronService: ElectronService,
@@ -56,7 +101,9 @@ export class HistoryComponent implements OnInit, OnDestroy {
   }
 
   async loadHistory(): Promise<void> {
-    this.isLoading = true;
+    if (this.isRefreshing) return;
+    this.isLoading = this.history.length === 0;
+    this.isRefreshing = true;
     try {
       console.log("Loading transcription history...");
       const result = await this.electronService.getTranscriptionHistory();
@@ -67,6 +114,7 @@ export class HistoryComponent implements OnInit, OnDestroy {
       this.history = [];
     } finally {
       this.isLoading = false;
+      this.isRefreshing = false;
     }
   }
 

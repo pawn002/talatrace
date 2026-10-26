@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Offline speech-to-text Electron application using OpenAI's Whisper model via whisper.cpp. Two-layer Electron-native architecture: Angular frontend and Electron main process with integrated services.
+TalaTrace is a private speech-to-text Electron application using local Whisper and Parakeet models. Two-layer Electron-native architecture: Angular frontend and Electron main process with integrated services.
 
 ## Common Commands
 

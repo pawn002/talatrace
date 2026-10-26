@@ -37,7 +37,7 @@ describe('AudioSpectrumComponent', () => {
       close = close;
     } as any;
     const canvas = document.createElement('canvas');
-    Object.defineProperties(canvas, { clientWidth: { value: 240 }, clientHeight: { value: 44 } });
+    Object.defineProperties(canvas, { clientWidth: { value: 68 }, clientHeight: { value: 24 } });
     component = new AudioSpectrumComponent({ streamForAnalysis: stream } as any, { runOutsideAngular: (fn: any) => fn(), run: (fn: any) => fn() } as any);
     component.canvas = { nativeElement: canvas };
     component.ngAfterViewInit();
@@ -72,7 +72,7 @@ describe('AudioSpectrumComponent', () => {
     expect(stream.getTracks).not.toHaveBeenCalled();
   });
 
-  it('clears old-colour history on a theme change without restarting analysis', async () => {
+  it('redraws bars in the new theme colour without restarting analysis', async () => {
     await start(); nextFrame!(1000);
     painter.clearRect.mockClear();
     const canvas = component.canvas.nativeElement;
@@ -89,9 +89,44 @@ describe('AudioSpectrumComponent', () => {
     preference.matches = true;
     preference.addEventListener.mock.calls[0][1]();
     expect(component.reducedMotion).toBe(true);
+    expect(analyser.smoothingTimeConstant).toBe(0);
     nextFrame!(1000);
     expect(painter.drawImage).not.toHaveBeenCalled();
     expect(painter.fillRect).toHaveBeenCalled();
+    nextFrame!(1100);
+    expect(analyser.getByteFrequencyData).toHaveBeenCalledTimes(1);
+    nextFrame!(1300);
+    expect(analyser.getByteFrequencyData).toHaveBeenCalledTimes(2);
+    preference.matches = false;
+    preference.addEventListener.mock.calls[0][1]();
+    expect(analyser.smoothingTimeConstant).toBe(0.35);
+  });
+
+  it('maps higher input frequencies to bars farther right and clears them in silence', async () => {
+    await start(); nextFrame!(1000);
+    const lowX = painter.fillRect.mock.calls.at(-1)[0];
+    painter.fillRect.mockClear();
+    analyser.getByteFrequencyData.mockImplementation((data: Uint8Array) => { data.fill(0); data[180] = 220; });
+    nextFrame!(2000);
+    expect(painter.fillRect.mock.calls.at(-1)[0]).toBeGreaterThan(lowX);
+    expect(painter.drawImage).not.toHaveBeenCalled();
+    painter.fillRect.mockClear();
+    analyser.getByteFrequencyData.mockImplementation((data: Uint8Array) => data.fill(0));
+    nextFrame!(3000);
+    expect(painter.fillRect).not.toHaveBeenCalled();
+  });
+
+  it('uses a gradual attack and a quick decay rather than jumping or retaining history', async () => {
+    await start(); nextFrame!(1000);
+    const initialHeight = painter.fillRect.mock.calls.at(-1)[3];
+    nextFrame!(1100);
+    const peakHeight = painter.fillRect.mock.calls.at(-1)[3];
+    expect(peakHeight).toBeGreaterThan(initialHeight);
+    analyser.getByteFrequencyData.mockImplementation((data: Uint8Array) => data.fill(0));
+    nextFrame!(1200);
+    const decayingHeight = painter.fillRect.mock.calls.at(-1)[3];
+    expect(decayingHeight).toBeGreaterThan(0);
+    expect(decayingHeight).toBeLessThan(peakHeight);
   });
 
   it('contains analysis failure and closes the graph while recording remains owned by the recorder', async () => {

@@ -1,6 +1,8 @@
-# Whisper Transcription
+# TalaTrace
 
-Offline speech-to-text Electron app using OpenAI's Whisper via whisper.cpp. Angular frontend, Electron main process — no backend server, no internet required after setup.
+Private audio transcription with local Whisper and Parakeet models. Angular frontend, Electron main process — no backend server, no internet required after setup.
+
+Previously named **Whisper Transcription**, TalaTrace has a model-neutral name: Swedish *tala* (“speak”) meets English *trace*, reflecting speech with timing context. Whisper and Parakeet remain selectable transcription engines. The repository URL, internal package name and installer identity remain unchanged. Existing local data is retained in its original profile directory; downloaded models and preferences do not need to be recreated.
 
 Record interview answers directly in the app: **Record answer → Stop & transcribe → Copy transcript**. Controls stay in stable positions, with a persistent recording status and final duration. Readable timestamped text and locally detected gaps in speech preserve pacing context for use in AI chats and TUIs. Original quiet-level measurements remain available for comparison. Existing audio-file transcription and TXT/SRT/VTT/JSON export remain available.
 

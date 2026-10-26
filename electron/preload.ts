@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   downloadModel: (modelName: string) =>
     ipcRenderer.invoke("download-model", modelName),
 
+  deleteModel: (modelName: string) => ipcRenderer.invoke("delete-model", modelName),
+
   getSystemInfo: () => ipcRenderer.invoke("get-system-info"),
 
   getTranscriptionHistory: () =>
@@ -89,6 +91,7 @@ declare global {
       saveTranscript: (resultData: any) => Promise<string | null>;
       getAvailableModels: () => Promise<any[]>;
       downloadModel: (modelName: string) => Promise<any>;
+      deleteModel: (modelName: string) => Promise<any>;
       getSystemInfo: () => Promise<any>;
       getTranscriptionHistory: () => Promise<any[]>;
       onTranscriptionProgress: (

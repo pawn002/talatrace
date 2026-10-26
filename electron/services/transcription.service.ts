@@ -177,7 +177,14 @@ export class TranscriptionService {
   }
 
   async getAvailableModels() {
-    return await this.whisperService.getAvailableModels();
+    return (await this.whisperService.getAvailableModels()).map(model => ({ ...model, deletionBlocked: this.busy }));
+  }
+
+  async deleteModel(modelName: string): Promise<void> {
+    if (this.busy) throw new Error('Finish transcription before deleting a model.');
+    this.busy = true;
+    try { await this.whisperService.deleteModel(modelName); }
+    finally { this.busy = false; }
   }
 
   async downloadModel(

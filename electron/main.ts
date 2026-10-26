@@ -2,12 +2,20 @@ import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
 import * as path from 'path';
 import isDev from 'electron-is-dev';
 import * as fs from 'fs/promises';
+import { existsSync } from 'fs';
 import { TranscriptionService } from './services/transcription.service';
 import { storeRecording, removeStaleRecordings } from './services/recording-storage';
 import { pathToFileURL } from 'url';
 
 // Import package.json for app version
 const packageJson = require(path.join(__dirname, '../../package.json'));
+
+// Keep pre-rename profiles (including packaged builds) and their models/preferences.
+const legacyPackagedProfile = path.join(app.getPath('appData'), 'Whisper Transcription');
+app.setPath('userData', app.isPackaged && existsSync(legacyPackagedProfile)
+  ? legacyPackagedProfile
+  : path.join(app.getPath('appData'), packageJson.name));
+app.setName('TalaTrace');
 
 let mainWindow: BrowserWindow | null = null;
 let transcriptionService: TranscriptionService | null = null;
@@ -120,7 +128,7 @@ function createWindow() {
       contextIsolation: true,
       sandbox: true,
     },
-    title: 'Whisper Transcription',
+    title: 'TalaTrace',
     backgroundColor: '#303030',
   });
 
@@ -346,14 +354,19 @@ ipcMain.handle('save-transcript', async (event, resultData: any) => {
 ipcMain.handle('get-available-models', async () => {
   try {
     if (!transcriptionService) {
-      console.error('[Main] Transcription service not initialized');
-      return [];
+      throw new Error('Transcription service not initialized');
     }
     return await transcriptionService.getAvailableModels();
   } catch (error: any) {
     console.error('[Main] Error fetching models:', error);
-    return [];
+    throw error;
   }
+});
+
+ipcMain.handle('delete-model', async (_event, modelName: string) => {
+  if (!transcriptionService) throw new Error('Transcription service not initialized');
+  await transcriptionService.deleteModel(modelName);
+  return { success: true };
 });
 
 ipcMain.handle('download-model', async (event, modelName: string) => {
