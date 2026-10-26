@@ -31,7 +31,7 @@ The app's display name is already TalaTrace. Internal package identifiers and th
 
 - App iteration and release readiness are not complete.
 - Packaged clean-install and upgrade checks remain to be performed.
-- Capture the exact blog destination before validating redirects; it has not been supplied in this plan.
+- Recheck the exact blog destinations recorded below after renaming; repair the existing Quick Start fragment when updating the blog.
 - Reassess release tooling, integrations and platform coverage at execution time.
 - No remote repository rename or release has been performed by recording this plan.
 
@@ -48,4 +48,17 @@ The app's display name is already TalaTrace. Internal package identifiers and th
 - Static installer-identity review: the app ID remains `com.yourcompany.whisper-electron`, as in 1.1.5; electron-builder derives its NSIS GUID from that ID. Product/executable names change. This supports continuity but does not substitute for an installed upgrade test.
 - Reviewable release notes: [1.2.0 draft](releases/1.2.0-draft.md).
 
-Next gate: test clean install and 1.1.5 → candidate upgrade on a disposable Windows machine/VM, checking the executable and shortcuts, one uninstall entry, downloaded weights, preferences and uninstall/rollback behavior. Windows Sandbox is unavailable on this host; no existing Whisper/TalaTrace per-user uninstall entry was found. The real installed-user workflow has not been exercised. The exact blog URL is requested so its actual destination can be checked after rename. Repository rename and public release wait for these checks.
+Next gate: test clean install and 1.1.5 → candidate upgrade on a disposable Windows machine/VM, checking the executable and shortcuts, one uninstall entry, downloaded weights, preferences and uninstall/rollback behavior. Windows Sandbox is unavailable on this host; no existing Whisper/TalaTrace per-user uninstall entry was found. The real installed-user workflow has not been exercised. The exact blog destinations are now recorded below for post-rename verification. Repository rename and public release wait for these checks.
+
+## Exact blog-link baseline
+
+User-supplied post: [Building a Privacy-First Transcription Tool with Claude Code](https://pawn002.github.io/blog-public/blog/building_whisper_transcription_app/). Fetched the live HTML on 26 October 2026. It contains four distinct links into this repository, with the repository root repeated in several places. All four return HTTP 200 before migration.
+
+| Current destination suffix under `https://github.com/pawn002/whisper-electron-app` | Blog role | Post-rename check |
+| --- | --- | --- |
+| (repository root) | App / GitHub links | Redirect reaches `pawn002/talatrace`. |
+| `/tree/main#-quick-start` | Getting started | Redirect reaches main; the existing fragment also needs correction (see below). |
+| `/blob/main/docs/architecture.md` | Architecture documentation | Redirect reaches the same document in `talatrace`. |
+| `/tree/main/docs` | Documentation directory | Redirect reaches the same directory in `talatrace`. |
+
+The Getting started link already has a stale `#-quick-start` fragment: the live README exposes `#quick-start` (`id="user-content-quick-start"`). HTTP 200 does not establish that a fragment scrolls correctly. When the blog is updated for TalaTrace, use `https://github.com/pawn002/talatrace#quick-start` and verify that heading navigation as well as the repository redirect. This is a pre-existing blog-link issue, not an effect of the rename. No blog content has been edited.
