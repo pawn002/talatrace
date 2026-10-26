@@ -12,6 +12,14 @@ const { ModelStore } = require('../../dist/electron/services/model-store');
 const { parseTransducerTranscript } = require('../../dist/electron/services/transducer-transcript');
 const { alignmentPreset } = require('../../dist/electron/services/speech-alignment');
 const { TranscribeEngine } = require('../../dist/electron/services/transcribe-engine');
+const { referencePerformance } = require('../../dist/electron/services/model-benchmarks');
+
+test('reference badges distinguish measurements from an unknown model and do not invent rankings', () => {
+  assert.deepEqual(referencePerformance('not-evaluated'), { speed: 'Not measured', accuracy: 'Not measured' });
+  assert.equal(referencePerformance('base').accuracy, referencePerformance('small').accuracy);
+  assert.equal(referencePerformance('tiny').speed, '4.4× real time');
+  assert.equal(referencePerformance('parakeet-tdt-0.6b-v3').accuracy, '1.9% errors');
+});
 
 test('alternate engine rejects unsupported languages and translation before touching audio', async () => {
   let converted = false;
@@ -28,6 +36,9 @@ test('catalog uses pinned HTTPS artifacts, hashes and controlled IDs; Turbo has 
     assert.match(model.sha256, /^[a-f0-9]{64}$/);
     assert.match(model.revision, /^[a-f0-9]{40}$/);
     assert.ok(model.url.startsWith('https://') && model.url.includes(model.revision));
+    assert.equal(new URL(model.repositoryUrl).hostname, 'huggingface.co');
+    assert.equal(new URL(model.repositoryUrl).pathname.slice(1), model.repository);
+    assert.ok(model.url.startsWith(model.repositoryUrl + '/resolve/'), 'Repository must identify the implemented conversion, not just the upstream model');
     assert.equal(path.basename(model.filename), model.filename);
   }
   assert.throws(() => speechModel('../../outside'), /Unknown/);

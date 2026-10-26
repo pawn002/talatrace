@@ -10,13 +10,15 @@ The app supports local Whisper transcription and a first Parakeet engine. All re
 | Whisper Base | 142 MiB | whisper.cpp | Existing default. |
 | Whisper Small | 466 MiB | whisper.cpp | More processing than Base. Compare accuracy on your recordings. |
 | Whisper Medium | 1.43 GiB | whisper.cpp | Higher resource requirements. |
-| Whisper Large | 2.88 GiB | whisper.cpp | New downloads use Large v3; the historical `large` selection ID is retained. |
-| Whisper Large v3 Turbo · Q5 | 548 MiB | whisper.cpp | Faster decoder with quantized weights; audio-aligned token timing enabled for recordings. |
-| Parakeet TDT 0.6B v3 · Q8 | 706 MiB | transcribe.cpp | 25 European languages; token timings; no translation. Initial evaluation option. |
+| Whisper Large v3 | 2.88 GiB | whisper.cpp | Segment-level timestamps; the historical `large` selection ID is retained. |
+| Whisper Large v3 Turbo · Q5_0 | 548 MiB | whisper.cpp | Faster decoder with quantized weights; audio-aligned token timing enabled for recordings. |
+| Parakeet TDT 0.6B v3 · Q8_0 | 706 MiB | transcribe.cpp | 25 European languages; token timings; no translation. Initial evaluation option. |
 
 Sizes describe the pinned weight artifacts, rounded in binary units. They are not parameter counts, RAM estimates, or total installation sizes. The model catalog in `electron/services/model-catalog.ts` is the source of truth for IDs, revisions, files, bytes, SHA-256 hashes and supported languages.
 
-The app does not offer English-only `.en` Whisper variants in this catalog. Speed and quality labels are guidance, not measurements of your hardware or guaranteed accuracy. Keep Base available while comparing the new choices. See [the model review](transcription-model-review.md) for the broader shortlist.
+Each Models row uses the same identity format: model/version/quantization, then a linked Hugging Face repository identifier. The repository identifies the implemented conversion: `ggerganov/whisper.cpp` for Whisper and `handy-computer/parakeet-tdt-0.6b-v3-gguf` for Parakeet. Links are derived from the pinned artifact URLs; the original upstream source and license metadata remain in the catalog. Descriptive model paragraphs are omitted from the table. Download uses Candor's subdued tertiary treatment without an outline; no download is promoted above the others. Required unavailable-runtime explanations remain beside disabled controls.
+
+The app does not offer English-only `.en` Whisper variants in this catalog. Table badges show reference speed and word error rate from the [documented English reading test](speech-model-evaluation-2026-10-25.md), not a prediction for the current device or a universal quality grade. Higher audio/processing speed and lower word error rate are better. Neutral badges retain their meaning without colour; missing results say "Not measured". The visible table note identifies the dataset, sample and reference hardware. Keep Base available while comparing the new choices. See [the model review](transcription-model-review.md) for the broader shortlist.
 
 ## Download and select
 

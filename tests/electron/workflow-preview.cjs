@@ -120,7 +120,7 @@ app.whenReady().then(async () => {
         if (icon.maskImage === 'none' || parseFloat(icon.width) !== 16) throw new Error('Disclosure icon is absent or incorrectly sized');
         colourPairs.push({ selector: host.classList.contains('timing-details') ? 'timing help mask' : 'settings gear mask', foreground: icon.backgroundColor, background: resolvedBackground(host), nonText: true });
       }
-      for (const selector of ['.file-name', '.file-size', '.source-help', '.action-reason', '#history-refresh-status', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
+      for (const selector of ['.file-name', '.file-size', '.model-name', '.model-repository a', '.models-page .info-alert a', '.source-help', '.action-reason', '#history-refresh-status', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
         for (const el of document.querySelectorAll(selector)) {
           if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
@@ -128,7 +128,12 @@ app.whenReady().then(async () => {
           colourPairs.push({ selector, foreground: style.color, background, size: parseFloat(style.fontSize), weight: parseInt(style.fontWeight), text: el.textContent.trim().slice(0, 80) });
         }
       }
-      for (const selector of ['.input', '.button:focus-visible', '.status-text i', '.local-badge--recording i', '.workflow-connector', '.spectrum-display canvas']) {
+      for (const link of document.querySelectorAll('.model-repository a, .models-page .info-alert a')) {
+        if (!link.checkVisibility({ checkVisibilityCSS: true })) continue;
+        const style = getComputedStyle(link);
+        colourPairs.push({ selector: 'repository visited token pairing', foreground: style.getPropertyValue('--color-link-visited').trim(), background: resolvedBackground(link), size: parseFloat(style.fontSize), weight: parseInt(style.fontWeight), text: link.textContent.trim() });
+      }
+      for (const selector of ['.input', '.button:focus-visible', '.model-repository a:focus-visible', '.status-text i', '.local-badge--recording i', '.workflow-connector', '.spectrum-display canvas']) {
         for (const el of document.querySelectorAll(selector)) {
           if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
@@ -388,16 +393,55 @@ app.whenReady().then(async () => {
       if (document.activeElement !== first) throw new Error('Main navigation Home failed');
     })()`);
     await click('#app-tab-models'); await capture('models');
+    await win.webContents.executeJavaScript("[...document.querySelectorAll('#app-panel-models tbody button')].at(-2).focus()");
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+    if (!await win.webContents.executeJavaScript("document.activeElement === [...document.querySelectorAll('.model-repository a')].at(-1) && document.activeElement.matches(':focus-visible')")) throw new Error('Repository link is not in the native keyboard sequence');
+    await capture('models-repository-focus');
+    await win.webContents.executeJavaScript("document.querySelector('#app-tab-models').focus()");
+    await win.webContents.executeJavaScript("document.querySelector('.app-container').scrollTop = 0");
     await win.webContents.executeJavaScript("document.querySelector('.models-page tbody tr:last-child').scrollIntoView({ block: 'center' })");
     await capture('models-added');
     await win.webContents.executeJavaScript("document.querySelector('.models-page .info-alert').scrollIntoView({ block: 'end' })");
     await capture('models-guidance');
     await win.webContents.executeJavaScript("document.querySelector('.app-container').scrollTop = 0");
     nativeTheme.themeSource = 'light'; await wait(350); await capture('models-light');
+    const hoverModel = async selector => {
+      const point = await win.webContents.executeJavaScript(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+      await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+      await wait(250); return point;
+    };
+    await hoverModel('#app-panel-models tbody tr:nth-child(2) .model-repository a');
+    await capture('models-repository-hover-light');
+    let modelButtonPoint = await hoverModel('#app-panel-models tbody tr:nth-child(4) button');
+    await capture('models-download-hover-light');
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...modelButtonPoint });
+    await capture('models-download-active-light');
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 10, y: 200 });
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, x: 10, y: 200 });
     nativeTheme.themeSource = 'dark'; await wait(350);
+    await hoverModel('#app-panel-models tbody tr:nth-child(2) .model-repository a');
+    await capture('models-repository-hover-dark');
+    modelButtonPoint = await hoverModel('#app-panel-models tbody tr:nth-child(4) button');
+    await capture('models-download-hover-dark');
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...modelButtonPoint });
+    await capture('models-download-active-dark');
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 10, y: 200 });
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, x: 10, y: 200 });
     win.setSize(360, 780); await capture('models-small');
+    await win.webContents.executeJavaScript("document.querySelector('#app-panel-models .table-container').scrollLeft = 300");
+    await capture('models-metrics-small');
+    await win.webContents.executeJavaScript("document.querySelector('#app-panel-models .table-container').scrollLeft = 0");
     await win.webContents.executeJavaScript("document.querySelector('.models-page .info-alert').scrollIntoView({ block: 'end' })");
     await capture('models-guidance-small');
+    win.setSize(480, 780);
+    await win.webContents.executeJavaScript("document.querySelector('.app-container').scrollTop = 0");
+    await capture('models-narrow');
+    await win.webContents.executeJavaScript("[...document.querySelectorAll('#app-panel-models .button')].at(-1).focus()");
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+    if (!await win.webContents.executeJavaScript("document.activeElement === document.querySelector('#model-benchmark-context a') && document.activeElement.matches(':focus-visible') && parseFloat(getComputedStyle(document.activeElement).outlineWidth) > 0")) throw new Error('Benchmark source link lacks visible keyboard focus');
+    await capture('models-benchmark-focus');
     if (!await win.webContents.executeJavaScript("document.querySelector('#app-panel-models .table-container').tabIndex === 0")) throw new Error('Overflowing table is not keyboard reachable');
     win.setSize(1100, 820); await wait(150);
     if (await win.webContents.executeJavaScript("document.querySelector('#app-panel-models .table-container').hasAttribute('tabindex')")) throw new Error('Fitting table adds an unnecessary tab stop');

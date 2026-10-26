@@ -13,14 +13,14 @@
 
     @if (!isLoading) {
       <div class="table-host table-container" appTableScroll aria-label="Speech models table">
-        <table>
-          <caption>Available speech models</caption>
+        <table aria-describedby="model-benchmark-context">
+          <caption>Available speech models · English reference test</caption>
           <thead>
             <tr>
               <th>Model</th>
               <th class="cell--numeric">Size</th>
-              <th>Expected speed</th>
-              <th>Quality</th>
+              <th class="cell--numeric">Reference speed</th>
+              <th class="cell--numeric">Word error rate</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -28,15 +28,20 @@
           <tbody>
             @for (model of models; track model) {
               <tr>
-                <td>{{ model.displayName || model.name }}@if (model.description) { <p class="model-description">{{ model.description }}</p> }</td>
+                <td><div class="model-identity">
+                  <span class="model-name">{{ model.displayName || model.name }}</span>
+                  @if (model.repository && model.repositoryUrl) {
+                    <p class="model-repository"><a [href]="model.repositoryUrl" target="_blank" rel="noopener noreferrer" [attr.aria-label]="(model.displayName || model.name) + ' on Hugging Face: ' + model.repository + ' (opens in a new window)'">{{ model.repository }}&nbsp;<i class="ph-bold ph-arrow-square-out" aria-hidden="true"></i></a></p>
+                  }
+                </div></td>
                 <td class="cell--numeric">{{ model.size }}</td>
-                <td>
-                  <span class="badge badge--sm badge--{{ getSpeedVariant(model.speed) }}">
+                <td class="cell--numeric">
+                  <span class="badge badge--sm badge--default">
                     {{ model.speed }}
                   </span>
                 </td>
-                <td>
-                  <span class="badge badge--sm badge--{{ getAccuracyVariant(model.accuracy) }}">
+                <td class="cell--numeric">
+                  <span class="badge badge--sm badge--default">
                     {{ model.accuracy }}
                   </span>
                 </td>
@@ -58,7 +63,7 @@
                 <td>
                   @if (!model.installed && !model.downloading) {
                     <button
-                      class="button button--primary button--small"
+                      class="button button--tertiary button--small"
                       (click)="downloadModel(model)"
                       [disabled]="model.available === false"
                       >
@@ -85,9 +90,13 @@
       <div class="alert alert--info info-alert">
         <i class="ph-bold ph-info alert__icon" aria-hidden="true"></i>
         <div class="alert__content">
-          <p class="alert__message">
-            Compare models on your recordings. Speed and quality vary by device and language.
-            Downloads from
+          <p class="alert__message" id="model-benchmark-context">
+            Reference test: 12 English reading clips from <a href="https://www.openslr.org/12/" target="_blank" rel="noopener noreferrer">LibriSpeech test-clean</a>,
+            100 seconds and 265 words, on an Intel i7-1260P with Iris Xe graphics.
+            Four threads; timing and pause detection enabled. Higher speed and lower word error rate are better.
+            This small sample does not predict interview accuracy or speed on every device.
+          </p>
+          <p class="alert__message download-note">Downloads from
             <a
               href="https://huggingface.co"
               target="_blank"

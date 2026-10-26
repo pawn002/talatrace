@@ -7,6 +7,8 @@ import { ToastService } from "../../services/toast.service";
 interface WhisperModel {
   displayName?: string;
   description?: string;
+  repository?: string;
+  repositoryUrl?: string;
   available?: boolean;
   unavailableReason?: string;
   name: string;
@@ -46,7 +48,7 @@ export class ModelSelectorComponent implements OnInit {
       const installedModels = await this.electronService.getAvailableModels();
 
       this.models = installedModels.map((model: any) => ({ ...model,
-        speed: model.speed || 'Evaluate', accuracy: model.accuracy || 'Evaluate',
+        speed: model.speed || 'Not measured', accuracy: model.accuracy || 'Not measured',
         installed: !!model.installed,
       }));
     } catch (error) {
@@ -91,28 +93,4 @@ export class ModelSelectorComponent implements OnInit {
     }
   }
 
-  getSpeedVariant(speed: string): string {
-    switch (speed) {
-      case "Fastest":
-      case "Fast":
-        return "success";
-      case "Slow":
-      case "Slowest":
-        return "warning";
-      default:
-        return "default";
-    }
-  }
-
-  getAccuracyVariant(accuracy: string): string {
-    switch (accuracy) {
-      case "Best":
-      case "Great":
-        return "success";
-      case "Lower":
-        return "warning";
-      default:
-        return "default";
-    }
-  }
 }
