@@ -1,7 +1,15 @@
 {
   "name": "whisper-electron-app",
-  "version": "1.1.5",
+  "version": "1.2.0",
   "description": "TalaTrace — private audio transcription with local Whisper and Parakeet models",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pawn002/talatrace.git"
+  },
+  "homepage": "https://github.com/pawn002/talatrace#readme",
+  "bugs": {
+    "url": "https://github.com/pawn002/talatrace/issues"
+  },
   "main": "dist/electron/main.js",
   "scripts": {
     "test": "npm --prefix frontend test -- --runInBand && npm run test:electron",
@@ -83,7 +91,9 @@
       {
         "from": "transcribe-runtime",
         "to": "transcribe-runtime",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "whisper.cpp/build-vulkan/bin",

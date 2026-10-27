@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide covers the complete installation process for the TalaTrace on all supported platforms.
+This guide covers source setup for TalaTrace. The 1.2.0 release provides a verified Windows x64 installer and ZIP; macOS/Linux packaging has not been validated for this release. Windows users can start with the [latest release](https://github.com/pawn002/talatrace/releases/latest) without installing Node.js or build tools. Source-build prerequisites follow below.
 
 ## Table of Contents
 
@@ -31,13 +31,13 @@ This guide covers the complete installation process for the TalaTrace on all sup
 ### All Platforms
 
 **[Node.js](https://nodejs.org/) and npm**
-- Node.js v18.0.0 or higher
-- npm v8.0.0 or higher
+- Node.js 20.19+, 22.12+ or 24+ (matching Angular 21's engine requirement)
+- npm v10.0.0 or higher
 
 Verify installation:
 ```bash
-node --version  # Should show v18.0.0 or higher
-npm --version   # Should show v8.0.0 or higher
+node --version  # Check against the supported versions above
+npm --version   # Should show v10.0.0 or higher
 ```
 
 **Git**
@@ -89,8 +89,8 @@ npm --version   # Should show v8.0.0 or higher
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/pawn002/whisper-electron-app.git
-cd whisper-electron-app
+git clone https://github.com/pawn002/talatrace.git
+cd talatrace
 ```
 
 ### 2. Run Setup Script
@@ -225,10 +225,10 @@ To completely remove the application:
 ```bash
 # From the project directory
 cd ..
-rm -rf whisper-electron-app
+rm -rf talatrace
 
 # Or on Windows (PowerShell)
-Remove-Item -Recurse -Force whisper-electron-app
+Remove-Item -Recurse -Force talatrace
 ```
 
 Models and app data are stored in:

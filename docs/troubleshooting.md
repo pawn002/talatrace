@@ -354,7 +354,7 @@ If your issue isn't covered here:
 ### 1. Check Existing Issues
 
 Search the GitHub issue tracker:
-https://github.com/pawn002/whisper-electron-app/issues
+https://github.com/pawn002/talatrace/issues
 
 ### 2. Collect Diagnostic Information
 
@@ -382,7 +382,7 @@ The legacy folder name is intentional after the TalaTrace rename. Packaged insta
 
 ### 4. Report the Issue
 
-Create a new issue: https://github.com/pawn002/whisper-electron-app/issues/new
+Create a new issue: https://github.com/pawn002/talatrace/issues/new
 
 Include:
 - Operating system and version

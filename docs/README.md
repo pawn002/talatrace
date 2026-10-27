@@ -20,12 +20,12 @@ Welcome to the TalaTrace documentation! This folder contains comprehensive guide
 ## Quick Links
 
 - [Main README](../README.md) - Project overview and quick start
-- [GitHub Issues](https://github.com/pawn002/whisper-electron-app/issues) - Report bugs or request features
+- [GitHub Issues](https://github.com/pawn002/talatrace/issues) - Report bugs or request features
 - [Changelog](../CHANGELOG.md) - Version history and release notes
 
 ## Need Help?
 
 If you can't find what you're looking for in these docs:
 1. Check the [Troubleshooting Guide](troubleshooting.md)
-2. Search [existing issues](https://github.com/pawn002/whisper-electron-app/issues)
-3. [Open a new issue](https://github.com/pawn002/whisper-electron-app/issues/new)
+2. Search [existing issues](https://github.com/pawn002/talatrace/issues)
+3. [Open a new issue](https://github.com/pawn002/talatrace/issues/new)

@@ -23,8 +23,8 @@ Ensure you have all the prerequisites installed as described in the [Installatio
 
 ```bash
 # Clone the repository
-git clone https://github.com/pawn002/whisper-electron-app.git
-cd whisper-electron-app
+git clone https://github.com/pawn002/talatrace.git
+cd talatrace
 
 # Run complete setup
 npm run setup
@@ -432,14 +432,14 @@ npm run lint:fix      # Auto-fix issues
 
 ### Community
 
-- [GitHub Issues](https://github.com/pawn002/whisper-electron-app/issues)
-- [Discussions](https://github.com/pawn002/whisper-electron-app/discussions)
+- [GitHub Issues](https://github.com/pawn002/talatrace/issues)
+- [Discussions](https://github.com/pawn002/talatrace/discussions)
 
 ## Getting Help
 
 If you're stuck:
 
 1. Check existing [documentation](README.md)
-2. Search [issues](https://github.com/pawn002/whisper-electron-app/issues)
-3. Ask in [discussions](https://github.com/pawn002/whisper-electron-app/discussions)
+2. Search [issues](https://github.com/pawn002/talatrace/issues)
+3. Ask in [discussions](https://github.com/pawn002/talatrace/discussions)
 4. Open a new issue with details

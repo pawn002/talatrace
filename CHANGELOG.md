@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-26
+
 ### Added
+- Record audio directly in the app with stable Record, Stop & transcribe and Copy controls, separate recording/file workflows, and readable timestamp/pause context for chats and terminals.
+- Use local Parakeet TDT 0.6B v3 (Q8_0) alongside Whisper, including Large v3 Turbo, with native token timing and lossless partitioning across long pauses.
+- Show live frequency bars during recording and support light, dark and system appearance preferences.
 - Open transcription settings in a Candor modal from the workflow card footer, beside the timing option.
 - Delete downloaded models from Models to reclaim disk space, with protection against deletion during transcription or an active download.
 - Remember the last selected model between sessions and select an available fallback if it is removed.
@@ -26,7 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Discover installed models without checksum-scanning every model at startup or during catalog refreshes. Keep full integrity verification on download and before recognition, and distinguish pending or failed discovery from an empty installation so startup does not incorrectly prompt a download.
-
 ## [1.1.5] - 2026-05-02
 
 ### Added
@@ -239,4 +243,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Progress Tracking**: Real-time progress updates during transcription
 - **Metadata Tracking**: Track model used, audio duration, and transcription time
 
+[1.2.0]: https://github.com/pawn002/talatrace/releases/tag/v1.2.0
 [1.0.0]: https://github.com/pawn002/whisper-electron-app/releases/tag/v1.0.0

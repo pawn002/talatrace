@@ -2,18 +2,26 @@
 
 Private audio transcription with local Whisper and Parakeet models. Angular frontend, Electron main process — no backend server, no internet required after setup.
 
-Previously named **Whisper Transcription**, TalaTrace has a model-neutral name: Swedish *tala* (“speak”) meets English *trace*, reflecting speech with timing context. Whisper and Parakeet remain selectable transcription engines. The repository URL, internal package name and installer identity remain unchanged. Existing local data is retained in its original profile directory; downloaded models and preferences do not need to be recreated.
+Previously named **Whisper Transcription**, TalaTrace has a model-neutral name: Swedish *tala* (“speak”) meets English *trace*, reflecting speech with timing context. Whisper and Parakeet remain selectable transcription engines. The repository is now [pawn002/talatrace](https://github.com/pawn002/talatrace); old repository links redirect here. The internal package name and installer identity remain stable. Existing local data is retained in its original profile directory; downloaded models and preferences do not need to be recreated.
 
 Record interview answers directly in the app: **Record answer → Stop & transcribe → Copy transcript**. Controls stay in stable positions, with a persistent recording status and final duration. Readable timestamped text and locally detected gaps in speech preserve pacing context for use in AI chats and TUIs. Original quiet-level measurements remain available for comparison. Existing audio-file transcription and TXT/SRT/VTT/JSON export remain available.
 
+## Download
+
+The [latest release](https://github.com/pawn002/talatrace/releases/latest) provides a Windows x64 installer and ZIP. The Windows package includes the local Whisper and Parakeet runtimes; download model weights from **Models**, then choose the model in **Transcription settings**. Install over 1.1.5 to keep existing models and preferences. The Windows builds are unsigned. macOS/Linux packaging is not validated for 1.2.0.
+
+<!-- Preserve the Getting started fragment in the original blog post. -->
+<a id="-quick-start"></a>
+
 ## Quick Start
 
-**Prerequisites:** Node.js v20+, npm v10+, Git, and platform build tools (Visual Studio Build Tools on Windows, Xcode CLI on macOS, build-essential on Linux). See [Installation Guide](docs/installation.md) for details.
+**Prerequisites:** Node.js 20.19+, 22.12+ or 24+, npm v10+, Git, and platform build tools (Visual Studio Build Tools on Windows, Xcode CLI on macOS, build-essential on Linux). See [Installation Guide](docs/installation.md) for details.
 
 ```bash
-git clone https://github.com/pawn002/whisper-electron-app.git
-cd whisper-electron-app
+git clone https://github.com/pawn002/talatrace.git
+cd talatrace
 npm run setup   # installs deps, builds whisper.cpp, downloads FFmpeg + base models
+npm run setup:transcribe -- --cpu  # optional: build the local Parakeet runtime (CPU)
 npm run dev     # starts frontend (localhost:4200) + Electron
 ```
 
@@ -29,12 +37,12 @@ npm run dev     # starts frontend (localhost:4200) + Electron
 | `npm run clean` | Remove intermediate build artifacts (`dist/`, `frontend/dist/`) |
 | `npm run clean:release` | Remove installer output (`release/`) |
 | `npm run release:interactive` | Guided release wizard (version bump, changelog, tag) |
-| `npm test` | Run frontend Jest test suite |
+| `npm test` | Run frontend and Electron tests |
 
 ## Project Structure
 
 ```
-whisper-electron-app/
+talatrace/
 ├── electron/        # Main process — IPC handlers, Whisper + transcription services
 ├── frontend/        # Angular renderer — UI components, Candor design system
 ├── build/           # Build assets (app icon)

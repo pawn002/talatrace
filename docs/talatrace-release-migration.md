@@ -2,7 +2,7 @@
 
 Recorded: 26 October 2026.
 
-Status: release preparation started on 26 October 2026. The local checkpoint and candidate below are complete; repository rename, merge, final version bump/tag and publication remain pending.
+Status: PR #23 merged and the existing repository renamed to `pawn002/talatrace` on 26 October 2026. Final 1.2.0 validation and publication are in progress. Checkpoint and upgrade evidence are retained below.
 
 ## Recommended approach
 
@@ -33,7 +33,7 @@ The app's display name is already TalaTrace. Internal package identifiers and th
 - Windows in-place upgrade is verified below. Fresh NSIS installation, uninstall and rollback remain untested; clean-profile packaged launch passes.
 - Recheck the exact blog destinations recorded below after renaming; repair the existing Quick Start fragment when updating the blog.
 - Reassess release tooling, integrations and platform coverage at execution time.
-- No remote repository rename or release has been performed by recording this plan.
+- Repository rename is complete; final release validation and publication are in progress.
 
 ## Preparation results — 26 October 2026
 
@@ -46,7 +46,7 @@ The app's display name is already TalaTrace. Internal package identifiers and th
 - ZIP SHA-256: `DBDB1FFC4D34790D834B6C74E9BFFD24260562F2FC345010B17C4E05FEA8A2D4`.
 - `node tests/electron/packaged-release-smoke.cjs` tests the actual packaged EXE. A debugger isolates appData before application code executes, with no production test hook. Both Whisper Base and Parakeet recognize the bundled reference sample with HTTP(S) blocked, returning duration/processing/timing data. A temporary legacy profile and marker survive, model selection persists over restart, and a clean profile launches. Temporary test profiles are retained for inspection. This does not install the app or validate NSIS upgrade behavior.
 - Static installer-identity review: the app ID remains `com.yourcompany.whisper-electron`, as in 1.1.5; electron-builder derives its NSIS GUID from that ID. Product/executable names change. This supports continuity but does not substitute for an installed upgrade test.
-- Reviewable release notes: [1.2.0 draft](releases/1.2.0-draft.md).
+- Release notes: [1.2.0](releases/1.2.0.md).
 
 The initial plan called for a disposable Windows machine/VM, but the user only has this system and confirmed that 1.1.5 is installed. A native-context registry check found the installation (the earlier sandbox-limited check did not expose it). The in-place upgrade results are recorded below. The exact blog destinations are recorded for post-rename verification. Repository rename and public release remain pending review of these results and remaining limitations.
 
@@ -74,3 +74,11 @@ User-supplied post: [Building a Privacy-First Transcription Tool with Claude Cod
 | `/tree/main/docs` | Documentation directory | Redirect reaches the same directory in `talatrace`. |
 
 The Getting started link already has a stale `#-quick-start` fragment: the live README exposes `#quick-start` (`id="user-content-quick-start"`). HTTP 200 does not establish that a fragment scrolls correctly. When the blog is updated for TalaTrace, use `https://github.com/pawn002/talatrace#quick-start` and verify that heading navigation as well as the repository redirect. This is a pre-existing blog-link issue, not an effect of the rename. No blog content has been edited.
+
+## Repository migration completed
+
+PR #23 merged as `2ec8e04d56389a92179c878e5f815d5245526084`. Renamed the existing repository to [pawn002/talatrace](https://github.com/pawn002/talatrace), retained its issues/releases/history, updated origin and fast-forwarded local main. Updated current canonical documentation and package repository metadata; historical release references remain intact. Internal package name and app ID are unchanged.
+
+All four exact old blog destinations, issue #16 and release v1.1.5 return HTTP 200 after following redirects to TalaTrace. The old direct 1.1.5 installer URL still reaches its release asset with HTTP 200. `git ls-remote` through the old repository URL returns the merged main revision. The README adds a compatibility anchor for the post's original `#-quick-start` fragment, so the blog itself need not be edited for continuity. Never recreate `pawn002/whisper-electron-app`.
+
+Final 1.2.0 manifests and lockfile metadata are synchronized on main. The complete 130 frontend / 42 Electron test suite passes. Final artifact checks and publication follow below when complete.
