@@ -121,7 +121,7 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
 (async () => {
   if(process.argv.includes('--real-profile')) {
     // Explicit opt-in for a backed-up installed-app check. Keep existing preferences.
-    const backup = (await fs.readFile(path.join(root,'release/active-upgrade-backup.txt'),'utf8')).trim();
+    const backup = (await fs.readFile(path.join(root,'.local-backups/active-upgrade-backup.txt'),'utf8')).trim();
     const manifest = JSON.parse(await fs.readFile(path.join(backup,'before.json'),'utf8'));
     assert.equal(manifest.Profile,path.join(process.env.APPDATA,'whisper-electron-app'));
     await launch(process.env.APPDATA,manifest.Profile,true,false,{ keepPreference:true,models:['tiny','parakeet-tdt-0.6b-v3'],screenshot:path.join(backup,'installed-models.png') });

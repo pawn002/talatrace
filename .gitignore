@@ -9,6 +9,7 @@ transcribe-runtime-*.tar.gz
 models
 ffmpeg
 release
+.local-backups/
 
 # Optimization testing
 .claude/

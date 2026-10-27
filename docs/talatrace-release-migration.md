@@ -31,7 +31,7 @@ The app's display name is already TalaTrace. Internal package identifiers and th
 
 - App iteration and release readiness are not complete.
 - Windows in-place upgrade is verified below. Fresh NSIS installation, uninstall and rollback remain untested; clean-profile packaged launch passes.
-- Recheck the exact blog destinations recorded below after renaming; repair the existing Quick Start fragment when updating the blog.
+- Post-rename redirects are verified below. A README compatibility anchor restores the original Quick Start fragment; modernizing the blog's link is optional.
 - Reassess release tooling, integrations and platform coverage at execution time.
 - Repository rename is complete; final release validation and publication are in progress.
 
@@ -82,3 +82,18 @@ PR #23 merged as `2ec8e04d56389a92179c878e5f815d5245526084`. Renamed the existin
 All four exact old blog destinations, issue #16 and release v1.1.5 return HTTP 200 after following redirects to TalaTrace. The old direct 1.1.5 installer URL still reaches its release asset with HTTP 200. `git ls-remote` through the old repository URL returns the merged main revision. The README adds a compatibility anchor for the post's original `#-quick-start` fragment, so the blog itself need not be edited for continuity. Never recreate `pawn002/whisper-electron-app`.
 
 Final 1.2.0 manifests and lockfile metadata are synchronized on main. The complete 130 frontend / 42 Electron test suite passes. Final artifact checks and publication follow below when complete.
+
+## Final 1.2.0 validation
+
+Built unsigned Windows x64 artifacts from main with synchronized 1.2.0 metadata and canonical repository links. The packaged application contains the expected 1.2.0 metadata and no profile backups or other private test artifacts. Final packaged offline Whisper Base/Parakeet, legacy-profile retention, preference restart and clean-profile launch tests pass.
+
+After the user closed the RC, backed up the current settings and installed final 1.2.0 over RC1 (exit code 0). All four model hashes remain unchanged. The installed app reports 1.2.0, uses the original profile, and Tiny/Parakeet recognize the reference sample with HTTP(S) blocked. Existing Parakeet preference is retained. Fresh NSIS installation, uninstall and rollback remain untested; only the described upgrade paths are verified.
+
+Moved the recovery directory to the ignored `.local-backups/upgrade-backup-20261026-195532/` so `npm run clean:release` cannot remove it. Its profile copy, model hashes, registry/shortcut evidence, pre-final settings snapshot and screenshot are retained. `.local-backups/active-upgrade-backup.txt` identifies this directory for explicit installed-profile smoke tests. Earlier `release/upgrade-backup-...` paths above record its original location; use `.local-backups/` for recovery now.
+
+| Final asset | SHA-256 |
+| --- | --- |
+| `TalaTrace-Setup-1.2.0.exe` | `9391ae53e920550ae5eabbeda7f2ff51a09f713ad4e4a8d111b2ae18ed818e64` |
+| `TalaTrace-1.2.0-win.zip` | `024ac48b495e9b54d2820e53dfee4c490ecdd7bc5bb959672affce189fa4e0d7` |
+
+Publication target: [v1.2.0](https://github.com/pawn002/talatrace/releases/tag/v1.2.0), with both artifacts and `SHA256SUMS.txt`. Preserve the old repository redirects and the previous release.
