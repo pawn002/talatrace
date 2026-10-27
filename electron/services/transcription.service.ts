@@ -1,27 +1,32 @@
 import { BrowserWindow } from 'electron';
-import { WhisperService } from './whisper.service';
-import { TranscriptionJob, TranscriptionOptions } from './types';
+import { SpeechService } from './speech.service';
+import { TranscriptionJob, TranscriptionOptions, TranscriptionResult } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
+import { performance } from 'perf_hooks';
 
 export class TranscriptionService {
   private jobs: Map<string, TranscriptionJob> = new Map();
   private transcriptionHistory: TranscriptionJob[] = [];
-  private whisperService: WhisperService;
+  private whisperService: SpeechService;
   private mainWindow: BrowserWindow | null;
+  private busy = false;
 
   constructor(mainWindow: BrowserWindow | null) {
     this.mainWindow = mainWindow;
-    this.whisperService = new WhisperService();
+    this.whisperService = new SpeechService();
     this.whisperService.initialize().catch((error) => {
-      console.error('[TranscriptionService] Failed to initialize WhisperService:', error);
+      console.error('[TranscriptionService] Failed to initialize SpeechService:', error);
     });
   }
 
   async processAudio(
     audioPath: string,
-    options: TranscriptionOptions
+    options: TranscriptionOptions,
+    cleanup?: () => Promise<void>
   ): Promise<TranscriptionJob> {
+    if (this.busy) throw new Error('Please wait for the current transcription to finish.');
+    this.busy = true;
     const jobId = uuidv4();
 
     const job: TranscriptionJob = {
@@ -37,18 +42,29 @@ export class TranscriptionService {
     this.jobs.set(jobId, job);
 
     // Start processing in the background
-    this.processTranscriptionJob(job);
+    this.processTranscriptionJob(job, cleanup);
 
     return job;
   }
 
-  private async processTranscriptionJob(job: TranscriptionJob): Promise<void> {
+  private async processTranscriptionJob(job: TranscriptionJob, cleanup?: () => Promise<void>): Promise<void> {
     try {
       job.status = 'processing';
-      const processingStartTime = Date.now();
+      const processingStartTime = performance.now();
 
+      await this.whisperService.initialize();
       // Get audio duration before transcription
       job.audioDuration = await this.whisperService.getAudioDuration(job.filePath);
+      const quietIntervals = job.options.detectQuietIntervals
+        ? await this.whisperService.detectQuietIntervals(job.filePath) : undefined;
+      let speechActivity: Partial<TranscriptionResult> = {};
+      if (job.options.detectQuietIntervals) {
+        try {
+          speechActivity = await this.whisperService.detectSpeechActivity(job.filePath);
+        } catch {
+          speechActivity = { speechDetectionWarning: 'Speech detection unavailable. Only low-level quiet regions are shown; background noise can hide gaps in speech.' };
+        }
+      }
 
       // Small delay to ensure IPC event listeners are ready
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -63,12 +79,13 @@ export class TranscriptionService {
         processors: 1,
         outputFormat: 'json',
         timestamps: true,
+        alignTimestamps: job.options.alignTimestamps,
         translate: job.options.translate,
       };
 
       this.emitProgress(job.id, 10, 'Loading model');
 
-      // Transcribe using WhisperService
+      // Transcribe using SpeechService
       const result = await this.whisperService.transcribe(
         job.filePath,
         whisperOptions,
@@ -81,14 +98,16 @@ export class TranscriptionService {
             job.progress,
             'Transcribing audio'
           );
-        }
+        },
+        { noSpeechIntervals: speechActivity.noSpeechIntervals }
       );
 
-      job.result = result;
+      job.transcriptionTime = performance.now() - processingStartTime;
+      job.result = { ...result, ...speechActivity, ...(quietIntervals ? { quietIntervals } : {}),
+        duration: job.audioDuration, processingTimeMs: job.transcriptionTime };
       job.status = 'completed';
       job.completedAt = new Date();
       job.progress = 100;
-      job.transcriptionTime = Date.now() - processingStartTime;
 
       // Add to history
       this.transcriptionHistory.unshift(job);
@@ -96,19 +115,26 @@ export class TranscriptionService {
         this.transcriptionHistory = this.transcriptionHistory.slice(0, 50);
       }
 
-      this.emitProgress(job.id, 100, 'Completed');
-      this.emitCompleted(job.result);
     } catch (error: any) {
       job.status = 'failed';
       job.error = error.message;
       job.completedAt = new Date();
 
-      this.emitError(error.message);
+    } finally {
+      // The job owns its temporary recording until Whisper has finished reading it.
+      try { await cleanup?.(); } catch (error) { console.error('Recording cleanup failed:', error); }
+      this.busy = false;
+    }
+    if (job.status === 'completed') {
+      this.emitProgress(job.id, 100, 'Completed');
+      this.emitCompleted(job.result);
+    } else {
+      this.emitError(job.error || 'Transcription failed');
     }
   }
 
   private emitProgress(jobId: string, progress: number, message?: string) {
-    if (this.mainWindow) {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
       this.mainWindow.webContents.send('transcription-progress', {
         jobId,
         progress,
@@ -118,13 +144,13 @@ export class TranscriptionService {
   }
 
   private emitCompleted(result: any) {
-    if (this.mainWindow) {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
       this.mainWindow.webContents.send('transcription-completed', result);
     }
   }
 
   private emitError(error: string) {
-    if (this.mainWindow) {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
       this.mainWindow.webContents.send('transcription-error', error);
     }
   }
@@ -151,7 +177,14 @@ export class TranscriptionService {
   }
 
   async getAvailableModels() {
-    return await this.whisperService.getAvailableModels();
+    return (await this.whisperService.getAvailableModels()).map(model => ({ ...model, deletionBlocked: this.busy }));
+  }
+
+  async deleteModel(modelName: string): Promise<void> {
+    if (this.busy) throw new Error('Finish transcription before deleting a model.');
+    this.busy = true;
+    try { await this.whisperService.deleteModel(modelName); }
+    finally { this.busy = false; }
   }
 
   async downloadModel(

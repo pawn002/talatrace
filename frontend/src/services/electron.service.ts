@@ -1,13 +1,17 @@
-import { Injectable } from '@angular/core';
+import { Injectable, NgZone } from '@angular/core';
+import { Subject } from 'rxjs';
 
 @Injectable({
   providedIn: 'root',
 })
 export class ElectronService {
+  readonly modelsChanged = new Subject<void>();
   private electron: any;
 
-  constructor() {
+  constructor(private zone: NgZone) {
     this.electron = (window as any).electronAPI;
+    this.electron?.onTranscriptionCompleted?.(() => this.zone.run(() => this.modelsChanged.next()));
+    this.electron?.onTranscriptionError?.(() => this.zone.run(() => this.modelsChanged.next()));
   }
 
   async selectAudioFile(): Promise<string | null> {
@@ -15,7 +19,15 @@ export class ElectronService {
   }
 
   async transcribeAudio(audioPath: string, options: any): Promise<any> {
-    return await this.electron.transcribeAudio(audioPath, options);
+    const result = await this.electron.transcribeAudio(audioPath, options);
+    if (result.success) this.modelsChanged.next();
+    return result;
+  }
+
+  async transcribeRecording(bytes: Uint8Array, options: any): Promise<any> {
+    const result = await this.electron.transcribeRecording(bytes, options);
+    if (result.success) this.modelsChanged.next();
+    return result;
   }
 
   async saveTranscript(resultData: any): Promise<string | null> {
@@ -27,7 +39,15 @@ export class ElectronService {
   }
 
   async downloadModel(modelName: string): Promise<any> {
-    return await this.electron.downloadModel(modelName);
+    const result = await this.electron.downloadModel(modelName);
+    if (result.success) this.modelsChanged.next();
+    return result;
+  }
+
+  async deleteModel(modelName: string): Promise<any> {
+    const result = await this.electron.deleteModel(modelName);
+    if (result.success) this.modelsChanged.next();
+    return result;
   }
 
   async getSystemInfo(): Promise<any> {

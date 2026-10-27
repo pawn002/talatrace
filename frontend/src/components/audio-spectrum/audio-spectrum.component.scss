@@ -1,0 +1,11 @@
+:host { display: block; height: 44px; margin-bottom: var(--spacing-xs); min-width: 0; }
+.spectrum-display { background: var(--color-bg-page); position: relative; height: 44px; display: flex; align-items: center; justify-content: center; gap: var(--spacing-sm); }
+canvas { display: block; width: 68px; height: 24px; color: var(--color-action-primary); }
+.spectrum-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: var(--spacing-sm); padding: var(--spacing-xs); }
+.spectrum-bars { display: flex; align-items: center; gap: 2px; height: 24px; }
+.spectrum-bars span { width: 3px; background: var(--color-border-control); }
+.spectrum-placeholder-label, .spectrum-live-label { font: var(--font-size-md)/var(--line-height-tight) var(--font-family-accessible); }
+// Match the neutral control-mark tone in both themes while deriving text from its semantic token.
+.spectrum-placeholder-label { color: oklch(from var(--color-text-subtle) min(l, 0.62) c h); }
+.spectrum-live-label { color: var(--color-text-default); }
+.spectrum-fallback { position: absolute; inset: 0; font: var(--font-size-md)/var(--line-height-tight) var(--font-family-accessible); letter-spacing: var(--letter-spacing-body); color: var(--color-text-default); }

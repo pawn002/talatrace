@@ -1,378 +1,78 @@
-# Whisper Models Guide
+# Speech models
 
-Comprehensive guide to understanding, choosing, and managing Whisper models for optimal transcription results.
+The app supports local Whisper transcription and a first Parakeet engine. All recognition stays on the device. Model downloads require a connection during setup; installed models work offline.
 
-## Table of Contents
+## Available models
 
-- [Model Overview](#model-overview)
-- [Model Comparison](#model-comparison)
-- [Choosing the Right Model](#choosing-the-right-model)
-- [Model Management](#model-management)
-- [Performance Benchmarks](#performance-benchmarks)
-- [Advanced Topics](#advanced-topics)
+| Model | Download size | Engine | Notes |
+| --- | --- | --- | --- |
+| Whisper Tiny | 75 MiB | whisper.cpp | Smallest download; useful for quick checks. |
+| Whisper Base | 142 MiB | whisper.cpp | Existing default. |
+| Whisper Small | 466 MiB | whisper.cpp | More processing than Base. Compare accuracy on your recordings. |
+| Whisper Medium | 1.43 GiB | whisper.cpp | Higher resource requirements. |
+| Whisper Large v3 | 2.88 GiB | whisper.cpp | Segment-level timestamps; the historical `large` selection ID is retained. |
+| Whisper Large v3 Turbo · Q5_0 | 548 MiB | whisper.cpp | Faster decoder with quantized weights; audio-aligned token timing enabled for recordings. |
+| Parakeet TDT 0.6B v3 · Q8_0 | 706 MiB | transcribe.cpp | 25 European languages; token timings; no translation. Initial evaluation option. |
 
-## Model Overview
+Sizes describe the pinned weight artifacts, rounded in binary units. They are not parameter counts, RAM estimates, or total installation sizes. The model catalog in `electron/services/model-catalog.ts` is the source of truth for IDs, revisions, files, bytes, SHA-256 hashes and supported languages.
 
-Whisper models are neural networks trained by OpenAI on 680,000 hours of multilingual audio data. The models come in five sizes, each offering different trade-offs between speed, accuracy, and resource requirements.
+Each Models row uses the same identity format: model/version/quantization, then a linked Hugging Face repository identifier. The repository identifies the implemented conversion: `ggerganov/whisper.cpp` for Whisper and `handy-computer/parakeet-tdt-0.6b-v3-gguf` for Parakeet. Links are derived from the pinned artifact URLs; the original upstream source and license metadata remain in the catalog. Descriptive model paragraphs are omitted from the table. Download and Delete use Candor's ghost treatment without a resting fill or outline; no download is promoted above the others. Required unavailable-runtime explanations remain beside disabled controls.
 
-### Available Models
+The app does not offer English-only `.en` Whisper variants in this catalog. Table badges show reference speed and word error rate from the [documented English reading test](speech-model-evaluation-2026-10-25.md), not a prediction for the current device or a universal quality grade. Higher audio/processing speed and lower word error rate are better. Neutral badges retain their meaning without colour; missing results say "Not measured". The visible table note identifies the dataset, sample and reference hardware. Keep Base available while comparing the new choices. See [the model review](transcription-model-review.md) for the broader shortlist.
 
-| Model | Parameters | Size | Relative Speed | English-only | Multilingual |
-|-------|-----------|------|----------------|--------------|--------------|
-| tiny | 39 M | 39 MB | ~32x | ✅ | ✅ |
-| base | 74 M | 74 MB | ~16x | ✅ | ✅ |
-| small | 244 M | 244 MB | ~6x | ✅ | ✅ |
-| medium | 769 M | 769 MB | ~2x | ✅ | ✅ |
-| large | 1550 M | 1550 MB (1.55 GB) | 1x | ❌ | ✅ |
+Activate the Model, Size, Reference speed, Word error rate or Status heading to sort; activate it again to reverse direction. Enter and Space work on the header buttons. Speed starts fastest first; the other columns start ascending (smallest size, lowest error rate, or natural alphabetical model/status order). The active header shows a single direction arrow and exposes `aria-sort`; Actions is not sortable. The initial view retains catalog order. Size uses raw bytes and performance uses unrounded reference values, so mixed units and equally rounded values do not give incorrect order. Unmeasured/invalid numeric values stay last in either direction, and ties retain catalog order. Sort choice and header focus survive catalog refreshes after downloads; sort selection lasts for the current component session.
 
-**Note**: Relative speed is compared to the large model. Actual speed depends on your hardware.
+## Download and select
 
-## Model Comparison
+1. Open Models and download the desired model. Only a complete, checksum-verified download is published; failed downloads do not replace an existing model.
+2. Open **Transcription settings** beside **Include timing and pauses** in the workflow card. Choose an installed model in the modal dialog, then select **Done** (or close it with Escape). Changes apply immediately to the next transcription.
+3. Record an answer or import a file. Stop and copy the transcript through the existing workflow.
 
-### Accuracy vs. Speed
+Changing models does not require changing the recording workflow. Parakeet's language list is limited to supported languages, with automatic detection available. If a previously selected language is unsupported, selection resets to Auto Detect. Parakeet cannot translate speech; use Whisper for translation.
 
-```
-tiny     ████░░░░░░ 40% accuracy  ██████████ fastest
-base     ██████░░░░ 60% accuracy  ████████░░ very fast
-small    ████████░░ 80% accuracy  ██████░░░░ moderate
-medium   █████████░ 90% accuracy  ████░░░░░░ slow
-large    ██████████ 95% accuracy  ██░░░░░░░░ slowest
-```
+Your selected model is saved locally and restored next session. If it is no longer installed or usable, the app selects Base when available, otherwise the first usable installed model, and saves that fallback. With no installed models, the workflow offers model setup.
 
-### Detailed Comparison
+Installed models offer **Delete** in the Actions column to reclaim disk space. This removes only that model's weights; it can be downloaded again. Deletion is blocked while transcription is running or that model is downloading. Deleting the selected model immediately refreshes the workflow's available choices. The app does not automatically download Tiny after you empty the model library.
 
-#### tiny
-**Best For:**
-- Quick drafts and previews
-- Low-priority transcriptions
-- Testing and development
-- Resource-constrained devices
+A build without the Parakeet runtime displays an adjacent unavailable explanation and disables its download. Installed weights alone do not make an absent runtime usable.
 
-**Characteristics:**
-- ⚡ Fastest processing
-- 💾 Smallest disk space (39 MB)
-- 🧠 Lowest RAM usage (~200 MB)
-- ❌ Lower accuracy, especially with accents
-- ❌ May miss words in noisy audio
+Catalog discovery checks file presence and expected size without hashing every model on startup or each refresh. Downloads are checksum-verified before publication, and the selected engine verifies its weights against the catalog's SHA-256 before recognition. That integrity result is cached until the file's identity or modification metadata changes. Missing, truncated and known checksum-invalid files are excluded from installed choices; same-size corruption discovered before use blocks recognition and is excluded on the next refresh. Catalog refreshes retain each model's active-download state independently, including when another download finishes or fails. Existing corrupt files are left in place until a verified replacement is ready; the app does not treat a saved HTTP error body as an installed model.
 
-**Example Use Cases:**
-- Quick meeting notes
-- Personal voice memos
-- Testing audio quality before using larger model
+## Timing and pauses
 
-#### base
-**Best For:**
-- General-purpose transcription
-- Everyday use
-- Good balance of speed and accuracy
+Completed results keep the model, decoded audio duration, total processing time and audio/processing speed ratio in the collapsed Transcript details footer, leaving the words as the primary reading content. History uses the same duration and processing measurement. Duration comes from FFmpeg's decoded output clock, including quiet tails, so browser WebM recordings without duration headers are measured correctly. Processing includes preparation, model loading, recognition and timing analysis; first-run setup and device load can affect comparisons. Measurements are displayed in the app and retained in JSON, without adding performance text to the copied interview transcript. Earlier session entries without duration are not backfilled.
 
-**Characteristics:**
-- ⚡ Very fast processing
-- 💾 Small disk space (74 MB)
-- 🧠 Low RAM usage (~300 MB)
-- ✅ Good accuracy for clear audio
-- ✅ Handles most accents reasonably well
+Whisper recordings request its model-specific DTW alignment where supported, including the Turbo preset. Parakeet exposes native token timestamps through the app's pinned CLI adapter. Both are estimates rather than exact word boundaries. Closing punctuation can be emitted late; it attaches to the preceding text without extending speech into silence.
 
-**Example Use Cases:**
-- Podcast transcription
-- Interview transcription
-- YouTube video captions
-- Voice notes and dictation
+Parakeet partitions normalized audio inside detector-estimated gaps of at least five seconds. This mitigates a reproduced native failure where speech after a long pause was silently omitted. Every audio sample is retained, including sound the detector may have missed; gaps select boundaries rather than removing audio. All pieces are decoded in one native batch, and token times are shifted back onto the original recording clock. Long gaps remain in the transcript metadata. JSON exports include `recognitionChunks` for auditing. If speech detection is unavailable, recognition falls back to the full input with a warning that the pause mitigation could not run. This does not resolve every kind of native omission.
 
-**Recommended**: This is the default model and best for most users.
+Silero speech detection and quiet-level measurements estimate gaps independently of recognition. They do not remove samples or change the recording clock. Recognition remains visible where detectors disagree. Invalid or incomplete token alignment preserves the full text with a warning instead of inventing timestamps. Long pauses are context, not evidence of thinking time.
 
-#### small
-**Best For:**
-- Professional transcription
-- Academic research
-- Content creation
+## Development and packaging
 
-**Characteristics:**
-- ⏱️ Moderate processing speed
-- 💾 Medium disk space (244 MB)
-- 🧠 Moderate RAM usage (~1 GB)
-- ✅ High accuracy
-- ✅ Better with accents and dialects
-- ✅ More reliable with background noise
+Whisper continues to use the existing bundled runtime and FFmpeg. To build Parakeet's runtime:
 
-**Example Use Cases:**
-- Academic lectures
-- Professional interviews
-- Documentary transcription
-- Archival work
-
-#### medium
-**Best For:**
-- High-quality transcription
-- Multi-speaker audio
-- Difficult audio conditions
-
-**Characteristics:**
-- 🐌 Slower processing
-- 💾 Large disk space (769 MB)
-- 🧠 High RAM usage (~2-3 GB)
-- ✅ Very high accuracy
-- ✅ Excellent with accents
-- ✅ Good multi-speaker separation
-
-**Example Use Cases:**
-- Legal depositions
-- Medical transcription
-- Film/TV subtitle creation
-- Multi-speaker meetings
-
-#### large
-**Best For:**
-- Maximum accuracy requirements
-- Complex audio scenarios
-- Professional subtitle creation
-
-**Characteristics:**
-- 🐌 Slowest processing
-- 💾 Very large disk space (1550 MB / 1.55 GB)
-- 🧠 Very high RAM usage (~4-8 GB)
-- ✅ Best possible accuracy
-- ✅ Excellent language support
-- ✅ Best for technical/specialized vocabulary
-
-**Example Use Cases:**
-- Professional film subtitles
-- Broadcast transcription
-- Historical audio restoration
-- Critical archival work
-
-## Choosing the Right Model
-
-### Decision Tree
-
-```
-Start here
-│
-├─ Need it fast? → tiny or base
-│  ├─ Just a quick draft? → tiny
-│  └─ Need decent quality? → base ⭐
-│
-├─ Professional use? → small, medium, or large
-│  ├─ Clear audio, single speaker? → small
-│  ├─ Multiple speakers or accents? → medium
-│  └─ Critical accuracy needed? → large
-│
-└─ Not sure? → base ⭐
+```powershell
+npm run setup:transcribe
 ```
 
-### By Use Case
+On Windows this needs Git, CMake, Visual Studio 2022 C++ Build Tools and the Vulkan SDK. `npm run setup:transcribe -- --cpu` builds without Vulkan. The script pins transcribe.cpp v0.4.1 at `4d7c1ccefd39e5a9ea36cca5f8fefc6dcc14b99b`, checks the source patch, builds the CLI and copies it with version/license notices into ignored `transcribe-runtime/`. No Python is needed. Windows x64 with Intel Iris Xe is the validated target; other platforms need their own native verification.
 
-| Use Case | Recommended Model | Alternative |
-|----------|------------------|-------------|
-| Personal voice memos | base | tiny |
-| Meeting notes | base | small |
-| Podcast transcription | base | small |
-| YouTube captions | base | small |
-| Interview transcription | small | medium |
-| Academic lectures | small | medium |
-| Legal/medical | medium | large |
-| Film/TV subtitles | large | medium |
-| Historical archives | large | - |
+The checked-in adapter patch exposes actual token rows in JSONL; the stock CLI's broad segment output is insufficient for this app's pause-aware transcript. Availability checks require the adapter version marker.
 
-### By Hardware
+Build the runtime before packaging a release that offers Parakeet. The packaging resource list includes it, while only the existing Tiny/Base/Silero resources are bundled from `models/`. Extra test models and generated audio are excluded; additional recognition models download on demand. The ignored runtime executable and weights are not Git artifacts.
 
-| Your System | Recommended Model | Maximum Model |
-|-------------|------------------|---------------|
-| 4 GB RAM, dual-core | tiny | base |
-| 8 GB RAM, quad-core | base | small |
-| 16 GB RAM, modern CPU | small | medium |
-| 32+ GB RAM, high-end CPU | medium | large |
+Run unit tests with `npm test`. Run the real offline workflow on a locally installed model using:
 
-### By Audio Quality
-
-| Audio Condition | Recommended Model |
-|----------------|------------------|
-| Clear studio recording | base |
-| Phone call recording | small |
-| Noisy environment | medium |
-| Multiple speakers | medium |
-| Heavy accent | small or medium |
-| Very old recording | medium or large |
-
-## Model Management
-
-### Downloading Models
-
-#### From the Application
-
-1. Open Whisper Transcription app
-2. Navigate to **Models** tab
-3. Click **"Download"** button next to desired model
-4. Wait for download to complete
-5. Model is immediately available
-
-#### Manual Download
-
-If automatic download fails:
-
-1. Visit: https://huggingface.co/ggerganov/whisper.cpp/tree/main
-2. Download the desired `.bin` file:
-   - `ggml-tiny.bin`
-   - `ggml-base.bin`
-   - `ggml-small.bin`
-   - `ggml-medium.bin`
-   - `ggml-large-v3.bin` (rename to `ggml-large.bin`)
-3. Place in the `models/` directory of the project
-4. Restart the application
-
-### Storage Locations
-
-**Development**:
-```
-whisper-electron-app/
-└── models/
-    ├── ggml-tiny.bin
-    ├── ggml-base.bin
-    ├── ggml-small.bin
-    ├── ggml-medium.bin
-    └── ggml-large.bin
+```powershell
+$env:WHISPER_SMOKE_MODEL='parakeet-tdt-0.6b-v3'
+npm run test:interview-smoke
 ```
 
-**Production** (packaged app):
-- **Windows**: `<app-directory>\resources\models\`
-- **macOS**: `Whisper Transcription.app/Contents/Resources/models/`
-- **Linux**: `<app-directory>/resources/models/`
+Use `large-v3-turbo-q5_0` or `base` to select another smoke-test model. The test uses a public sample and synthetic microphone, an isolated profile, blocked renderer HTTP(S), a known long pause and intercepted clipboard writes.
 
-### Deleting Models
+## Attribution and compatibility
 
-To free up disk space:
+Whisper weights/code are MIT licensed. Parakeet v3 is developed by NVIDIA under CC-BY-4.0; this app uses the GGUF conversion published by handy-computer. The app retains runtime notices and identifies the source and conversion in its catalog. See the [NVIDIA model card](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) and [runtime source](https://github.com/handy-computer/transcribe.cpp/tree/v0.4.1).
 
-1. Navigate to the `models/` directory
-2. Delete the `.bin` file for the model you want to remove
-3. Restart the application
-
-**Note**: The app requires at least one model to function. Keep `base` if unsure.
-
-## Performance Benchmarks
-
-### Processing Time
-
-Approximate times for 1 hour of audio on different hardware:
-
-**Mid-range Desktop (Intel i5, 16GB RAM)**
-- tiny: 5-8 minutes
-- base: 10-15 minutes
-- small: 25-35 minutes
-- medium: 50-70 minutes
-- large: 90-120 minutes
-
-**High-end Desktop (Intel i9, 32GB RAM)**
-- tiny: 3-5 minutes
-- base: 6-10 minutes
-- small: 15-25 minutes
-- medium: 30-45 minutes
-- large: 60-80 minutes
-
-**Laptop (Intel i7, 16GB RAM)**
-- tiny: 8-12 minutes
-- base: 15-25 minutes
-- small: 40-60 minutes
-- medium: 80-120 minutes
-- large: 150-200 minutes
-
-**Note**: Times vary based on audio complexity, language, and system load.
-
-**Vulkan iGPU (Windows — Intel Iris Xe)**: The app automatically selects the Vulkan backend when available, reducing the times above by **1.7–4x**. The largest gains are on single-threaded runs; at 8 threads the speedup is ~1.7x on the base model. Example measured times for 11 seconds of audio: baseline 1.7 s → Vulkan 1.0 s (base model, 8 threads).
-
-### Memory Usage
-
-Typical RAM usage during transcription:
-
-- tiny: ~200-400 MB
-- base: ~300-600 MB
-- small: ~800-1500 MB
-- medium: ~2-4 GB
-- large: ~4-8 GB
-
-**Recommendation**: Ensure you have at least 2x the model's RAM requirement available.
-
-### Disk Space
-
-Total disk space with all models:
-- All models: ~2.68 GB (2682 MB)
-- Recommended (tiny + base + small): ~357 MB
-- Minimum (base only): 74 MB
-
-## Advanced Topics
-
-### Model Versions
-
-Whisper has multiple versions. This app uses:
-- **Whisper v3** for large model (latest)
-- **Whisper v2** for other models
-
-The version is handled automatically - you don't need to choose.
-
-### English-Only vs. Multilingual
-
-- **tiny, base, small, medium**: Available in English-only and multilingual versions
-- **large**: Multilingual only
-
-This app uses multilingual versions by default, which work well for all languages including English.
-
-### Quantization
-
-All models in this app use **int8 quantization** (ggml format):
-- Reduced file size
-- Faster processing
-- Minimal accuracy loss (~1-2%)
-
-### GPU Acceleration
-
-**Vulkan iGPU (Windows)**: The app automatically uses the Vulkan backend on supported Intel iGPUs (e.g. Iris Xe), delivering 1.7–4x speedups. No configuration required — the app selects the best available backend at startup.
-
-**Planned**:
-- CUDA support (NVIDIA)
-- Metal support (Apple Silicon)
-
-### Custom Models
-
-Advanced users can use custom or fine-tuned models:
-
-1. Convert model to ggml format using whisper.cpp tools
-2. Place `.bin` file in `models/` directory
-3. Restart application
-4. Model appears in model selector
-
-## Frequently Asked Questions
-
-### Can I use multiple models simultaneously?
-
-No, only one transcription runs at a time. However, you can download multiple models and switch between them.
-
-### Do models work offline?
-
-Yes! Once downloaded, all models work 100% offline.
-
-### Which languages are supported?
-
-All models support 99 languages including:
-- English, Spanish, French, German, Italian, Portuguese
-- Chinese, Japanese, Korean, Arabic, Russian
-- And many more
-
-See Whisper documentation for the complete list.
-
-### Can I delete models I don't use?
-
-Yes, delete the `.bin` files from the `models/` directory to free space.
-
-### Why is large model so slow?
-
-The large model has 1.55 billion parameters and requires significant computation. It's designed for maximum accuracy, not speed.
-
-### Should I always use the largest model?
-
-No! For most purposes, `base` or `small` provide excellent results with much faster processing.
-
-## Further Reading
-
-- [OpenAI Whisper](https://github.com/openai/whisper) - Original project
-- [OpenAI Whisper Paper](https://arxiv.org/abs/2212.04356) - Research paper
-- [whisper.cpp](https://github.com/ggerganov/whisper.cpp) - C++ implementation
-- [Model Downloads](https://huggingface.co/ggerganov/whisper.cpp) - Hugging Face
+Existing downloaded model files are not deleted by this change. Installation checks require the catalog's expected byte count; an older or partial artifact with a different size is not presented as ready. Re-download that model to obtain the pinned version, or return to the checkpoint build to use an older artifact.

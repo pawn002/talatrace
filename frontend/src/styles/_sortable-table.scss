@@ -1,0 +1,9 @@
+.sort-header { display: inline-flex; align-items: center; justify-content: inherit; gap: var(--spacing-2xs); min-height: var(--hit-target-aaa); min-width: var(--hit-target-aaa); padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: inherit; font: inherit; text-align: inherit; cursor: pointer; }
+.sort-header i { flex: none; font-size: 1em; color: var(--color-border-control); }
+.sort-header.is-sorted i { color: var(--color-action-primary); }
+.sort-header.is-sorted, .sort-header:hover, .sort-header:focus-visible { color: var(--color-text-default); }
+.sort-header:hover i, .sort-header:focus-visible i { color: var(--color-action-primary); }
+.sort-header:hover { background: var(--color-bg-hover); }
+.sort-header:hover span { text-decoration: underline; text-underline-offset: .15em; }
+.sort-header:focus-visible { outline: var(--focus-ring-width) solid var(--color-focus); outline-offset: var(--focus-ring-offset); }
+.sort-status { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

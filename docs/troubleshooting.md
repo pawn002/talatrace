@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-Solutions to common issues when installing, building, or using the Whisper Electron App.
+Solutions to common issues when installing, building, or using the TalaTrace.
 
 ## Table of Contents
 
@@ -369,9 +369,11 @@ Before reporting an issue, collect:
 ### 3. Check Log Files and Console
 
 Application data directory:
-- **Windows**: `C:\Users\<user>\AppData\Roaming\whisper-transcription\`
-- **macOS**: `~/Library/Application Support/whisper-transcription/`
-- **Linux**: `~/.config/whisper-transcription/`
+- **Windows**: `C:\Users\<user>\AppData\Roaming\whisper-electron-app\`
+- **macOS**: `~/Library/Application Support/whisper-electron-app/`
+- **Linux**: `~/.config/whisper-electron-app/`
+
+The legacy folder name is intentional after the TalaTrace rename. Packaged installations with an existing `Whisper Transcription` profile continue using that folder instead.
 
 **Electron DevTools Console**:
 - Press `Ctrl+Shift+I` / `Cmd+Option+I` to open DevTools

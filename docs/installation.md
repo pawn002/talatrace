@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide covers the complete installation process for the Whisper Electron App on all supported platforms.
+This guide covers the complete installation process for the TalaTrace on all supported platforms.
 
 ## Table of Contents
 
@@ -232,6 +232,8 @@ Remove-Item -Recurse -Force whisper-electron-app
 ```
 
 Models and app data are stored in:
-- **Windows**: `C:\Users\<username>\AppData\Roaming\whisper-transcription`
-- **macOS**: `~/Library/Application Support/whisper-transcription`
-- **Linux**: `~/.config/whisper-transcription`
+- **Windows**: `C:\Users\<username>\AppData\Roaming\whisper-electron-app`
+- **macOS**: `~/Library/Application Support/whisper-electron-app`
+- **Linux**: `~/.config/whisper-electron-app`
+
+TalaTrace retains this legacy directory name to preserve existing models and preferences. Packaged installations that already used a `Whisper Transcription` directory continue using that directory instead. Renaming the app does not require downloading models again.

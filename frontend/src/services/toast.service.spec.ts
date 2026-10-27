@@ -26,8 +26,8 @@ describe('ToastService', () => {
   });
 
   it('dismiss() removes the toast with the matching id', () => {
-    service.show('A', 'success', 60000);
-    service.show('B', 'error', 60000);
+    service.show('A', 'success');
+    service.show('B', 'error');
     let toasts: any[] = [];
     service.toasts$.subscribe(t => (toasts = t));
     expect(toasts.length).toBe(2);
@@ -39,13 +39,16 @@ describe('ToastService', () => {
     expect(toasts[0].message).toBe('B');
   });
 
-  it('show() auto-dismisses after the specified duration', fakeAsync(() => {
-    service.show('Temporary', 'info', 1000);
+  it('keeps notifications until explicitly dismissed', fakeAsync(() => {
+    service.show('Persistent', 'info');
     let toasts: any[] = [];
     service.toasts$.subscribe(t => (toasts = t));
     expect(toasts.length).toBe(1);
 
-    tick(1000);
+    tick(60000);
+    service.toasts$.subscribe(t => (toasts = t));
+    expect(toasts.length).toBe(1);
+    service.dismiss(toasts[0].id);
     service.toasts$.subscribe(t => (toasts = t));
     expect(toasts.length).toBe(0);
   }));

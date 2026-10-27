@@ -1,0 +1,19 @@
+# UI quality
+
+Before creating or changing any widget, read its current Candor Storybook documentation and relevant story/construction source. Audit the whole widget: semantics, token pairings, typography, spacing, states, keyboard/focus, icons and responsive behaviour. Consult the inventory in docs/candor-widget-review.md. Token availability or a similar appearance alone does not establish conformity. Record deliberate app-specific adaptations.
+
+Tooltips must use the actual `candor-tooltip` component, imported through its supported per-component entry point. Do not use native `title` tooltips or a local tooltip imitation. Follow Candor's contract: a trigger is independently named, tooltip text is supplementary, the bubble is AT-hidden without `aria-describedby`, and disabled-control explanations are adjacent visible text. Check hover, focus, Escape, pointer entry into the bubble, clipping and viewport placement. Keep toast containers mounted, use Candor's persistent announcement regions, and retain notifications until explicitly dismissed.
+
+All readable text must be at least 14px. Use Candor's supported type scale. Read the [Storybook contrast guidance](https://main--69c25e2492ad056c24329876.chromatic.com/?path=/story/design-tokens-typography--okca-contrast-guidance) and token combination rules before changing typography or colours. At 14px, functional text needs OKCA 6.5 regular or 4.5 at weight 700; regular instructions, errors and reading prose use at least 16px. Supplementary text needs a verified redundant channel, not merely a muted colour. Use semantic text tokens for text and icon/border tokens for non-text. Measure actual foreground/background pairings with klar 3.x.
+
+Nested disclosures follow [Candor's accordion hierarchy](https://main--69c25e2492ad056c24329876.chromatic.com/?path=/story/components-accordion--hierarchy-variants): default section headings are 16px bold; subtle subsection headings are 16px regular with subtle text; quiet help headings are 14px, weight 500, with optical sizing and GRAD -150. Choose the variant by role rather than making every summary bold. Show the parent/child relationship spatially, preserve focus outlines, and check that mouse and keyboard activation of a child leaves the parent open.
+
+For UI work, inspect the rendered app before editing and state the concrete visual problems. A passing build is not a visual review.
+
+Use spacing and heading hierarchy before adding cards. Cards bring content forward; avoid giving every section its own bordered or filled container. Timing and pause explanations belong within the transcript output, not in a separate card.
+
+For redesigns, make at least three meaningful render–inspect–refine passes before handing off. Inspect screenshots with the image viewer; do not merely generate them. Use `npm run preview:workflow` to render the real built app with isolated local fixtures. Review ready, recording, processing, completed, copied, failure/retry, and file-import states. Check desktop, short windows, 360/480px widths, light/dark themes, keyboard focus, and zoom. Address issues found in the screenshots before delivery.
+
+Preserve stable Record/Stop/Copy locations, numbered workflow sequencing, separate recording/file subtabs, whole-second live duration, and millisecond final duration. Keep audio processing local. Timing metadata is approximate context; do not optimize for perfect detection at the expense of the workflow.
+
+Report what was visually checked and any material gaps honestly. Do not equate visual polish or sampled contrast checks with a complete accessibility conformance audit.

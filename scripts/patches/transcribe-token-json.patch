@@ -1,0 +1,29 @@
+diff --git a/examples/cli/asr.cpp b/examples/cli/asr.cpp
+index 3f8e49b..1567612 100644
+--- a/examples/cli/asr.cpp
++++ b/examples/cli/asr.cpp
+@@ -76,6 +76,24 @@ std::string segment_row_json(const struct transcribe_segment & seg) {
+ // entry when the kind is NONE, but with zero timing — don't pollute the
+ // JSON with it).
+ std::string segments_json(const transcribe_session * ctx) {
++    // Interview app adapter: export actual token locations instead of broad segments.
++    if (transcribe_returned_timestamp_kind(ctx) == TRANSCRIBE_TIMESTAMPS_TOKEN) {
++        std::string out = ",\"token_segments\":[";
++        for (int i = 0; i < transcribe_n_tokens(ctx); ++i) {
++            if (i > 0) out += ",";
++            struct transcribe_token token;
++            transcribe_token_init(&token);
++            (void) transcribe_get_token(ctx, i, &token);
++            struct transcribe_segment segment;
++            transcribe_segment_init(&segment);
++            segment.t0_ms = token.t0_ms;
++            segment.t1_ms = token.t1_ms;
++            segment.text = token.text;
++            out += segment_row_json(segment);
++        }
++        out += "]";
++        return out;
++    }
+     if (transcribe_returned_timestamp_kind(ctx) == TRANSCRIBE_TIMESTAMPS_NONE &&
+         transcribe_n_speaker_segments(ctx) <= 0) {
+         return {};

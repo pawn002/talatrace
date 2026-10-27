@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Technical architecture documentation for the Whisper Electron App.
+Technical architecture documentation for the TalaTrace.
 
 ## Table of Contents
 
@@ -287,7 +287,7 @@ whisper-electron-app/
 ### Production Structure (Packaged)
 
 ```
-Whisper Transcription.exe
+TalaTrace.exe
 app.asar               # Frontend + Electron code (compressed)
 resources/
   ├── whisper.cpp/

@@ -1,103 +1,78 @@
 <header class="app-header">
   <img src="favicon.svg" class="app-logo" alt="" aria-hidden="true" width="28" height="28">
   <span class="app-title">{{ title }}</span>
+  <div class="theme-control">
+    <fieldset id="theme-control" class="theme-track" role="radiogroup" aria-labelledby="theme-legend" (keydown)="onThemeKeydown($event)">
+      <legend id="theme-legend" class="theme-legend">Theme</legend>
+      @for (option of themeOptions; track option.value) {
+        <candor-tooltip [text]="option.value === 'system' ? 'Follow system appearance' : option.label + ' theme'" position="bottom">
+          <label class="theme-option">
+            <input type="radio" name="appearance" [value]="option.value" [attr.aria-label]="option.label" [attr.aria-description]="option.value === 'system' ? 'Follows the light or dark appearance of your device.' : null" [checked]="themePreference === option.value" (change)="onThemeChange($event)">
+            <span class="theme-choice" aria-hidden="true"><i [class]="'ph-bold ph-' + option.icon" aria-hidden="true"></i></span>
+          </label>
+        </candor-tooltip>
+      }
+    </fieldset>
+  </div>
+  <span class="local-badge" [class.local-badge--recording]="!!transcription?.isRecording"><i class="ph-bold" [class.ph-record]="!!transcription?.isRecording" [class.ph-waveform]="!!transcription?.isTranscribing" [class.ph-shield-check]="!transcription?.isRecording && !transcription?.isTranscribing" aria-hidden="true"></i> {{ transcription?.isRecording ? 'Recording' : transcription?.isTranscribing ? 'Transcribing' : 'On device' }}</span>
 </header>
 
 <div class="app-container">
   <div class="tabs">
-    <div class="tabs__list" role="tablist">
+    <div class="tabs__list" role="tablist" aria-label="Main navigation">
       <button
         class="tabs__tab"
         role="tab"
+        id="app-tab-transcription"
+        aria-controls="app-panel-transcription"
+        [attr.tabindex]="activeTab === 0 ? 0 : -1"
+        (keydown)="onAppTabKeydown($event)"
         [attr.aria-selected]="activeTab === 0"
         (click)="activeTab = 0"
         >
-        Transcription
+        <i class="ph-fill ph-microphone" aria-hidden="true"></i> Transcription
       </button>
       <button
         class="tabs__tab"
         role="tab"
+        id="app-tab-models"
+        aria-controls="app-panel-models"
+        [attr.tabindex]="activeTab === 1 ? 0 : -1"
+        (keydown)="onAppTabKeydown($event)"
         [attr.aria-selected]="activeTab === 1"
         (click)="activeTab = 1"
         >
-        Models
+        <i class="ph-fill ph-cpu" aria-hidden="true"></i> Models
       </button>
       <button
         class="tabs__tab"
         role="tab"
+        id="app-tab-history"
+        aria-controls="app-panel-history"
+        [attr.tabindex]="activeTab === 2 ? 0 : -1"
+        (keydown)="onAppTabKeydown($event)"
         [attr.aria-selected]="activeTab === 2"
         (click)="activeTab = 2"
         >
-        History
+        <i class="ph-bold ph-clock-counter-clockwise" aria-hidden="true"></i> History
       </button>
     </div>
     <div class="tabs__panels">
-      <div role="tabpanel" [hidden]="activeTab !== 0">
-        <app-transcription></app-transcription>
+      <div id="app-panel-transcription" role="tabpanel" aria-labelledby="app-tab-transcription" [hidden]="activeTab !== 0">
+        <app-transcription (manageModels)="activeTab = 1"></app-transcription>
       </div>
-      <div role="tabpanel" [hidden]="activeTab !== 1">
+      <div id="app-panel-models" role="tabpanel" aria-labelledby="app-tab-models" [hidden]="activeTab !== 1">
         <app-model-selector></app-model-selector>
       </div>
-      <div role="tabpanel" [hidden]="activeTab !== 2">
+      <div id="app-panel-history" role="tabpanel" aria-labelledby="app-tab-history" [hidden]="activeTab !== 2">
         <app-history></app-history>
       </div>
     </div>
   </div>
 </div>
 
-@if (systemInfo) {
-  <div class="status-bar">
-    <span>Platform: {{ systemInfo.platform }}</span>
-    <span>•</span>
-    <span>Version: {{ systemInfo.version }}</span>
-  </div>
-}
-
-<div class="toast-container" aria-live="polite" aria-atomic="false">
-  @for (toast of toastService.toasts$ | async; track toast) {
-    <div
-      class="toast toast--{{ toast.variant }}"
-      [attr.role]="toast.variant === 'warning' || toast.variant === 'error' ? 'alert' : 'status'"
-      >
-      <svg class="toast__icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        @if (toast.variant === 'info') {
-          <ng-container>
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
-          </ng-container>
-        }
-        @if (toast.variant === 'success') {
-          <ng-container>
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-            <polyline points="22 4 12 14.01 9 11.01"/>
-          </ng-container>
-        }
-        @if (toast.variant === 'warning') {
-          <ng-container>
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-            <line x1="12" y1="9" x2="12" y2="13"/>
-            <line x1="12" y1="17" x2="12.01" y2="17"/>
-          </ng-container>
-        }
-        @if (toast.variant === 'error') {
-          <ng-container>
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="15" y1="9" x2="9" y2="15"/>
-            <line x1="9" y1="9" x2="15" y2="15"/>
-          </ng-container>
-        }
-      </svg>
-      <div class="toast__content">
-        <p class="toast__message">{{ toast.message }}</p>
-      </div>
-      <button
-        class="toast__dismiss"
-        (click)="toastService.dismiss(toast.id)"
-        aria-label="Dismiss notification"
-        >
-        <i class="ph-fill ph-x" aria-hidden="true"></i>
-      </button>
-    </div>
+<candor-toast-container class="toast-container" position="top-right">
+  @for (toast of toastService.toasts$ | async; track toast.id) {
+    <candor-toast [message]="toast.message" [variant]="toast.variant" [dismissible]="true" (dismiss)="toastService.dismiss(toast.id)"></candor-toast>
   }
-</div>
+</candor-toast-container>

@@ -3,6 +3,9 @@
 **/dist
 dist
 whisper.cpp
+transcribe.cpp/
+transcribe-runtime/
+transcribe-runtime-*.tar.gz
 models
 ffmpeg
 release
@@ -12,6 +15,8 @@ release
 system-info.json
 whisper-bins/
 benchmarks/results/
+benchmarks/cache/
+**/__pycache__/
 openvino_2025.4.0/
 openvino_2025.4.0.zip
 frontend/coverage/

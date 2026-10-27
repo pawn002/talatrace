@@ -1,4 +1,6 @@
-import { Component, OnInit } from "@angular/core";
+import { readThemePreference, saveThemePreference } from './theme';
+import { Component, OnInit, ViewChild } from "@angular/core";
+import { TranscriptionComponent } from "./components/transcription/transcription.component";
 import { ElectronService } from "./services/electron.service";
 import { ToastService } from "./services/toast.service";
 
@@ -9,9 +11,39 @@ import { ToastService } from "./services/toast.service";
   standalone: false,
 })
 export class AppComponent implements OnInit {
-  title = "Whisper Transcription";
+  title = "TalaTrace";
   systemInfo: any = null;
   activeTab = 0;
+  themePreference = readThemePreference();
+  readonly themeOptions = [{ value: 'light', label: 'Light', icon: 'sun' }, { value: 'dark', label: 'Dark', icon: 'moon' }, { value: 'system', label: 'System', icon: 'desktop' }];
+
+  onThemeChange(event: Event): void {
+    if (!(event.target instanceof HTMLInputElement) || !event.target.checked) return;
+    const value = event.target.value;
+    if (value !== 'light' && value !== 'dark' && value !== 'system') return;
+    this.themePreference = value;
+    saveThemePreference(value);
+  }
+
+  onThemeKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'Home' && event.key !== 'End') return;
+    const inputs = document.querySelectorAll<HTMLInputElement>('#theme-control input');
+    const next = inputs[event.key === 'Home' ? 0 : inputs.length - 1];
+    if (!next) return;
+    event.preventDefault();
+    next.focus();
+    next.click();
+  }
+
+  @ViewChild(TranscriptionComponent) transcription?: TranscriptionComponent;
+
+  onAppTabKeydown(event: KeyboardEvent): void {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    this.activeTab = event.key === 'Home' ? 0 : event.key === 'End' ? 2
+      : (this.activeTab + (event.key === 'ArrowRight' ? 1 : 2)) % 3;
+    document.getElementById(['app-tab-transcription', 'app-tab-models', 'app-tab-history'][this.activeTab])?.focus();
+  }
 
   constructor(
     private electronService: ElectronService,
@@ -38,11 +70,11 @@ export class AppComponent implements OnInit {
   async openFile() {
     const filePath = await this.electronService.selectAudioFile();
     if (filePath) {
-      this.toastService.show(`Selected file: ${filePath}`, "info", 3000);
+      this.toastService.show(`Selected file: ${filePath}`, "info");
     }
   }
 
   async saveTranscript() {
-    this.toastService.show("Save transcript functionality", "info", 3000);
+    this.toastService.show("Save transcript functionality", "info");
   }
 }

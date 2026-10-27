@@ -1,9 +1,14 @@
 {
   "name": "whisper-electron-app",
   "version": "1.1.5",
-  "description": "Offline Speech-to-Text Electron App with Whisper.cpp",
+  "description": "TalaTrace — private audio transcription with local Whisper and Parakeet models",
   "main": "dist/electron/main.js",
   "scripts": {
+    "test": "npm --prefix frontend test -- --runInBand && npm run test:electron",
+    "test:electron": "npm run build:electron && node --test tests/electron/*.test.cjs",
+    "test:speech-activity": "npm run build:electron && node tests/electron/speech-activity-native.cjs",
+    "test:interview-smoke": "npm run build && electron tests/electron/interview-smoke.cjs",
+    "preview:workflow": "npm run build && electron tests/electron/workflow-preview.cjs",
     "start": "npm run build && electron .",
     "build": "npm run build:frontend && npm run build:electron",
     "build:frontend": "cd frontend && npm run build",
@@ -14,6 +19,7 @@
     "setup": "npm install && npm run install:all && node scripts/setup-whisper.js",
     "install:all": "cd frontend && npm install",
     "build:whisper": "node scripts/build-whisper.js",
+    "setup:transcribe": "node scripts/setup-transcribe.cjs",
     "system-info": "node scripts/system-info.js",
     "build:whisper-variants": "node scripts/build-whisper-variants.js",
     "build:whisper-baseline": "node scripts/build-whisper-variants.js --variant=baseline",
@@ -21,6 +27,8 @@
     "build:whisper-sycl": "node scripts/build-whisper-variants.js --variant=sycl",
     "build:whisper-openvino": "node scripts/build-whisper-variants.js --variant=openvino",
     "benchmark": "node scripts/benchmark-variants.js",
+    "eval:speech:prepare": "python scripts/prepare-speech-eval.py",
+    "eval:speech": "npm run build:electron && electron scripts/evaluate-speech-models.cjs",
     "clean": "node -e \"['dist','frontend/dist','frontend/.angular'].forEach(d=>{try{require('fs').rmSync(d,{recursive:true,force:true})}catch(e){}})\"",
     "clean:release": "node -e \"require('fs').rmSync('release',{recursive:true,force:true})\"",
     "dist": "npm run build && electron-builder",
@@ -61,7 +69,7 @@
   },
   "build": {
     "appId": "com.yourcompany.whisper-electron",
-    "productName": "Whisper Transcription",
+    "productName": "TalaTrace",
     "electronCompile": false,
     "directories": {
       "output": "release"
@@ -73,10 +81,16 @@
     ],
     "extraResources": [
       {
+        "from": "transcribe-runtime",
+        "to": "transcribe-runtime",
+        "filter": ["**/*"]
+      },
+      {
         "from": "whisper.cpp/build-vulkan/bin",
         "to": "whisper.cpp/build-vulkan/bin",
         "filter": [
           "whisper-cli.exe",
+          "whisper-vad-speech-segments.exe",
           "whisper.dll",
           "ggml.dll",
           "ggml-base.dll",
@@ -89,6 +103,7 @@
         "to": "whisper.cpp/build/bin/Release",
         "filter": [
           "whisper-cli.exe",
+          "whisper-vad-speech-segments.exe",
           "whisper.dll",
           "ggml.dll",
           "ggml-base.dll",
@@ -99,7 +114,9 @@
         "from": "models",
         "to": "models",
         "filter": [
-          "**/*"
+          "ggml-tiny.bin",
+          "ggml-base.bin",
+          "ggml-silero-v5.1.2.bin"
         ]
       },
       {
@@ -112,6 +129,9 @@
     ],
     "icon": "build/icon.png",
     "mac": {
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Record interview answers for private, on-device transcription."
+      },
       "category": "public.app-category.productivity",
       "target": [
         "dmg",

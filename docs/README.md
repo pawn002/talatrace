@@ -1,6 +1,6 @@
-# Whisper Electron App Documentation
+# TalaTrace Documentation
 
-Welcome to the Whisper Electron App documentation! This folder contains comprehensive guides to help you get started, use, and troubleshoot the application.
+Welcome to the TalaTrace documentation! This folder contains comprehensive guides to help you get started, use, and troubleshoot the application.
 
 ## 📚 Documentation Index
 
@@ -9,12 +9,13 @@ Welcome to the Whisper Electron App documentation! This folder contains comprehe
 - [Usage Guide](usage.md) - Detailed walkthrough of all features
 
 ### Reference
-- [Model Guide](models.md) - Whisper model comparison and recommendations
+- [Model Guide](models.md) - Local speech models, reference measurements and recommendations
 - [Troubleshooting](troubleshooting.md) - Common issues and solutions
 
 ### Advanced
 - [Development Guide](development.md) - Contributing and development setup
 - [Architecture](architecture.md) - Technical architecture overview
+- [TalaTrace Release and Repository Migration](talatrace-release-migration.md) - Deferred rename, compatibility checks and release sequence
 
 ## Quick Links
 

@@ -1,0 +1,25 @@
+.result-section { margin-top: var(--spacing-md); }
+.transcript-output { display: block; --candor-card-overflow: visible; }
+.transcript-heading { padding: var(--spacing-md); font-weight: var(--font-weight-regular); }
+.transcript-heading h3 { margin: 0; }
+.transcript-content { padding: var(--spacing-2xs) var(--spacing-md); }
+.transcript-view { max-height: 360px; overflow: auto; }
+.transcript-segment { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: baseline; gap: var(--spacing-sm); margin: 0; padding: var(--spacing-sm) 0; border-bottom: 1px solid color-mix(in srgb, var(--color-border-default) 55%, transparent); line-height: var(--line-height-relaxed); }
+.transcript-segment:last-child { border: 0; }
+.segment__time { font: var(--font-weight-bold) var(--font-size-sm)/var(--line-height-normal) var(--font-family-mono); color: var(--color-text-subtle); white-space: nowrap; }
+.explanation-prose, .segment__text { font: var(--font-size-md)/var(--line-height-relaxed) var(--font-family-reading); letter-spacing: var(--letter-spacing-normal); max-inline-size: 65ch; }
+.explanation-prose { margin: 0 0 var(--spacing-md); }
+.segment__stamp { display: block; }
+.transcript-metadata { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--spacing-xs) var(--spacing-md); margin: 0 0 var(--spacing-md); font: var(--font-size-md)/var(--line-height-normal) var(--font-family-accessible); }
+.transcript-metadata dt { color: var(--color-text-subtle); }
+.transcript-metadata dd { margin: 0; overflow-wrap: anywhere; }
+.timing-details { --candor-disclosure-trigger-padding-y: var(--spacing-xs); }
+.timing-details::part(trigger) { min-height: var(--hit-target-aaa); font-size: var(--font-size-sm); font-weight: 500; font-optical-sizing: auto; font-variation-settings: 'GRAD' -150; color: var(--color-text-subtle); }
+.timing-details::part(trigger):hover { color: var(--color-text-default); }
+.timing-details::part(label)::before { flex-basis: var(--font-size-sm); width: var(--font-size-sm); height: var(--font-size-sm); }
+@media (prefers-reduced-motion: reduce) { .timing-details::part(icon) { transition: none; } }
+@media (max-width: 640px) {
+  .transcript-segment { grid-template-columns: 1fr; gap: var(--spacing-2xs); }
+  .segment__stamp { display: inline; }
+  .segment__stamp + .segment__stamp { margin-inline-start: var(--spacing-2xs); }
+}

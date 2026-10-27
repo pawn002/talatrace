@@ -2,15 +2,23 @@ import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
 import * as path from 'path';
 import isDev from 'electron-is-dev';
 import * as fs from 'fs/promises';
+import { existsSync } from 'fs';
 import { TranscriptionService } from './services/transcription.service';
-import { WhisperService } from './services/whisper.service';
+import { storeRecording, removeStaleRecordings } from './services/recording-storage';
+import { pathToFileURL } from 'url';
 
 // Import package.json for app version
 const packageJson = require(path.join(__dirname, '../../package.json'));
 
+// Keep pre-rename profiles (including packaged builds) and their models/preferences.
+const legacyPackagedProfile = path.join(app.getPath('appData'), 'Whisper Transcription');
+app.setPath('userData', app.isPackaged && existsSync(legacyPackagedProfile)
+  ? legacyPackagedProfile
+  : path.join(app.getPath('appData'), packageJson.name));
+app.setName('TalaTrace');
+
 let mainWindow: BrowserWindow | null = null;
 let transcriptionService: TranscriptionService | null = null;
-let whisperService: WhisperService | null = null;
 
 // Helper function to format seconds to SRT timestamp (HH:MM:SS,mmm)
 function formatTimestampForSRT(seconds: number): string {
@@ -120,13 +128,28 @@ function createWindow() {
       contextIsolation: true,
       sandbox: true,
     },
-    title: 'Whisper Transcription',
+    title: 'TalaTrace',
     backgroundColor: '#303030',
+  });
+
+  // Grant only app-origin microphone capture and the existing Copy action.
+  const appUrl = isDev ? 'http://localhost:4200' : pathToFileURL(path.join(__dirname, '../../frontend/dist/index.html')).href;
+  const isAppUrl = (url: string) => isDev
+    ? (() => { try { return new URL(url).origin === appUrl; } catch { return false; } })()
+    : url.split(/[?#]/)[0] === appUrl;
+  const appSession = mainWindow.webContents.session;
+  appSession.setPermissionCheckHandler((contents, permission, origin, details) => {
+    if (contents !== mainWindow?.webContents || !isAppUrl(details.requestingUrl || origin)) return false;
+    return permission === 'clipboard-sanitized-write' || (permission === 'media' && details.mediaType === 'audio');
+  });
+  appSession.setPermissionRequestHandler((contents, permission, callback, details) => {
+    const trusted = contents === mainWindow?.webContents && isAppUrl(details.requestingUrl);
+    callback(trusted && (permission === 'clipboard-sanitized-write' ||
+      (permission === 'media' && 'mediaTypes' in details && details.mediaTypes?.length === 1 && details.mediaTypes[0] === 'audio')));
   });
 
   // Initialize services immediately
   transcriptionService = new TranscriptionService(mainWindow);
-  whisperService = new WhisperService();
 
   console.log('[Main] Services initialized');
 
@@ -144,12 +167,12 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
     transcriptionService = null;
-    whisperService = null;
   });
 }
 
 // App lifecycle - Simplified, no backend to start!
 app.whenReady().then(() => {
+  void removeStaleRecordings(path.join(app.getPath('temp'), 'whisper-interview-recordings')).catch(console.error);
   createWindow();  // Create window immediately!
 });
 
@@ -238,6 +261,27 @@ ipcMain.handle(
   }
 );
 
+ipcMain.handle('transcribe-recording', async (event, bytes: unknown, options: any) => {
+  let recording: Awaited<ReturnType<typeof storeRecording>> | undefined;
+  try {
+    if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) {
+      throw new Error('Recording request must come from the app window.');
+    }
+    if (!transcriptionService) throw new Error('Service not initialized');
+    recording = await storeRecording(bytes, path.join(app.getPath('temp'), 'whisper-interview-recordings'));
+    const job = await transcriptionService.processAudio(recording.audioPath, {
+      model: options?.model || 'base', language: options?.language,
+      timestamps: true, threads: 4, outputFormat: 'json',
+      detectQuietIntervals: true,
+      alignTimestamps: true,
+    }, recording.cleanup);
+    return { success: true, data: { id: job.id, status: job.status } };
+  } catch (error: any) {
+    await recording?.cleanup().catch(() => {});
+    return { success: false, error: error.message || 'Failed to transcribe recording' };
+  }
+});
+
 ipcMain.handle('save-transcript', async (event, resultData: any) => {
   const saveResult = await dialog.showSaveDialog({
     defaultPath: `transcript.txt`,
@@ -267,7 +311,9 @@ ipcMain.handle('save-transcript', async (event, resultData: any) => {
 
     } else if (ext === '.txt') {
       // Plain text without timestamps
-      if (hasSegments) {
+      if (typeof resultData?.timestampedText === 'string') {
+        content = resultData.timestampedText;
+      } else if (hasSegments) {
         content = segments.map((seg: any) => seg.text).join(' ');
       } else {
         content = resultData?.text || JSON.stringify(resultData);
@@ -307,27 +353,32 @@ ipcMain.handle('save-transcript', async (event, resultData: any) => {
 
 ipcMain.handle('get-available-models', async () => {
   try {
-    if (!whisperService) {
-      console.error('[Main] WhisperService not initialized');
-      return [];
+    if (!transcriptionService) {
+      throw new Error('Transcription service not initialized');
     }
-    return await whisperService.getAvailableModels();
+    return await transcriptionService.getAvailableModels();
   } catch (error: any) {
     console.error('[Main] Error fetching models:', error);
-    return [];
+    throw error;
   }
+});
+
+ipcMain.handle('delete-model', async (_event, modelName: string) => {
+  if (!transcriptionService) throw new Error('Transcription service not initialized');
+  await transcriptionService.deleteModel(modelName);
+  return { success: true };
 });
 
 ipcMain.handle('download-model', async (event, modelName: string) => {
   try {
-    if (!whisperService) {
+    if (!transcriptionService) {
       return {
         success: false,
         message: 'Service not initialized',
       };
     }
 
-    await whisperService.downloadModel(modelName, (progress) => {
+    await transcriptionService.downloadModel(modelName, (progress) => {
       if (mainWindow) {
         mainWindow.webContents.send('model-download-progress', {
           modelName,

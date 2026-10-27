@@ -3,29 +3,27 @@
 const fs = require('fs');
 const path = require('path');
 
-// Read root package.json version
-const rootPackagePath = path.join(__dirname, '..', 'package.json');
-const rootPackage = JSON.parse(fs.readFileSync(rootPackagePath, 'utf8'));
-const version = rootPackage.version;
-
-console.log(`Syncing version ${version} to all sub-packages...`);
-
-// Update backend package.json
-const backendPackagePath = path.join(__dirname, '..', 'backend', 'package.json');
-if (fs.existsSync(backendPackagePath)) {
-  const backendPackage = JSON.parse(fs.readFileSync(backendPackagePath, 'utf8'));
-  backendPackage.version = version;
-  fs.writeFileSync(backendPackagePath, JSON.stringify(backendPackage, null, 2) + '\n');
-  console.log(`✓ Updated backend/package.json to ${version}`);
+function syncVersions(root, version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version) {
+  const updated = [];
+  for (const directory of ['', 'frontend', 'backend']) {
+    const manifest = path.join(root, directory, 'package.json');
+    if (!fs.existsSync(manifest)) continue;
+    const pkg = JSON.parse(fs.readFileSync(manifest, 'utf8'));
+    pkg.version = version;
+    fs.writeFileSync(manifest, JSON.stringify(pkg, null, 2) + '\n');
+    updated.push(path.relative(root, manifest));
+    const lockfile = path.join(root, directory, 'package-lock.json');
+    if (!fs.existsSync(lockfile)) continue;
+    const lock = JSON.parse(fs.readFileSync(lockfile, 'utf8'));
+    lock.version = version;
+    if (lock.packages?.['']) lock.packages[''].version = version;
+    fs.writeFileSync(lockfile, JSON.stringify(lock, null, 2) + '\n');
+    updated.push(path.relative(root, lockfile));
+  }
+  return updated;
 }
 
-// Update frontend package.json
-const frontendPackagePath = path.join(__dirname, '..', 'frontend', 'package.json');
-if (fs.existsSync(frontendPackagePath)) {
-  const frontendPackage = JSON.parse(fs.readFileSync(frontendPackagePath, 'utf8'));
-  frontendPackage.version = version;
-  fs.writeFileSync(frontendPackagePath, JSON.stringify(frontendPackage, null, 2) + '\n');
-  console.log(`✓ Updated frontend/package.json to ${version}`);
+module.exports = { syncVersions };
+if (require.main === module) {
+  console.log('Synchronized version metadata:', syncVersions(path.join(__dirname, '..')).join(', '));
 }
-
-console.log(`\n✅ All packages synced to version ${version}`);

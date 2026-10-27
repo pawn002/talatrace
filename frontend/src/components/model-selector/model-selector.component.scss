@@ -1,7 +1,17 @@
-.models-card {
-  max-width: 1200px;
+@use '../../styles/sortable-table';
+.models-page {
+  max-width: 1040px;
   margin: 0 auto;
 }
+.models-page .page-heading { padding-bottom: var(--spacing-md); }
+.models-page .page-subtitle { font-size: var(--font-size-md); font-weight: 400; color: var(--color-text-subtle); margin: var(--spacing-xs) 0 0; }
+.models-page .page-content { min-width: 0; }
+.models-page table { font-size: var(--font-size-sm); min-width: 880px; }
+.models-page caption { text-align: left; }
+.models-page .cell--numeric, .models-page .status-text { white-space: nowrap; }
+.models-page .cell--mono { white-space: nowrap; }
+.models-page .button { min-height: var(--hit-target-aaa); padding: var(--spacing-xs) var(--spacing-sm); font-size: var(--font-size-sm); }
+
 
 .loading-container {
   display: flex;
@@ -10,30 +20,54 @@
   padding: var(--spacing-xl) var(--spacing-md);
   text-align: center;
   font-family: var(--font-family-accessible);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-subtle);
+  font-size: var(--font-size-md);
+  color: var(--color-text-default);
 }
 
-.info-alert {
-  margin-bottom: var(--spacing-md);
-
-  .alert__message {
-    font-family: var(--font-family-serif);
-  }
+.guidance-divider { border: 0; border-top: var(--border-width-thin) solid var(--color-border-default); margin: var(--spacing-lg) 0 var(--spacing-md); }
+.info-alert { margin: 0; }
+.info-alert .alert__message { max-width: 65ch; }
+.download-note { margin-top: var(--spacing-sm); }
+.model-identity { min-width: 14rem; max-width: 16rem; }
+.model-name { display: block; font: var(--font-weight-bold) var(--font-size-md)/var(--line-height-normal) var(--font-family-accessible); }
+.model-repository, .info-alert {
+  // Default link/visited colours do not clear the reading floor on light zebra rows.
+  // Keep all rows consistent; underline and the external-link glyph identify the action.
+  --color-link: var(--color-text-default);
+  --color-link-hover: var(--color-text-default);
+  --color-link-visited: var(--color-text-default);
 }
+.model-repository {
+  margin: var(--spacing-2xs) 0 0;
+  font: var(--font-size-md)/var(--line-height-normal) var(--font-family-accessible);
+  overflow-wrap: anywhere;
+}
+.model-repository a { color: var(--color-link); text-decoration: underline; text-underline-offset: .15em; }
+.model-repository a:visited { color: var(--color-link-visited); }
+.model-repository a:hover { color: var(--color-link-hover); text-decoration-thickness: var(--border-width-medium); }
+.info-alert a { text-decoration: underline; text-underline-offset: .15em; }
+.info-alert a:visited { color: var(--color-link-visited); }
+.info-alert a:hover { text-decoration-thickness: var(--border-width-medium); }
+.model-repository a:focus-visible, .info-alert a:focus-visible { outline: var(--focus-ring-width) solid var(--color-focus); outline-offset: var(--focus-ring-offset); }
+.model-repository i { font-size: 1em; white-space: nowrap; }
+.model-description { margin-top: var(--spacing-xs); font: var(--font-size-md)/var(--line-height-relaxed) var(--font-family-reading); color: var(--color-text-default); max-width: 24ch; }
 
 .table-container {
   overflow-x: auto;
 }
 
 .status-text {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-subtle);
+  font-size: var(--font-size-md);
+  color: var(--color-text-default);
 
-  &--installed { color: var(--color-status-success); }
+  &--installed { color: var(--color-text-default); }
   &--downloading { color: var(--color-text-subtle); }
 }
 
 .download-progress {
   width: 120px;
 }
+
+.status-text { display: inline-flex; align-items: center; gap: var(--spacing-xs); color: var(--color-text-default); }
+.status-text i { color: var(--color-status-success); }
+.status-text--error i { color: var(--color-status-error); }

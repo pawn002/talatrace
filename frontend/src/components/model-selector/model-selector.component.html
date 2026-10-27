@@ -1,10 +1,11 @@
-<div class="card card--elevated card--padding-md models-card">
-  <div class="card__header">
-    <h2>Whisper Model Management</h2>
-    <p class="card-subtitle">Download and manage speech recognition models</p>
+<div class="models-page">
+  <div class="page-heading">
+    <h2 id="models-heading">Speech models</h2>
+    <p id="model-action-status" class="page-subtitle" role="status" aria-atomic="true">{{ deletionNotice || 'Download once. Transcribe on your device.' }}</p>
   </div>
 
-  <div class="card__body">
+  <div class="page-content">
+    <p class="sort-status" role="status" aria-live="polite" aria-atomic="true">{{ sortAnnouncement }}</p>
     @if (isLoading) {
       <div class="loading-container">
         <p>Loading models...</p>
@@ -12,57 +13,45 @@
     }
 
     @if (!isLoading) {
-      <div class="alert alert--info info-alert">
-        <i class="ph ph-info alert__icon" aria-hidden="true"></i>
-        <div class="alert__content">
-          <p class="alert__message">
-            <strong>Tip:</strong> Smaller models are faster but less accurate.
-            Larger models provide better accuracy but take longer to process.
-            Models are downloaded from
-            <a
-              href="https://huggingface.co/ggerganov/whisper.cpp"
-              target="_blank"
-              rel="noopener noreferrer"
-            >Hugging Face</a>
-            and stored locally for offline use.
-          </p>
-        </div>
-      </div>
-    }
-
-    @if (!isLoading) {
-      <div class="table-host table-container">
-        <table>
+      <div class="table-host table-container" appTableScroll aria-label="Speech models table" [attr.aria-busy]="isRefreshing">
+        <table aria-labelledby="models-heading" aria-describedby="model-benchmark-context">
           <thead>
             <tr>
-              <th>Model</th>
-              <th>Size</th>
-              <th>Speed</th>
-              <th>Accuracy</th>
-              <th>Status</th>
-              <th>Actions</th>
+              @for (column of columns; track column.key) {
+                <th scope="col" [class.cell--numeric]="column.numeric" [attr.aria-sort]="sortKey === column.key ? sortDirection : null">
+                  <button type="button" class="sort-header" [attr.data-sort]="column.key" [class.is-sorted]="sortKey === column.key" (click)="sortBy(column.key)" [attr.aria-label]="'Sort by ' + column.label + ', ' + nextSortDirection(column.key)">
+                    <span>{{ column.label }}</span><i class="ph-bold" [class.ph-arrows-down-up]="sortKey !== column.key" [class.ph-arrow-up]="sortKey === column.key && sortDirection === 'ascending'" [class.ph-arrow-down]="sortKey === column.key && sortDirection === 'descending'" aria-hidden="true"></i>
+                  </button>
+                </th>
+              }
+              <th scope="col">Actions</th>
             </tr>
           </thead>
           <tbody>
-            @for (model of models; track model) {
-              <tr>
-                <td>{{ model.name }}</td>
-                <td class="cell--mono">{{ model.size }}</td>
-                <td>
-                  <span class="badge badge--sm badge--{{ getSpeedVariant(model.speed) }}">
-                    {{ model.speed }}
-                  </span>
-                </td>
-                <td>
-                  <span class="badge badge--sm badge--{{ getAccuracyVariant(model.accuracy) }}">
-                    {{ model.accuracy }}
-                  </span>
-                </td>
-                <td>
-                  @if (model.installed) {
-                    <span class="status-text status-text--installed">Installed</span>
+            @for (model of sortedModels; track model.name) {
+              <tr [attr.data-model]="model.name">
+                <td><div class="model-identity">
+                  <span class="model-name">{{ model.displayName || model.name }}</span>
+                  @if (model.repository && model.repositoryUrl) {
+                    <p class="model-repository"><a [href]="model.repositoryUrl" target="_blank" rel="noopener noreferrer" [attr.aria-label]="(model.displayName || model.name) + ' on Hugging Face: ' + model.repository + ' (opens in a new window)'">{{ model.repository }}&nbsp;<i class="ph-bold ph-arrow-square-out" aria-hidden="true"></i></a></p>
                   }
-                  @if (!model.installed && !model.downloading) {
+                </div></td>
+                <td class="cell--numeric">{{ model.size }}</td>
+                <td class="cell--numeric">
+                  {{ model.speed }}
+                </td>
+                <td class="cell--numeric">
+                  {{ model.accuracy }}
+                </td>
+                <td>
+                  @if (model.installed && model.available !== false) {
+                    <span class="status-text status-text--installed"><i class="ph-bold ph-check-circle" aria-hidden="true"></i>Installed</span>
+                  }
+                  @if (model.available === false) {
+                    <span class="status-text">Unavailable</span>
+                    <p class="model-description">{{ model.unavailableReason }}</p>
+                  }
+                  @if (!model.installed && !model.downloading && model.available !== false) {
                     <span class="status-text">Not Installed</span>
                   }
                   @if (model.downloading) {
@@ -70,18 +59,22 @@
                   }
                 </td>
                 <td>
-                  @if (!model.installed && !model.downloading) {
+                  @if (!model.downloading) {
                     <button
-                      class="button button--primary button--small"
-                      (click)="downloadModel(model)"
+                      class="button button--ghost button--small"
+                      data-model-action
+                      (click)="model.installed ? deleteModel(model) : downloadModel(model)"
+                      [disabled]="model.deleting || (model.installed ? model.deletionBlocked || deletionInProgress : model.available === false)"
+                      [attr.aria-label]="(model.deleting ? 'Deleting ' : model.installed ? 'Delete ' : 'Download ') + (model.displayName || model.name)"
+                      [attr.aria-describedby]="model.installed && (model.deletionBlocked || deletionInProgress) ? 'model-action-status' : null"
                       >
-                      <i class="ph-fill ph-cloud-arrow-down" aria-hidden="true"></i>
-                      Download
+                      <i class="ph-fill" [class.ph-trash]="model.installed" [class.ph-cloud-arrow-down]="!model.installed" aria-hidden="true"></i>
+                      {{ model.deleting ? 'Deleting…' : model.installed ? 'Delete' : 'Download' }}
                     </button>
                   }
                   @if (model.downloading) {
                     <div class="download-progress">
-                      <div class="progress-bar">
+                      <div class="progress-bar" role="progressbar" [attr.aria-label]="'Downloading ' + model.name + ' model'">
                         <div class="progress-bar__fill progress-bar__fill--indeterminate"></div>
                       </div>
                     </div>
@@ -93,5 +86,28 @@
         </table>
       </div>
     }
+    @if (!isLoading) {
+      <hr class="guidance-divider">
+      <div class="alert alert--info info-alert">
+        <i class="ph-bold ph-info alert__icon" aria-hidden="true"></i>
+        <div class="alert__content">
+          <p class="alert__message" id="model-benchmark-context">
+            Reference test: 12 English reading clips from <a href="https://www.openslr.org/12/" target="_blank" rel="noopener noreferrer">LibriSpeech test-clean</a>,
+            100 seconds and 265 words, on an Intel i7-1260P with Iris Xe graphics.
+            Four threads; timing and pause detection enabled. Higher speed and lower word error rate are better.
+            This small sample does not predict interview accuracy or speed on every device.
+          </p>
+          <p class="alert__message download-note">Downloads from
+            <a
+              href="https://huggingface.co"
+              target="_blank"
+              rel="noopener noreferrer"
+            >Hugging Face</a>
+            are stored on this device for offline use.
+          </p>
+        </div>
+      </div>
+    }
+
   </div>
 </div>

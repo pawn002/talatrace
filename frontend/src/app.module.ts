@@ -1,4 +1,4 @@
-import { NgModule } from "@angular/core";
+import { CUSTOM_ELEMENTS_SCHEMA, NgModule } from "@angular/core";
 import { BrowserModule } from "@angular/platform-browser";
 import { HttpClientModule } from "@angular/common/http";
 import { FormsModule } from "@angular/forms";
@@ -9,6 +9,7 @@ import { HistoryComponent } from "./components/history/history.component";
 import { ModelSelectorComponent } from "./components/model-selector/model-selector.component";
 
 import { ElectronService } from "./services/electron.service";
+import { AudioSpectrumComponent } from './components/audio-spectrum/audio-spectrum.component';
 
 @NgModule({
   declarations: [AppComponent, TranscriptionComponent],
@@ -16,10 +17,12 @@ import { ElectronService } from "./services/electron.service";
     BrowserModule,
     HttpClientModule,
     FormsModule,
+    AudioSpectrumComponent,
     // Standalone components
     HistoryComponent,
     ModelSelectorComponent,
   ],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   providers: [ElectronService],
   bootstrap: [AppComponent],
 })

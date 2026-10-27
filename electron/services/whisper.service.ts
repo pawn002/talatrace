@@ -1,41 +1,32 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { spawn } from 'child_process';
-import * as https from 'https';
-import { createWriteStream } from 'fs';
+import { ModelStore } from './model-store';
+import { decodedAudioDuration } from './audio-duration';
+import { speechModel, SPEECH_MODELS } from './model-catalog';
+import { RecognitionEngine } from './recognition-engine';
+import { parseQuietIntervals, QuietInterval } from './quiet-intervals';
+import { alignmentPreset, parseWhisperTranscript } from './speech-alignment';
+import { parseSpeechActivity } from './speech-activity';
 import { app } from 'electron';
 import { TranscriptionOptions, TranscriptionResult } from './types';
 
-// Valid model names whitelist for security
-const VALID_MODEL_NAMES = ['tiny', 'base', 'small', 'medium', 'large'] as const;
-type ValidModelName = (typeof VALID_MODEL_NAMES)[number];
-
-export class WhisperService {
+export class WhisperService implements RecognitionEngine {
   private whisperPath: string;
   private whisperBinDir: string;
   private modelsPath: string;
   private ffmpegPath: string;
+  private vadModelPath: string;
   private initialized: boolean = false;
   private ffmpegAvailable: boolean = false;
-  private availableModels = [
-    { name: 'tiny', size: '39 MB', description: 'Fastest, least accurate' },
-    { name: 'base', size: '74 MB', description: 'Fast, good accuracy' },
-    { name: 'small', size: '244 MB', description: 'Balanced speed/accuracy' },
-    { name: 'medium', size: '769 MB', description: 'Slower, better accuracy' },
-    { name: 'large', size: '1550 MB', description: 'Slowest, best accuracy' },
-  ];
+  private models!: ModelStore;
+  private initialization?: Promise<void>;
 
-  /**
-   * Validates that a model name is in the allowed list
-   */
-  private isValidModelName(name: string): name is ValidModelName {
-    return VALID_MODEL_NAMES.includes(name as ValidModelName);
-  }
-
-  constructor() {
+  constructor(store?: ModelStore) {
     // Determine base path based on environment
     const isDev = !app.isPackaged;
     const basePath = isDev ? app.getAppPath() : process.resourcesPath;
+    this.vadModelPath = path.join(basePath, 'models', 'ggml-silero-v5.1.2.bin');
 
     console.log('[WhisperService] Environment:', isDev ? 'development' : 'production');
     console.log('[WhisperService] Base path:', basePath);
@@ -67,6 +58,7 @@ export class WhisperService {
 
     // Models stored in user data directory (writable location)
     this.modelsPath = path.join(app.getPath('userData'), 'models');
+    this.models = store || new ModelStore(this.modelsPath);
 
     console.log('[WhisperService] Whisper path:', this.whisperPath);
     console.log('[WhisperService] Models path:', this.modelsPath);
@@ -74,6 +66,12 @@ export class WhisperService {
   }
 
   async initialize(): Promise<void> {
+    if (this.initialized) return;
+    if (!this.initialization) this.initialization = this.initializeOnce().catch(error => { this.initialization = undefined; throw error; });
+    return this.initialization;
+  }
+
+  private async initializeOnce(): Promise<void> {
     // Ensure directories exist
     await this.ensureDirectories();
 
@@ -98,12 +96,7 @@ export class WhisperService {
       );
     }
 
-    // Check for at least one model
-    const models = await this.getInstalledModels();
-    if (models.length === 0) {
-      console.log('[WhisperService] No models found, downloading tiny model...');
-      await this.downloadModel('tiny');
-    }
+    // Models are downloaded explicitly from Models; an empty library is intentional.
 
     this.initialized = true;
     console.log('[WhisperService] Initialization complete');
@@ -132,7 +125,7 @@ export class WhisperService {
         console.log('[WhisperService] Migrating models from old location...');
 
         const files = await fs.readdir(oldModelsPath);
-        const binFiles = files.filter(f => f.endsWith('.bin'));
+        const binFiles = files.filter(f => SPEECH_MODELS.some(model => model.filename === f));
 
         if (binFiles.length > 0) {
           await fs.mkdir(this.modelsPath, { recursive: true });
@@ -185,97 +178,10 @@ export class WhisperService {
     }
   }
 
-  async getAvailableModels(): Promise<any[]> {
-    const installed = await this.getInstalledModels();
+  async getAvailableModels() { return this.models.list(); }
 
-    return this.availableModels.map((model) => ({
-      ...model,
-      installed: installed.includes(model.name),
-      path: path.join(this.modelsPath, `ggml-${model.name}.bin`),
-    }));
-  }
-
-  private async getInstalledModels(): Promise<string[]> {
-    try {
-      const files = await fs.readdir(this.modelsPath);
-      return files
-        .filter((file) => file.startsWith('ggml-') && file.endsWith('.bin'))
-        .map((file) => file.replace('ggml-', '').replace('.bin', ''));
-    } catch {
-      return [];
-    }
-  }
-
-  async downloadModel(
-    modelName: string,
-    progressCallback?: (progress: number) => void
-  ): Promise<void> {
-    // Validate model name against whitelist to prevent path injection
-    if (!this.isValidModelName(modelName)) {
-      throw new Error(
-        `Invalid model name: ${modelName}. Valid models are: ${VALID_MODEL_NAMES.join(', ')}`
-      );
-    }
-
-    const modelUrl = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-${modelName}.bin`;
-    const modelPath = path.join(this.modelsPath, `ggml-${modelName}.bin`);
-
-    // Ensure models directory exists
-    await fs.mkdir(this.modelsPath, { recursive: true });
-
-    return new Promise((resolve, reject) => {
-      const file = createWriteStream(modelPath);
-
-      const downloadFile = (url: string) => {
-        https
-          .get(url, (response) => {
-            // Follow redirects
-            if (response.statusCode === 301 || response.statusCode === 302) {
-              const redirectUrl = response.headers.location;
-              if (redirectUrl) {
-                console.log(`[WhisperService] Following redirect to: ${redirectUrl}`);
-                downloadFile(redirectUrl);
-                return;
-              }
-            }
-
-            const totalSize = parseInt(
-              response.headers['content-length'] || '0',
-              10
-            );
-            let downloadedSize = 0;
-
-            console.log(
-              `[WhisperService] Downloading ${modelName} model (${(totalSize / 1024 / 1024).toFixed(2)} MB)...`
-            );
-
-            response.on('data', (chunk) => {
-              downloadedSize += chunk.length;
-              if (progressCallback && totalSize > 0) {
-                const progress = (downloadedSize / totalSize) * 100;
-                progressCallback(progress);
-              }
-            });
-
-            response.pipe(file);
-
-            file.on('finish', () => {
-              file.close();
-              console.log(`[WhisperService] Model ${modelName} downloaded successfully`);
-              resolve();
-            });
-          })
-          .on('error', async (err) => {
-            file.close();
-            try {
-              await fs.unlink(modelPath);
-            } catch {}
-            reject(err);
-          });
-      };
-
-      downloadFile(modelUrl);
-    });
+  async downloadModel(modelName: string, progress?: (progress: number) => void): Promise<void> {
+    return this.models.download(modelName, progress);
   }
 
   async transcribe(
@@ -289,24 +195,16 @@ export class WhisperService {
 
     // Validate model name against whitelist
     const modelName = options.model || 'base';
-    if (!this.isValidModelName(modelName)) {
-      throw new Error(
-        `Invalid model name: ${modelName}. Valid models are: ${VALID_MODEL_NAMES.join(', ')}`
-      );
-    }
+    const definition = speechModel(modelName);
+    if (definition.engine !== 'whisper.cpp') throw new Error('This model requires the alternate speech engine');
 
     // Canonicalize audio path to prevent path traversal
     const resolvedAudioPath = path.resolve(audioPath);
 
-    const modelPath = path.join(this.modelsPath, `ggml-${modelName}.bin`);
+    const modelPath = this.models.path(modelName);
 
-    // Check if model exists
-    try {
-      await fs.access(modelPath);
-    } catch {
-      throw new Error(
-        `Model ${options.model} not found. Please download it first.`
-      );
+    if (!await this.models.installed(definition)) {
+      throw new Error(`Model ${modelName} is missing, incomplete or corrupt. Download it again from Models before transcribing.`);
     }
 
     // Check if audio needs conversion
@@ -348,7 +246,7 @@ export class WhisperService {
     }
 
     if (options.outputFormat === 'json') {
-      args.push('-oj');
+      args.push(options.alignTimestamps && alignmentPreset(modelName) ? '-ojf' : '-oj');
     } else if (options.outputFormat === 'srt') {
       args.push('-osrt');
     } else if (options.outputFormat === 'vtt') {
@@ -358,12 +256,18 @@ export class WhisperService {
     if (!options.timestamps) {
       args.push('-nt');
     }
+    const preset = options.alignTimestamps ? alignmentPreset(modelName) : undefined;
+    if (preset) {
+      // DTW requires cross-attention weights; flash attention would silently disable it.
+      args.push('-dtw', preset, '-nfa');
+    }
 
     // Log the command being executed
     console.log('[WhisperService] Executing whisper command:', this.whisperPath);
     console.log('[WhisperService] Arguments:', args);
 
-    return new Promise((resolve, reject) => {
+    try {
+    return await new Promise<TranscriptionResult>((resolve, reject) => {
       let whisperProcess;
 
       try {
@@ -371,6 +275,7 @@ export class WhisperService {
           env: { ...process.env, PATH: `${this.whisperBinDir}${path.delimiter}${process.env.PATH}` },
         });
       } catch (spawnError: any) {
+        if (needsCleanup) void fs.rm(path.dirname(processedAudioPath), { recursive: true, force: true }).catch(() => {});
         console.error('[WhisperService] Failed to spawn whisper process:', spawnError);
         reject(new Error(`Failed to start whisper: ${spawnError.message}`));
         return;
@@ -418,16 +323,6 @@ export class WhisperService {
       whisperProcess.on('close', async (code) => {
         console.log(`[WhisperService] Whisper process closed with code: ${code}`);
 
-        // Clean up converted WAV file if we created one
-        if (needsCleanup) {
-          try {
-            await fs.unlink(processedAudioPath);
-            console.log(`[WhisperService] Cleaned up converted file: ${processedAudioPath}`);
-          } catch (cleanupError) {
-            console.error('[WhisperService] Failed to cleanup converted file:', cleanupError);
-          }
-        }
-
         if (code === 0) {
           // Parse the output based on format
           if (options.outputFormat === 'json') {
@@ -437,21 +332,16 @@ export class WhisperService {
               const jsonRaw = await fs.readFile(jsonFilePath, 'utf8');
               await fs.unlink(jsonFilePath).catch(() => {});
               const jsonResult = JSON.parse(jsonRaw);
-              const rawSegments: any[] = jsonResult.transcription || jsonResult.segments || [];
-              const segments = rawSegments.map((s: any) => ({
-                start: s.offsets ? s.offsets.from / 1000 : s.start,
-                end:   s.offsets ? s.offsets.to   / 1000 : s.end,
-                text:  s.text,
-              }));
+              const transcript = parseWhisperTranscript(jsonResult, Boolean(preset));
               resolve({
-                text: segments.map(s => s.text).join('') || output,
-                segments,
+                ...transcript,
+                ...(options.alignTimestamps && !preset ? { alignmentWarning: 'Audio alignment is not available for this model variant. Original approximate speech times are shown.' } : {}),
                 language: jsonResult.result?.language || jsonResult.language,
                 duration: jsonResult.duration,
               });
             } catch (e) {
               console.error('[WhisperService] Failed to read/parse JSON output file:', e);
-              resolve({ text: output });
+              reject(new Error('Could not read the timestamped transcript. Please retry transcription.'));
             }
           } else {
             resolve({ text: output });
@@ -461,6 +351,9 @@ export class WhisperService {
           console.error(`[WhisperService] ${errorMsg}`);
           reject(new Error(errorMsg));
         }
+        if (needsCleanup) {
+          await fs.rm(path.dirname(processedAudioPath), { recursive: true, force: true }).catch(() => {});
+        }
       });
 
       whisperProcess.on('error', async (err) => {
@@ -469,7 +362,7 @@ export class WhisperService {
         // Clean up converted WAV file if we created one
         if (needsCleanup) {
           try {
-            await fs.unlink(processedAudioPath);
+            await fs.rm(path.dirname(processedAudioPath), { recursive: true, force: true });
           } catch (cleanupError) {
             console.error('[WhisperService] Failed to cleanup converted file:', cleanupError);
           }
@@ -478,6 +371,12 @@ export class WhisperService {
         reject(new Error(`Whisper process error: ${err.message}`));
       });
     });
+    } catch (error) {
+      if (!preset) throw error;
+      // Unsupported hardware/builds must not lose a successfully captured answer.
+      const fallback = await this.transcribe(audioPath, { ...options, alignTimestamps: false }, progressCallback);
+      return { ...fallback, originalSegments: fallback.segments, alignmentWarning: 'Audio alignment could not run on this model or device. Original approximate speech times are shown.' };
+    }
   }
 
   async getAudioDuration(audioPath: string): Promise<number | undefined> {
@@ -494,18 +393,27 @@ export class WhisperService {
       const ffmpegProcess = spawn(this.ffmpegPath, [
         '-i',
         resolvedAudioPath,
+        '-vn',
+        '-progress',
+        'pipe:1',
+        '-nostats',
         '-f',
         'null',
         '-',
       ]);
 
       let errorOutput = '';
+      let progressOutput = '';
+      ffmpegProcess.stdout.on('data', data => { progressOutput += data.toString(); });
 
       ffmpegProcess.stderr.on('data', (data) => {
         errorOutput += data.toString();
       });
 
-      ffmpegProcess.on('close', () => {
+      ffmpegProcess.on('close', (code) => {
+        if (code !== 0) { resolve(undefined); return; }
+        const decoded = decodedAudioDuration(progressOutput);
+        if (decoded !== undefined) { resolve(decoded); return; }
         // Parse duration from ffmpeg output: "Duration: HH:MM:SS.mmm"
         const durationMatch = errorOutput.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2}\.\d{2})/);
 
@@ -530,6 +438,48 @@ export class WhisperService {
     });
   }
 
+  async detectQuietIntervals(audioPath: string): Promise<QuietInterval[]> {
+    if (!this.initialized) await this.initialize();
+    return new Promise((resolve, reject) => {
+      const process = spawn(this.ffmpegPath, [
+        '-i', path.resolve(audioPath), '-af', 'silencedetect=noise=-35dB:d=1.5', '-f', 'null', '-',
+      ]);
+      let output = '';
+      process.stderr.on('data', chunk => { output += chunk.toString(); });
+      process.on('error', reject);
+      process.on('close', code => code === 0
+        ? resolve(parseQuietIntervals(output))
+        : reject(new Error('Could not analyze recording timing. Please retry.')));
+    });
+  }
+
+  async detectSpeechActivity(audioPath: string): Promise<Pick<TranscriptionResult, 'speechIntervals' | 'noSpeechIntervals' | 'speechDetectionMethod'>> {
+    if (!this.initialized) await this.initialize();
+    const binary = path.join(this.whisperBinDir, process.platform === 'win32' ? 'whisper-vad-speech-segments.exe' : 'whisper-vad-speech-segments');
+    await fs.access(binary);
+    await fs.access(this.vadModelPath);
+    // Decode independently; VAD must never remove samples from Whisper's timeline.
+    const wav = await this.convertAudioToWav(audioPath);
+    try {
+      const duration = await this.getAudioDuration(wav);
+      if (!duration) throw new Error('Could not measure recording duration');
+      const output = await new Promise<string>((resolve, reject) => {
+        const child = spawn(binary, ['-vm', this.vadModelPath, '-f', wav, '-np'], {
+          env: { ...process.env, PATH: `${this.whisperBinDir}${path.delimiter}${process.env.PATH}` },
+        });
+        let stdout = '';
+        child.stdout.on('data', chunk => { stdout += chunk.toString(); });
+        // Drain native backend diagnostics without retaining audio-derived logs.
+        child.stderr.on('data', () => {});
+        child.on('error', reject);
+        child.on('close', code => code === 0 ? resolve(stdout) : reject(new Error('Speech detection failed')));
+      });
+      return { ...parseSpeechActivity(output, duration), speechDetectionMethod: 'silero-v5.1.2' };
+    } finally {
+      await fs.rm(path.dirname(wav), { recursive: true, force: true }).catch(() => {});
+    }
+  }
+
   async convertAudioToWav(inputPath: string): Promise<string> {
     if (!this.ffmpegAvailable) {
       throw new Error(
@@ -540,11 +490,11 @@ export class WhisperService {
     // Canonicalize input path to prevent path traversal
     const resolvedInputPath = path.resolve(inputPath);
 
-    // Construct output path safely using path.join
-    const outputPath = path.join(
-      path.dirname(resolvedInputPath),
-      path.basename(resolvedInputPath, path.extname(resolvedInputPath)) + '.wav'
-    );
+    // Never overwrite an existing WAV beside the user's imported recording.
+    const conversionRoot = path.join(app.getPath('temp'), 'whisper-interview-recordings');
+    await fs.mkdir(conversionRoot, { recursive: true });
+    const conversionWorkspace = await fs.mkdtemp(path.join(conversionRoot, 'recording-conversion-'));
+    const outputPath = path.join(conversionWorkspace, 'audio.wav');
 
     console.log(
       `[WhisperService] Converting ${resolvedInputPath} to WAV format using bundled ffmpeg...`
@@ -575,6 +525,7 @@ export class WhisperService {
           console.log(`[WhisperService] Audio converted successfully to: ${outputPath}`);
           resolve(outputPath);
         } else {
+          void fs.rm(conversionWorkspace, { recursive: true, force: true }).catch(() => {});
           console.error('[WhisperService] ffmpeg conversion failed:', errorOutput);
           reject(
             new Error(
@@ -585,6 +536,7 @@ export class WhisperService {
       });
 
       ffmpegProcess.on('error', (err) => {
+        void fs.rm(conversionWorkspace, { recursive: true, force: true }).catch(() => {});
         console.error('[WhisperService] ffmpeg process error:', err);
         reject(
           new Error(
