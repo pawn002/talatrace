@@ -15,7 +15,7 @@ TalaTrace is an Angular/Electron app with local Whisper and Parakeet engines. Re
 
 Use focused branches and preserve user changes. Codex-created branches use `codex/`. Run appropriate checks and report actual outcomes. `npm test` includes frontend and Electron tests; a build/Jest result alone does not establish visual quality, native model behavior, platform support or accessibility conformance.
 
-Keep audio local. Do not run a supposedly isolated harness against a valuable profile without checking how startup assigns appData/userData. The older interview smoke has a known isolation defect; see Development. `.local-backups/` is ignored recovery material, not a build artifact. `npm run clean:release` deletes `release/`.
+Keep audio local. Do not run a supposedly isolated harness against a valuable profile without checking startup path assignment. The interview smoke now isolates appData/userData/sessionData and asserts the post-start paths; older revisions did not. See Development. `.local-backups/` is ignored recovery material, not a build artifact. `npm run clean:release` deletes `release/`.
 
 Final version bumps and release sections belong on main after feature work merges. The release wizard enforces main. Avoid npm version shortcuts that create a tag before frontend/lockfile synchronization; use the staged procedure in Releasing. Never rename the internal app ID/profile identity merely to match branding.
 

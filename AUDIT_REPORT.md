@@ -24,9 +24,11 @@ The stable README Quick Start anchors and user-guide filenames remain; `docs/can
 | Completed migration listed as deferred and obsolete UI iterations mixed with current instructions | Completed work archived with historical banners; current widget table rewritten for the final 1.2.0 construction |
 | Four default hardware benchmark variants, old whisper-bins paths and hypothetical speedups | Actual baseline/Vulkan config, current build discovery and raw-benchmark versus service-evaluation limits |
 
-## Unresolved code/tooling findings
+## Code/tooling findings at the audit baseline
 
 These are visible in the code; the docs now disclose them instead of claiming fixes that were not made.
+
+Follow-up on 27 October: the interview smoke isolation defect is fixed. It assigns appData/userData/sessionData before main, links only the selected model into the owned profile and asserts startup retained isolation. Real capture → local recognition → Copy → file import → second recording passes with networking blocked; the fast startup guard passes independently. Other findings below describe the original baseline; further resolutions are recorded as they land.
 
 1. **Interview smoke profile isolation (priority).** `tests/electron/interview-smoke.cjs` sets userData, then requires main; `electron/main.ts` assigns userData again from appData. The older command can use the real profile despite historical isolation claims. It was not run during this audit. Use the packaged smoke's pre-start appData isolation, or repair/test the older harness before recommending it for valuable profiles.
 2. **Native bootstrap drift.** `setup-whisper.js` uses legacy make/CMake/output assumptions and unpinned setup downloads. `build-whisper.js` writes `native/`, while the app expects the variant layouts. Current guides explicitly verify native paths; a clean-machine bootstrap was not rerun or repaired. A reproducible pinned/checksummed bootstrap needs code work.

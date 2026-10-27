@@ -5,6 +5,24 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const root = path.resolve(__dirname, '../..');
 const profile = require('node:fs').mkdtempSync(path.join(os.tmpdir(), 'whisper-interview-smoke-'));
+const syncFs = require('node:fs');
+const model = require(path.join(root, 'dist/electron/services/model-catalog')).speechModel(process.env.WHISPER_SMOKE_MODEL || 'base');
+const originalAppData = app.getPath('appData');
+// Main assigns userData itself. Isolate its parent before requiring main, and seed
+// only the requested model through an owned hardlink rather than copying a profile.
+const appData = path.join(profile, 'app-data');
+const isolatedUserData = path.join(appData, 'whisper-electron-app');
+syncFs.mkdirSync(path.join(isolatedUserData, 'models'), { recursive: true });
+const sourceModel = [path.join(root, 'models', model.filename),
+  path.join(originalAppData, 'whisper-electron-app', 'models', model.filename),
+  path.join(originalAppData, 'Whisper Transcription', 'models', model.filename)]
+  .find(file => syncFs.existsSync(file) && syncFs.statSync(file).size === model.sizeBytes);
+if (!sourceModel) throw new Error('Install the smoke model first: ' + model.name);
+syncFs.linkSync(sourceModel, path.join(isolatedUserData, 'models', model.filename));
+syncFs.writeFileSync(path.join(isolatedUserData, '.models-migrated'), 'Isolated smoke: only the selected model is linked.');
+app.setPath('appData', appData);
+app.setPath('userData', isolatedUserData);
+app.setPath('sessionData', isolatedUserData);
 const fixture = path.join(profile, 'answer-with-pause.wav');
 const fixtureProcess = require('node:child_process').spawnSync(path.join(root, 'ffmpeg/bin/ffmpeg.exe'), [
   '-i', path.join(root, 'whisper.cpp/samples/jfk.wav'),
@@ -13,7 +31,6 @@ const fixtureProcess = require('node:child_process').spawnSync(path.join(root, '
 ], { windowsHide: true });
 if (fixtureProcess.status !== 0) throw new Error('Could not create sample audio with a known thirty-second pause');
 app.setAppPath(root);
-app.setPath('userData', profile);
 app.commandLine.appendSwitch('use-fake-device-for-media-stream');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
@@ -22,6 +39,9 @@ app.commandLine.appendSwitch('use-file-for-fake-audio-capture', fixture);
 const devModule = require.resolve('electron-is-dev', { paths: [root] });
 require.cache[devModule] = { id: devModule, filename: devModule, loaded: true, exports: false };
 require(path.join(root, 'dist/electron/main.js'));
+if (app.getPath('userData') !== isolatedUserData || app.getPath('sessionData') !== isolatedUserData) {
+  throw new Error('Smoke isolation was overridden during app startup.');
+}
 // Use a public local sample instead of opening a native file picker in this test.
 ipcMain.removeHandler('select-audio-file');
 ipcMain.handle('select-audio-file', async () => ({
@@ -38,6 +58,10 @@ app.whenReady().then(async () => {
   win.webContents.session.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, (_details, callback) => callback({ cancel: true }));
   try {
     if (win.webContents.isLoading()) await new Promise(resolve => win.webContents.once('did-finish-load', resolve));
+    if (process.env.WHISPER_SMOKE_PROFILE_ONLY === '1') {
+      console.log('SMOKE PROFILE PASSED:', JSON.stringify({ appData: app.getPath('appData'), userData: app.getPath('userData'), sessionData: app.getPath('sessionData') }));
+      clearTimeout(timeout); app.quit(); return;
+    }
     win.webContents.debugger.attach('1.3');
     await win.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true });
     await win.webContents.executeJavaScript(`window.__smokeModel = ${JSON.stringify(process.env.WHISPER_SMOKE_MODEL || 'base')}`);
@@ -46,7 +70,7 @@ app.whenReady().then(async () => {
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
       const button = text => [...document.querySelectorAll('.transcription-page button')].find(el => el.textContent.includes(text));
       const requirePrimary = text => {
-        const actions = [...document.querySelectorAll('.transcription-page button.button--primary')];
+        const actions = [...document.querySelectorAll('.workflow-controls button.button--primary')];
         if (actions.length !== 1 || !actions[0].textContent.includes(text)) throw new Error('Unclear primary action: ' + actions.map(el => el.textContent).join('; '));
       };
       for (let i = 0; i < 200 && ![...document.querySelectorAll('#model-select option')].some(option => option.value === window.__smokeModel); i++) await wait(100);
@@ -72,7 +96,7 @@ app.whenReady().then(async () => {
       requirePrimary('Stop & transcribe');
       assertStable();
       await wait(1000);
-      if (document.querySelector('.spectrum-display')?.getAttribute('data-mode') !== 'spectrogram') throw new Error('Recorded microphone stream is not being analyzed');
+      if (!['frequency-bars','bars-reduced-motion'].includes(document.querySelector('.spectrum-display')?.getAttribute('data-mode'))) throw new Error('Recorded microphone stream is not being analyzed');
       const spectrum = document.querySelector('app-audio-spectrum canvas');
       if (!spectrum.getContext('2d').getImageData(0, 0, spectrum.width, spectrum.height).data.some((value, index) => index % 4 === 3 && value > 0)) throw new Error('Real microphone audio produced no spectrum');
       if (document.querySelector('#app-tab-models').disabled || document.querySelector('#app-tab-history').disabled) throw new Error('Main views unnecessarily locked during recording');
@@ -97,8 +121,8 @@ app.whenReady().then(async () => {
       }
       const segment = document.querySelector('.segment__time')?.textContent;
       if (!segment) throw new Error('No timestamped speech returned');
-      const performanceSummary = document.querySelector('.performance-summary')?.textContent;
-      if (!performanceSummary?.includes('s audio') || !performanceSummary.includes('s processing')) throw new Error('Recording result omitted performance measurements');
+      const performanceSummary = document.querySelector('.transcript-metadata')?.textContent;
+      if (!performanceSummary?.includes('Audio length') || !performanceSummary.includes('Processing')) throw new Error('Recording result omitted performance measurements');
       const latest = (await window.electronAPI.getTranscriptionHistory())[0];
       if (!(latest.audioDuration > 37 && latest.audioDuration < 43)) throw new Error('History omitted the full recording duration: ' + latest.audioDuration);
       if (latest.result.duration !== latest.audioDuration || latest.result.processingTimeMs !== latest.transcriptionTime) throw new Error('Result and history disagree about performance');
@@ -112,10 +136,9 @@ app.whenReady().then(async () => {
       if (!/^\\[\\d{2}:\\d{2}:\\d{2}\\.\\d{3} →/m.test(copied)) throw new Error('Copy omitted timestamps: ' + copied);
       if (!copied.includes('No speech detected (')) throw new Error('Known speech gap was not preserved in Copy: ' + copied);
       if (!copied.includes('audio-aligned token locations')) throw new Error('Audio alignment was not used: ' + copied);
-      const speechRows = [...document.querySelectorAll('.transcript-view .transcript-segment:not(.transcript-segment--pause)')];
-      const speechTimes = speechRows.map(row => row.querySelector('.segment__time').textContent);
-      if (!speechTimes.some(time => /^\\[00:00:3[3-6]\\./.test(time))) throw new Error('Resumed speech was not aligned to the known audio location: ' + speechTimes.join('; '));
-      if (speechTimes.some(time => /^\\[00:00:(?:0[4-9]|[12][0-9]|3[0-2])\\./.test(time))) throw new Error('A speech entry starts inside the known thirty-second silence: ' + speechRows.map(row => row.textContent).join('; '));
+      const speechTimes = latest.result.segments.map(segment => segment.start);
+      if (!speechTimes.some(time => time >= 33 && time < 37)) throw new Error('Resumed speech was not aligned to the known audio location: ' + speechTimes.join('; '));
+      if (speechTimes.some(time => time >= 4 && time < 33)) throw new Error('A speech entry starts inside the known thirty-second silence: ' + speechTimes.join('; '));
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach(track => track.stop());
       const visibleText = document.querySelector('.result-section').textContent;
