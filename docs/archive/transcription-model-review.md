@@ -1,5 +1,7 @@
 # Local transcription model review
 
+> Historical record from October 2026. Earlier findings, commands and verification claims may be superseded. Use the [current documentation index](../README.md), [current widget inventory](../candor-widget-review.md) and [documentation audit](../../AUDIT_REPORT.md) for present behavior and known test-harness limits.
+
 Reviewed 24 October 2026 against current primary model cards, runtime documentation, and this app's code. This is a research and integration assessment, not a benchmark on the user's machine. Quality and speed judgements below are provisional. Target: Windows, CPU/Intel integrated GPU, local interview answers and imported recordings, readable timing and pause context, few recurring steps.
 
 ## Recommendation
@@ -66,7 +68,7 @@ Built transcribe.cpp v0.4.1 with the checked-in token-JSON adapter and tested Wi
 
 Both new models pass the complete isolated offline microphone workflow with a synthetic 30-second pause, timestamped copy, file import, repeat/discard and stable controls. On the public 11-second JFK sample, Parakeet's first observed encode/decode took about 4.8 seconds plus 1.3 seconds model loading; a subsequent run took about 0.67 seconds encode/decode plus 1.0 seconds loading. Shader/cache warmup matters. These small-sample observations are not a throughput benchmark or a speed comparison with Whisper.
 
-Validation: 101 frontend tests and 24 Electron tests pass; 48 renderer states show no page-wide overflow or readable text below 14px; 45 sampled pairings pass klar 3.1.0. Inspected three rendered passes, including new model rows, dark/light, narrow layouts and an unavailable-runtime build. Existing bundle/style warnings remain. Other OS/hardware, long interviews and representative accuracy remain unqualified. Neither new choice replaces the default based on this evidence. See [model setup and usage](models.md).
+Validation: 101 frontend tests and 24 Electron tests pass; 48 renderer states show no page-wide overflow or readable text below 14px; 45 sampled pairings pass klar 3.1.0. Inspected three rendered passes, including new model rows, dark/light, narrow layouts and an unavailable-runtime build. Existing bundle/style warnings remain. Other OS/hardware, long interviews and representative accuracy remain unqualified. Neither new choice replaces the default based on this evidence. See [model setup and usage](../models.md).
 
 ## Evidence follow-up: model-table ratings (2026-10-25)
 
@@ -78,4 +80,4 @@ The current generic quality badges and "Evaluate" labels should be replaced by e
 
 Recommended next table revision: distinguish published recognition evidence (dataset, language, metric and source) from measured device speed. Avoid implying a shared ranking across different datasets or backends. A local comparison should run the same audio through the exact installed artifacts and packaged engines, record cold and repeated runs, and report median stop-to-result time and audio/processing ratio. Accuracy needs a human reference transcript; include names, spontaneous corrections, noise, and long quiet sections. WER alone does not evaluate timestamp usefulness or invented words in pauses. No new comparative benchmark was run in this follow-up; the existing single-sample smoke observations remain limited.
 
-Subsequently completed an [automated local evaluation](speech-model-evaluation-2026-10-25.md) using public audio and supplied reference transcripts. The user does not need to record or label test material. The small baseline measures six installed models through the real pipeline and includes a complete-utterance pause control that exposed omitted continuation text in the current Parakeet path. See [the reusable harness](speech-model-evaluation.md) for preparation, scoring, provenance and limitations.
+Subsequently completed an [automated local evaluation](speech-model-evaluation-2026-10-25.md) using public audio and supplied reference transcripts. The user does not need to record or label test material. The small baseline measures six installed models through the real pipeline and includes a complete-utterance pause control that exposed omitted continuation text in the current Parakeet path. See [the reusable harness](../speech-model-evaluation.md) for preparation, scoring, provenance and limitations.

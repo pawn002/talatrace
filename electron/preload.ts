@@ -85,7 +85,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 declare global {
   interface Window {
     electronAPI: {
-      selectAudioFile: () => Promise<string | null>;
+      selectAudioFile: () => Promise<{ path: string; size: number } | null>;
       transcribeAudio: (audioPath: string, options: any) => Promise<any>;
       transcribeRecording: (bytes: Uint8Array, options: any) => Promise<any>;
       saveTranscript: (resultData: any) => Promise<string | null>;

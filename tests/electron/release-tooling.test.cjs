@@ -4,7 +4,52 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { syncVersions } = require('../../scripts/sync-version');
-const { prependChangelog, extractVersionSection } = require('../../scripts/release');
+const { prependChangelog, extractVersionSection, findArtifacts, packagingArguments } = require('../../scripts/release');
+const { prepareVersion } = require('../../scripts/prepare-version.cjs');
+const { execFileSync } = require('node:child_process');
+
+test('version shortcuts synchronize metadata without moving HEAD or creating tags', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'talatrace-stage-version-'));
+  const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore','pipe','pipe'] }).trim();
+  try {
+    for (const sub of ['', 'frontend']) {
+      fs.mkdirSync(path.join(root, sub), { recursive: true });
+      fs.writeFileSync(path.join(root, sub, 'package.json'), JSON.stringify({ version: '1.2.0' }));
+      fs.writeFileSync(path.join(root, sub, 'package-lock.json'), JSON.stringify({ version: '1.2.0', packages: { '': { version: '1.2.0' } } }));
+    }
+    git(['init', '--initial-branch=main']); git(['add', '.']);
+    git(['-c','user.name=Test','-c','user.email=test@example.test','-c','commit.gpgsign=false','commit','-m','baseline']);
+    git(['-c','tag.gpgSign=false','tag','v1.2.0']);
+    const head = git(['rev-parse','HEAD']), tags = git(['tag']);
+    assert.equal(prepareVersion('patch', root).version, '1.2.1');
+    assert.equal(git(['rev-parse','HEAD']), head); assert.equal(git(['tag']), tags);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(root,'frontend/package-lock.json'))).packages[''].version,'1.2.1');
+    assert.throws(() => prepareVersion('invalid', root), /Choose/);
+    fs.writeFileSync(path.join(root,'frontend/package-lock.json'),'invalid JSON');
+    assert.throws(() => prepareVersion('minor', root), SyntaxError);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(root,'package.json'))).version,'1.2.1','Invalid lockfile must not leave a partial version bump');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('artifact discovery handles nested/custom output without uploading runtimes, backups or other versions', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'talatrace-artifacts-'));
+  try {
+    fs.writeFileSync(path.join(root,'package.json'),JSON.stringify({ build:{ directories:{ output:'artifacts' } } }));
+    for(const name of ['nested/TalaTrace-Setup-1.2.0.exe','nested/TalaTrace-1.2.0-win.zip','TalaTrace-1.2.01-win.zip','TalaTrace-1.2.0-rc.1-win.zip','win-unpacked/TalaTrace-1.2.0.exe','upgrade-backup/Old-1.2.0.exe','build-tools/rcedit-1.2.0.exe']) {
+      const file=path.join(root,'artifacts',name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,'fixture');
+    }
+    assert.deepEqual(findArtifacts('1.2.0',root).map(a=>a.name).sort(),['TalaTrace-1.2.0-win.zip','TalaTrace-Setup-1.2.0.exe']);
+    fs.mkdirSync(path.join(root,'artifacts','another'));
+    fs.writeFileSync(path.join(root,'artifacts','another','TalaTrace-Setup-1.2.0.exe'),'duplicate');
+    assert.throws(()=>findArtifacts('1.2.0',root),/Duplicate artifact/);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('packaging and discovery agree on explicit custom output with spaces', () => {
+  const output = path.join(os.tmpdir(), 'candidate files');
+  assert.deepEqual(packagingArguments('win32', output), ['run','dist:win','--','--publish','never','--config.directories.output=' + path.resolve(output)]);
+  assert.throws(() => packagingArguments('unsupported'), /Unsupported/);
+});
 
 test('release version synchronization updates both lockfile roots without changing dependency versions', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'talatrace-version-'));

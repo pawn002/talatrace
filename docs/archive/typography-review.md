@@ -1,5 +1,7 @@
 # Typography review — 25 October 2026
 
+> Historical record from October 2026. Earlier findings, commands and verification claims may be superseded. Use the [current documentation index](../README.md), [current widget inventory](../candor-widget-review.md) and [documentation audit](../../AUDIT_REPORT.md) for present behavior and known test-harness limits.
+
 The implementation before this review is saved in commit `9d4c7f9`. This follow-up changes presentation only; audio capture, local engines, timing, copying and persistence are unchanged.
 
 ## Sources reviewed

@@ -1,24 +1,28 @@
 # Speech models
 
-The app supports local Whisper transcription and a first Parakeet engine. All recognition stays on the device. Model downloads require a connection during setup; installed models work offline.
+TalaTrace 1.2.0 supports local Whisper and Parakeet transcription. All recognition stays on the device. Downloads require a connection; installed models work offline with the packaged runtimes.
 
 ## Available models
 
 | Model | Download size | Engine | Notes |
 | --- | --- | --- | --- |
 | Whisper Tiny | 75 MiB | whisper.cpp | Smallest download; useful for quick checks. |
-| Whisper Base | 142 MiB | whisper.cpp | Existing default. |
+| Whisper Base | 142 MiB | whisper.cpp | Initial preference; subsequent sessions restore the selected model. |
 | Whisper Small | 466 MiB | whisper.cpp | More processing than Base. Compare accuracy on your recordings. |
 | Whisper Medium | 1.43 GiB | whisper.cpp | Higher resource requirements. |
 | Whisper Large v3 | 2.88 GiB | whisper.cpp | Segment-level timestamps; the historical `large` selection ID is retained. |
 | Whisper Large v3 Turbo · Q5_0 | 548 MiB | whisper.cpp | Faster decoder with quantized weights; audio-aligned token timing enabled for recordings. |
-| Parakeet TDT 0.6B v3 · Q8_0 | 706 MiB | transcribe.cpp | 25 European languages; token timings; no translation. Initial evaluation option. |
+| Parakeet TDT 0.6B v3 · Q8_0 | 706 MiB | transcribe.cpp | Implemented engine; 25 European languages, token timings, no translation. |
 
 Sizes describe the pinned weight artifacts, rounded in binary units. They are not parameter counts, RAM estimates, or total installation sizes. The model catalog in `electron/services/model-catalog.ts` is the source of truth for IDs, revisions, files, bytes, SHA-256 hashes and supported languages.
 
 Each Models row uses the same identity format: model/version/quantization, then a linked Hugging Face repository identifier. The repository identifies the implemented conversion: `ggerganov/whisper.cpp` for Whisper and `handy-computer/parakeet-tdt-0.6b-v3-gguf` for Parakeet. Links are derived from the pinned artifact URLs; the original upstream source and license metadata remain in the catalog. Descriptive model paragraphs are omitted from the table. Download and Delete use Candor's ghost treatment without a resting fill or outline; no download is promoted above the others. Required unavailable-runtime explanations remain beside disabled controls.
 
-The app does not offer English-only `.en` Whisper variants in this catalog. Table badges show reference speed and word error rate from the [documented English reading test](speech-model-evaluation-2026-10-25.md), not a prediction for the current device or a universal quality grade. Higher audio/processing speed and lower word error rate are better. Neutral badges retain their meaning without colour; missing results say "Not measured". The visible table note identifies the dataset, sample and reference hardware. Keep Base available while comparing the new choices. See [the model review](transcription-model-review.md) for the broader shortlist.
+The app does not offer English-only `.en` Whisper variants in this catalog.
+
+## Performance evidence
+
+The table displays plain reference speed/error values, not badges or a universal quality grade. They come from the [25 October English reading test](archive/speech-model-evaluation-2026-10-25.md): 12 LibriSpeech test-clean speakers, 265 normalized words and 99.93 seconds, on an i7-1260P/Iris Xe with four threads and timing/pause metadata. Higher audio/processing speed and lower word error rate are better within that test. Missing results say Not measured. The visible table note identifies the dataset and hardware; it is not a prediction for this device, conversational interviews or other languages. The [earlier model review](archive/transcription-model-review.md) is historical research, not the implemented catalog.
 
 Activate the Model, Size, Reference speed, Word error rate or Status heading to sort; activate it again to reverse direction. Enter and Space work on the header buttons. Speed starts fastest first; the other columns start ascending (smallest size, lowest error rate, or natural alphabetical model/status order). The active header shows a single direction arrow and exposes `aria-sort`; Actions is not sortable. The initial view retains catalog order. Size uses raw bytes and performance uses unrounded reference values, so mixed units and equally rounded values do not give incorrect order. Unmeasured/invalid numeric values stay last in either direction, and ties retain catalog order. Sort choice and header focus survive catalog refreshes after downloads; sort selection lasts for the current component session.
 
@@ -28,7 +32,7 @@ Activate the Model, Size, Reference speed, Word error rate or Status heading to 
 2. Open **Transcription settings** beside **Include timing and pauses** in the workflow card. Choose an installed model in the modal dialog, then select **Done** (or close it with Escape). Changes apply immediately to the next transcription.
 3. Record an answer or import a file. Stop and copy the transcript through the existing workflow.
 
-Changing models does not require changing the recording workflow. Parakeet's language list is limited to supported languages, with automatic detection available. If a previously selected language is unsupported, selection resets to Auto Detect. Parakeet cannot translate speech; use Whisper for translation.
+Changing models does not require changing the recording workflow. Parakeet's language list is limited to supported languages, with automatic detection available. If a previously selected language is unsupported, selection resets to Auto Detect. Parakeet cannot translate speech. The current settings dialog does not expose a translation control; backend Whisper translation support is not a visible user workflow.
 
 Your selected model is saved locally and restored next session. If it is no longer installed or usable, the app selects Base when available, otherwise the first usable installed model, and saves that fallback. With no installed models, the workflow offers model setup.
 
@@ -50,29 +54,10 @@ Silero speech detection and quiet-level measurements estimate gaps independently
 
 ## Development and packaging
 
-Whisper continues to use the existing bundled runtime and FFmpeg. To build Parakeet's runtime:
-
-```powershell
-npm run setup:transcribe
-```
-
-On Windows this needs Git, CMake, Visual Studio 2022 C++ Build Tools and the Vulkan SDK. `npm run setup:transcribe -- --cpu` builds without Vulkan. The script pins transcribe.cpp v0.4.1 at `4d7c1ccefd39e5a9ea36cca5f8fefc6dcc14b99b`, checks the source patch, builds the CLI and copies it with version/license notices into ignored `transcribe-runtime/`. No Python is needed. Windows x64 with Intel Iris Xe is the validated target; other platforms need their own native verification.
-
-The checked-in adapter patch exposes actual token rows in JSONL; the stock CLI's broad segment output is insufficient for this app's pause-aware transcript. Availability checks require the adapter version marker.
-
-Build the runtime before packaging a release that offers Parakeet. The packaging resource list includes it, while only the existing Tiny/Base/Silero resources are bundled from `models/`. Extra test models and generated audio are excluded; additional recognition models download on demand. The ignored runtime executable and weights are not Git artifacts.
-
-Run unit tests with `npm test`. Run the real offline workflow on a locally installed model using:
-
-```powershell
-$env:WHISPER_SMOKE_MODEL='parakeet-tdt-0.6b-v3'
-npm run test:interview-smoke
-```
-
-Use `large-v3-turbo-q5_0` or `base` to select another smoke-test model. The test uses a public sample and synthetic microphone, an isolated profile, blocked renderer HTTP(S), a known long pause and intercepted clipboard writes.
+The Windows release includes the local engines. Source builds must stage the pinned transcribe.cpp v0.4.1 token-JSON adapter, version marker and license notices before packaging. Stock CLI segment output is not a replacement for this adapter. See [Development](development.md#dependencies-and-native-setup) for native commands and smoke-harness limits, [Architecture](architecture.md#packaged-runtime-layout-and-limits) for resource/profile behavior, and [Releasing](releasing.md) for validation. Runtime binaries and downloaded weights remain ignored local artifacts.
 
 ## Attribution and compatibility
 
 Whisper weights/code are MIT licensed. Parakeet v3 is developed by NVIDIA under CC-BY-4.0; this app uses the GGUF conversion published by handy-computer. The app retains runtime notices and identifies the source and conversion in its catalog. See the [NVIDIA model card](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) and [runtime source](https://github.com/handy-computer/transcribe.cpp/tree/v0.4.1).
 
-Existing downloaded model files are not deleted by this change. Installation checks require the catalog's expected byte count; an older or partial artifact with a different size is not presented as ready. Re-download that model to obtain the pinned version, or return to the checkpoint build to use an older artifact.
+Library discovery requires the catalog's expected byte count; selected weights also undergo hash verification. An older, corrupt or partial artifact is not usable simply because its filename matches. Download the pinned replacement through Models rather than bypassing verification. Model deletion is an explicit user action; failed replacement downloads do not publish partial weights over an existing file.

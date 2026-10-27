@@ -6,7 +6,7 @@ const os = require('os');
 const path = require('path');
 const { gatherSystemInfo } = require('./system-info.js');
 
-const WHISPER_CPP_REPO = 'https://github.com/ggerganov/whisper.cpp.git';
+const { ensureWhisperSource } = require('./native-source.cjs');
 
 // Parse command line arguments
 function parseArgs() {
@@ -51,11 +51,11 @@ function getVariantConfig(variantName) {
   const configs = {
     baseline: {
       name: 'baseline',
-      description: 'CPU-optimized baseline (-march=native)',
+      description: 'CPU baseline without host-native tuning (GGML_NATIVE=OFF)',
       cmakeArgs: [
         '-DWHISPER_BUILD_EXAMPLES=ON',
         '-DCMAKE_BUILD_TYPE=Release',
-        '-DGGML_NATIVE=ON'
+        '-DGGML_NATIVE=OFF'
       ],
       requiresToolchain: null
     },
@@ -109,34 +109,9 @@ function getVariantConfig(variantName) {
 
 // Ensure whisper.cpp repository exists
 async function ensureWhisperCpp(projectRoot, verbose) {
-  const whisperDir = path.join(projectRoot, 'whisper.cpp');
-
-  if (!fs.existsSync(whisperDir)) {
-    console.log('📥 Cloning whisper.cpp repository...');
-    try {
-      execSync(`git clone ${WHISPER_CPP_REPO} "${whisperDir}"`, {
-        stdio: verbose ? 'inherit' : 'pipe'
-      });
-      console.log('✅ Repository cloned successfully\n');
-    } catch (error) {
-      throw new Error('Failed to clone whisper.cpp repository. Make sure git is installed.');
-    }
-  } else {
-    console.log('✅ whisper.cpp directory already exists\n');
-  }
-
-  // Get current commit hash for documentation
-  try {
-    const commitHash = execSync('git rev-parse --short HEAD', {
-      cwd: whisperDir,
-      encoding: 'utf8'
-    }).trim();
-    console.log(`📌 Using whisper.cpp commit: ${commitHash}\n`);
-    return commitHash;
-  } catch (error) {
-    console.warn('⚠️  Could not determine whisper.cpp commit hash\n');
-    return 'unknown';
-  }
+  const commit = ensureWhisperSource(projectRoot);
+  console.log(`Pinned whisper.cpp: ${commit}`);
+  return commit;
 }
 
 // Capture environment variables from Windows batch file
@@ -378,6 +353,7 @@ async function buildVariant(variantName, systemInfo, options) {
 
   // Clean if requested
   if (options.clean && fs.existsSync(buildDir)) {
+    if (!path.resolve(buildDir).startsWith(path.resolve(whisperDir) + path.sep)) throw new Error('Build cleanup escaped the native source directory');
     console.log('🧹 Cleaning build directory...');
     fs.rmSync(buildDir, { recursive: true, force: true });
   }
@@ -452,7 +428,7 @@ async function buildVariant(variantName, systemInfo, options) {
     console.log('   This may take several minutes...');
 
     const startTime = Date.now();
-    execFileSync('cmake', ['--build', '.', '--config', 'Release'], {
+    execFileSync('cmake', ['--build', '.', '--config', 'Release', '--parallel', '4'], {
       cwd: buildDir,
       stdio: options.verbose ? 'inherit' : 'pipe',
       env: env

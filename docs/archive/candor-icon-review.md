@@ -1,5 +1,7 @@
 # Icon review
 
+> Historical record from October 2026. Earlier findings, commands and verification claims may be superseded. Use the [current documentation index](../README.md), [current widget inventory](../candor-widget-review.md) and [documentation audit](../../AUDIT_REPORT.md) for present behavior and known test-harness limits.
+
 Initially reviewed 25 October 2026 after checkpoint `c459137`. Sources: current Candor Icons, Button, Toolbar, Disclosure, Alert, Badge and AccessibleText stories/constructions at `a4d27af8edc503aa801b7b336e1e23b41287c9e5`, plus the app templates/styles and screenshots of the real built app from `disabled-final`. Initial audit inspected light/dark recording, ready, copied, Models and History. The findings below describe that starting point; subsequent implementation and verification follow at the end.
 
 ## The role determines the icon

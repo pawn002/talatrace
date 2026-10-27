@@ -1,6 +1,8 @@
 # Local model evaluation — 25 October 2026
 
-Completed an automated reference-transcript evaluation through the app's real transcription service. No user recordings, manual reference transcription or cloud recognition were needed. The harness and preparation commands are documented in [Automated local speech evaluation](speech-model-evaluation.md).
+> Historical record from October 2026. Earlier findings, commands and verification claims may be superseded. Use the [current documentation index](../README.md), [current widget inventory](../candor-widget-review.md) and [documentation audit](../../AUDIT_REPORT.md) for present behavior and known test-harness limits.
+
+Completed an automated reference-transcript evaluation through the app's real transcription service. No user recordings, manual reference transcription or cloud recognition were needed. The harness and preparation commands are documented in [Automated local speech evaluation](../speech-model-evaluation.md).
 
 ## Clean-speech baseline
 

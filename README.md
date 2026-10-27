@@ -1,77 +1,44 @@
 # TalaTrace
 
-Private audio transcription with local Whisper and Parakeet models. Angular frontend, Electron main process — no backend server, no internet required after setup.
+Private audio recording and transcription with local Whisper and Parakeet models. Record an answer or import audio, then copy readable timing/pause context into a chat or terminal. Recognition stays on your device; model downloads need an initial connection.
 
-Previously named **Whisper Transcription**, TalaTrace has a model-neutral name: Swedish *tala* (“speak”) meets English *trace*, reflecting speech with timing context. Whisper and Parakeet remain selectable transcription engines. The repository is now [pawn002/talatrace](https://github.com/pawn002/talatrace); old repository links redirect here. The internal package name and installer identity remain stable. Existing local data is retained in its original profile directory; downloaded models and preferences do not need to be recreated.
-
-Record interview answers directly in the app: **Record answer → Stop & transcribe → Copy transcript**. Controls stay in stable positions, with a persistent recording status and final duration. Readable timestamped text and locally detected gaps in speech preserve pacing context for use in AI chats and TUIs. Original quiet-level measurements remain available for comparison. Existing audio-file transcription and TXT/SRT/VTT/JSON export remain available.
+Formerly **Whisper Transcription**. The existing repository is now [pawn002/talatrace](https://github.com/pawn002/talatrace); old links redirect. The internal package/installer identity and legacy profile directories remain stable to retain downloaded models and preferences.
 
 ## Download
 
-The [latest release](https://github.com/pawn002/talatrace/releases/latest) provides a Windows x64 installer and ZIP. The Windows package includes the local Whisper and Parakeet runtimes; download model weights from **Models**, then choose the model in **Transcription settings**. Install over 1.1.5 to keep existing models and preferences. The Windows builds are unsigned. macOS/Linux packaging is not validated for 1.2.0.
+Get the unsigned Windows x64 installer or ZIP and `SHA256SUMS.txt` from the [latest release](https://github.com/pawn002/talatrace/releases/latest). The Windows package includes both native recognition engines, FFmpeg and speech-detection resources; choose/download model weights in **Models**, then select the model in **Transcription settings**.
+
+Windows is the validated 1.2.0 release target. [Linux support is tracked in #24](https://github.com/pawn002/talatrace/issues/24); macOS/Linux build-target declarations are not verified releases. See [Installation](docs/installation.md) for upgrade/storage details and [1.2.0 notes](docs/releases/1.2.0.md) for tested limits.
 
 <!-- Preserve the Getting started fragment in the original blog post. -->
 <a id="-quick-start"></a>
 
 ## Quick Start
 
-**Prerequisites:** Node.js 20.19+, 22.12+ or 24+, npm v10+, Git, and platform build tools (Visual Studio Build Tools on Windows, Xcode CLI on macOS, build-essential on Linux). See [Installation Guide](docs/installation.md) for details.
+In the app: **Record answer → Stop & transcribe → Copy transcript**. The Audio file subtab provides the equivalent import workflow. Enable **Include timing and pauses** for a readable timeline; timing/gaps are approximate context, not inferred thinking time. Save needed results: History belongs to the current session and is not a persistent archive.
 
-```bash
+For a source checkout:
+
+```powershell
 git clone https://github.com/pawn002/talatrace.git
 cd talatrace
-npm run setup   # installs deps, builds whisper.cpp, downloads FFmpeg + base models
-npm run setup:transcribe -- --cpu  # optional: build the local Parakeet runtime (CPU)
-npm run dev     # starts frontend (localhost:4200) + Electron
 ```
 
-## Scripts
+Follow [Development](docs/development.md) for npm/native dependencies and the known setup-script limitations before running the app. End users should use the packaged download rather than install a development toolchain.
 
-| Command | Description |
-|---|---|
-| `npm run dev` | Start dev mode (frontend + Electron) |
-| `npm run build` | Compile TypeScript + Angular |
-| `npm run dist:win` | Build Windows installer — **run as administrator** |
-| `npm run dist:mac` | Build macOS DMG |
-| `npm run dist:linux` | Build Linux AppImage / deb |
-| `npm run clean` | Remove intermediate build artifacts (`dist/`, `frontend/dist/`) |
-| `npm run clean:release` | Remove installer output (`release/`) |
-| `npm run release:interactive` | Guided release wizard (version bump, changelog, tag) |
-| `npm test` | Run frontend and Electron tests |
+## Contribute
 
-## Project Structure
+Read [AGENTS.md](AGENTS.md), then use the [documentation index](docs/README.md). Common commands, once dependencies/native resources exist:
 
-```
-talatrace/
-├── electron/        # Main process — IPC handlers, Whisper + transcription services
-├── frontend/        # Angular renderer — UI components, Candor design system
-├── build/           # Build assets (app icon)
-├── scripts/         # Setup and release scripts
-└── docs/            # Documentation
+| Command | Purpose |
+| --- | --- |
+| `npm run start` | Build and launch the desktop app |
+| `npm run dev` | Angular dev server plus Electron |
+| `npm run build` | Compile renderer and main/preload/services |
+| `npm test` | Frontend Jest and compiled Electron tests |
+| `npm run preview:workflow` | Built-app workflow fixtures, screenshots and metrics |
+| `npm run dist:win` | Package Windows NSIS/ZIP; see [Releasing](docs/releasing.md) first |
 
-# Created by npm run setup (gitignored):
-├── whisper.cpp/     # Whisper.cpp binary
-├── models/          # Downloaded Whisper model files
-└── ffmpeg/          # Bundled FFmpeg
-```
+[Architecture](docs/architecture.md) explains the implementation; [Models](docs/models.md) describes current model behavior; [archived reviews](docs/archive/README.md) preserve research and past design decisions. Current user instructions belong in the guides, not duplicated audit logs.
 
-## Documentation
-
-| Guide | Contents |
-|---|---|
-| [Installation](docs/installation.md) | Full setup instructions for all platforms |
-| [Usage](docs/usage.md) | Transcription workflow, model management, export formats |
-| [Models](docs/models.md) | Model comparison, recommendations, performance benchmarks |
-| [Development](docs/development.md) | Dev environment, architecture, testing, contributing |
-| [Architecture](docs/architecture.md) | IPC design, service layer, security model |
-| [Troubleshooting](docs/troubleshooting.md) | Common issues and fixes |
-
-## Contributing
-
-1. Fork and create a feature branch
-2. Follow the commit and PR conventions in [docs/development.md](docs/development.md)
-3. Run `npm test` before opening a PR
-
-## License
-
-MIT — see [LICENSE](LICENSE)
+MIT — see [LICENSE](LICENSE).

@@ -1,239 +1,48 @@
-# Installation Guide
+# Install and update TalaTrace
 
-This guide covers source setup for TalaTrace. The 1.2.0 release provides a verified Windows x64 installer and ZIP; macOS/Linux packaging has not been validated for this release. Windows users can start with the [latest release](https://github.com/pawn002/talatrace/releases/latest) without installing Node.js or build tools. Source-build prerequisites follow below.
+## Windows release
 
-## Table of Contents
+TalaTrace 1.2.0 provides an unsigned Windows x64 installer and ZIP on the [release page](https://github.com/pawn002/talatrace/releases/latest). End users do not need Node.js, Python, CMake or a compiler. The package includes the native Whisper/Parakeet engines, FFmpeg and the speech detector. Recognition model weights are selected and downloaded in the app.
 
-- [System Requirements](#system-requirements)
-- [Prerequisites](#prerequisites)
-- [Installation Steps](#installation-steps)
-- [Platform-Specific Setup](#platform-specific-setup)
-- [Verification](#verification)
-- [Next Steps](#next-steps)
+1. Download `TalaTrace-Setup-1.2.0.exe` or the ZIP, plus `SHA256SUMS.txt` if checking the download.
+2. Close any existing TalaTrace/Whisper Transcription session after saving transcripts you need.
+3. Run the installer, then launch **TalaTrace** from the Desktop or Start Menu. For the ZIP, extract the complete archive before running `TalaTrace.exe`; its resources must stay beside it.
+4. Open **Models**, download a model, then select it in **Transcription settings**. See [Usage](usage.md) and [Models](models.md).
 
-## System Requirements
+The release is unsigned; verify its source and checksum before deciding whether to run it. In PowerShell:
 
-### Minimum Requirements
-- **RAM**: 4 GB (8 GB recommended for larger models)
-- **Storage**: 2 GB free space (more for additional models)
-- **OS**: 
-  - Windows 10/11 (64-bit)
-  - macOS 10.15+ (Catalina or later)
-  - Ubuntu 20.04+ / Debian 11+
-
-### Recommended Requirements
-- **RAM**: 8 GB or more
-- **Storage**: 5 GB free space
-- **CPU**: Multi-core processor (4+ cores recommended)
-
-## Prerequisites
-
-### All Platforms
-
-**[Node.js](https://nodejs.org/) and npm**
-- Node.js 20.19+, 22.12+ or 24+ (matching Angular 21's engine requirement)
-- npm v10.0.0 or higher
-
-Verify installation:
-```bash
-node --version  # Check against the supported versions above
-npm --version   # Should show v10.0.0 or higher
+```powershell
+Get-FileHash -LiteralPath .\TalaTrace-Setup-1.2.0.exe -Algorithm SHA256
 ```
 
-**Git**
-- Required for cloning whisper.cpp during setup
+Compare the hash with the matching filename in `SHA256SUMS.txt`. Allow disk space for the app, downloaded weights and temporary audio; [Models](models.md) lists the actual model sizes. Model size alone is not a RAM requirement or a hardware performance guarantee.
 
-### Platform-Specific Prerequisites
+## Upgrade from Whisper Transcription
 
-#### Windows
+The existing GitHub repository was renamed to [pawn002/talatrace](https://github.com/pawn002/talatrace). Old repository links redirect. Do not create a new repository using the old name.
 
-1. **[Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022)**
-   - Install "Desktop development with C++" workload
+Close the app, back up its profile, then install over the existing installation. The 1.1.5 → 1.2.0-rc.1 → 1.2.0 Windows path was tested with retained models/preferences, renamed Desktop/Start Menu shortcuts and one unchanged uninstall entry. Fresh NSIS installation, uninstall and downgrade/rollback were not exercised for 1.2.0. See the [release notes](releases/1.2.0.md) for the validation limits.
 
-2. **[CMake](https://cmake.org/download/)**
-   - Select "Add CMake to system PATH" during installation
+History belongs to the current session; save transcripts before closing. Neither the rename nor installation makes session history persistent.
 
-3. **[Git for Windows](https://git-scm.com/download/win)**
-   - Use default installation options
+## Profile and model storage
 
-#### macOS
+The internal package name stays `whisper-electron-app` for compatibility. On Windows the usual profile is `%APPDATA%\whisper-electron-app`; weights are in its `models` subdirectory. A packaged installation with an existing `%APPDATA%\Whisper Transcription` profile keeps that directory instead. Inspect the Models directory reported by the app's startup log when locating a particular installation.
 
-1. **Xcode Command Line Tools**
-   ```bash
-   xcode-select --install
-   ```
+In source/development mode, repository `models/` is also used for setup files and one-time migration. App downloads go to the writable profile, not back into the checkout. Deleting all models in the app intentionally leaves an empty library. A fresh packaged profile also requires model selection/download in Models; bundled resource files do not imply an installed model library.
 
-2. **Verify Installation**
-   ```bash
-   xcode-select -p
-   # Should output: /Library/Developer/CommandLineTools
-   ```
+Back up the complete profile while the app is closed if preserving preferences and downloaded weights. A backup inside `release/` will be deleted by `npm run clean:release`; keep recovery material outside that disposable folder. This project's ignored `.local-backups/` is used for local upgrade evidence.
 
-#### Linux (Ubuntu/Debian)
+## Linux and macOS
 
-1. **Build Tools**
-   ```bash
-   sudo apt-get update
-   sudo apt-get install build-essential cmake git
-   ```
+Linux support is [open work in #24](https://github.com/pawn002/talatrace/issues/24). The repository declares AppImage/deb and macOS targets, but 1.2.0 publishes only verified Windows x64 artifacts. Do not treat the target names or old platform instructions as tested installation support.
 
-2. **Verify Installation**
-   ```bash
-   gcc --version
-   cmake --version
-   git --version
-   ```
+## Build from source
 
-## Installation Steps
+Contributors should follow [Development](development.md), including its native-runtime path checks and current setup-script limitations. Source setup is separate from installing the Windows release.
 
-### 1. Clone the Repository
+## Remove the app
 
-```bash
-git clone https://github.com/pawn002/talatrace.git
-cd talatrace
-```
+For the installed Windows app, use **Settings → Apps → Installed apps → TalaTrace → Uninstall**. For a ZIP extraction, close the app before removing the extracted files. Removing a source checkout is not the same as uninstalling an installed app.
 
-### 2. Run Setup Script
-
-The setup script automates the entire installation process:
-
-```bash
-npm run setup
-```
-
-This command will:
-1. Install root dependencies
-2. Install frontend dependencies
-3. Clone whisper.cpp repository
-4. Build whisper.cpp for your platform
-5. Download and bundle FFmpeg
-6. Download tiny and base Whisper models (~113 MB)
-
-**Expected Duration**: 5-15 minutes depending on your internet speed and CPU.
-
-### 3. Verify Setup
-
-After setup completes, verify the installation:
-
-```bash
-# Check if whisper.cpp baseline binary was built (Windows)
-dir whisper.cpp\build-baseline\bin\Release\whisper-cli.exe
-
-# Check if models were downloaded
-ls models/
-
-# Should see:
-# ggml-tiny.bin
-# ggml-base.bin
-```
-
-## Platform-Specific Setup
-
-### Windows-Specific Steps
-
-If you encounter permission errors during setup:
-
-1. **Run as Administrator**
-   - Right-click Command Prompt or PowerShell
-   - Select "Run as administrator"
-   - Navigate to project directory
-   - Run `npm run setup`
-
-2. **Antivirus/Windows Defender**
-   - Some antivirus software may block the build process
-   - Temporarily disable or add exception for the project folder
-
-### macOS-Specific Steps
-
-If you get "xcrun: error" during setup:
-
-```bash
-# Ensure Xcode Command Line Tools are properly installed
-sudo xcode-select --reset
-xcode-select --install
-
-# Accept Xcode license
-sudo xcodebuild -license accept
-```
-
-### Linux-Specific Steps
-
-If setup fails with "Permission denied":
-
-```bash
-# Ensure you have proper permissions
-sudo chown -R $USER:$USER .
-
-# Re-run setup
-npm run setup
-```
-
-## Verification
-
-### Test the Application
-
-After installation, test that everything works:
-
-1. **Start Development Mode**
-   ```bash
-   npm run dev
-   ```
-
-2. **Verify Services**
-   - Frontend should start on http://localhost:4200
-   - Electron app should launch immediately (no startup delay)
-
-3. **Test Transcription**
-   - Select an audio file
-   - Start transcription with the base model
-   - Verify results appear
-
-### Common Installation Issues
-
-See the [Troubleshooting Guide](troubleshooting.md) for solutions to common installation problems.
-
-## Next Steps
-
-Once installation is complete:
-
-1. **Read the Usage Guide** - Learn how to use all features: [usage.md](usage.md)
-2. **Download Additional Models** - Get larger models for better accuracy: [models.md](models.md)
-3. **Build Production App** - Create distributable package:
-
-   > **⚠️ Windows Users**: Building distribution packages requires **administrator privileges**. Run your terminal as administrator before executing these commands.
-
-   ```bash
-   npm run dist    # Requires admin on Windows
-   ```
-
-## Updating
-
-To update to the latest version:
-
-```bash
-# Pull latest changes
-git pull origin main
-
-# Re-run setup to update dependencies and rebuild
-npm run setup
-```
-
-## Uninstallation
-
-To completely remove the application:
-
-```bash
-# From the project directory
-cd ..
-rm -rf talatrace
-
-# Or on Windows (PowerShell)
-Remove-Item -Recurse -Force talatrace
-```
-
-Models and app data are stored in:
-- **Windows**: `C:\Users\<username>\AppData\Roaming\whisper-electron-app`
-- **macOS**: `~/Library/Application Support/whisper-electron-app`
-- **Linux**: `~/.config/whisper-electron-app`
-
-TalaTrace retains this legacy directory name to preserve existing models and preferences. Packaged installations that already used a `Whisper Transcription` directory continue using that directory instead. Renaming the app does not require downloading models again.
+Downloaded weights/preferences reside in the profile described above. Back it up first if deciding to remove that data separately. The 1.2.0 uninstall/data-retention behavior has not been verified; this guide does not promise that uninstall preserves or deletes it.

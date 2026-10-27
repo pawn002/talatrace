@@ -1,5 +1,7 @@
 # Prior art review: continue, pivot, or retire
 
+> Historical record from October 2026. Earlier findings, commands and verification claims may be superseded. Use the [current documentation index](../README.md), [current widget inventory](../candor-widget-review.md) and [documentation audit](../../AUDIT_REPORT.md) for present behavior and known test-harness limits.
+
 Review date: October 23, 2026. Related issues: #16 (comparison), #22 (recording), #20 (model readiness), #21 (design tokens).
 
 ## Decision status
