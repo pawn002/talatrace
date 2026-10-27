@@ -24,8 +24,8 @@
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:electron\"",
     "dev:frontend": "cd frontend && npm run start",
     "dev:electron": "npm run build:electron && wait-on tcp:4200 && npx electron . --dev",
-    "setup": "npm install && npm run install:all && node scripts/setup-whisper.js",
-    "install:all": "cd frontend && npm install",
+    "setup": "npm ci && npm run install:all && node scripts/setup-whisper.js",
+    "install:all": "npm --prefix frontend ci",
     "build:whisper": "node scripts/build-whisper.js",
     "setup:transcribe": "node scripts/setup-transcribe.cjs",
     "system-info": "node scripts/system-info.js",
@@ -43,9 +43,9 @@
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:win": "npm run build && electron-builder --win",
     "dist:linux": "npm run build && electron-builder --linux",
-    "version:patch": "npm version patch && npm run version:sync",
-    "version:minor": "npm version minor && npm run version:sync",
-    "version:major": "npm version major && npm run version:sync",
+    "version:patch": "node scripts/prepare-version.cjs patch",
+    "version:minor": "node scripts/prepare-version.cjs minor",
+    "version:major": "node scripts/prepare-version.cjs major",
     "version:sync": "node scripts/sync-version.js",
     "release": "npm run version:sync && git push --follow-tags",
     "release:interactive": "node scripts/release.js"
@@ -124,8 +124,6 @@
         "from": "models",
         "to": "models",
         "filter": [
-          "ggml-tiny.bin",
-          "ggml-base.bin",
           "ggml-silero-v5.1.2.bin"
         ]
       },
@@ -133,7 +131,10 @@
         "from": "ffmpeg",
         "to": "ffmpeg",
         "filter": [
-          "**/*"
+          "bin/ffmpeg.exe",
+          "bin/ffmpeg",
+          "licenses/**/*",
+          "version.json"
         ]
       }
     ],

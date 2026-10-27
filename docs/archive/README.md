@@ -14,6 +14,7 @@ These are dated records, not current installation/user/contributor instructions.
 | [Typography review](typography-review.md) | Historical reading-measure/type changes |
 | [Visual review](visual-review.md) | Earlier prototype critique, superseded by later workflow passes |
 | [TalaTrace migration/release](talatrace-release-migration.md) | Completed rename, redirect tests, Windows upgrade and 1.2.0 publication evidence |
+| [Legacy container sketches](legacy-container/README.md) | Removed-backend Docker/compose files, archived instead of presented as a desktop build path |
 
 Earlier records may say work was uncommitted or describe controls/cards/badges that were subsequently replaced. Preserve that chronology rather than mixing it into current guides. The older interview smoke's isolation claims have a [known implementation flaw](../../AUDIT_REPORT.md); its historical assertions do not make that command safe for a real profile. The speech-evaluation runner and packaged smoke have different isolation mechanisms.
 

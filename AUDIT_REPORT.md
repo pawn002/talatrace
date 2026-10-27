@@ -1,6 +1,6 @@
 # Documentation audit — 26 October 2026
 
-Audited the 24 tracked Markdown documents at `07835cc` (TalaTrace 1.2.0 release/migration complete), plus the scripts/configuration that their claims depend on. This cleanup changes documentation and provenance/legacy-warning comments only; no UI, engine behavior, version or installed user data changes.
+Audited the 24 tracked Markdown documents at `07835cc` (TalaTrace 1.2.0 release/migration complete), plus the scripts/configuration that their claims depend on. The initial cleanup changed documentation and provenance/legacy-warning comments only. The subsequent tooling fixes are recorded below; neither phase changes the UI, app version or installed user data.
 
 ## Outcome
 
@@ -28,7 +28,7 @@ The stable README Quick Start anchors and user-guide filenames remain; `docs/can
 
 These are visible in the code; the docs now disclose them instead of claiming fixes that were not made.
 
-Follow-up on 27 October: the interview smoke isolation defect is fixed. It assigns appData/userData/sessionData before main, links only the selected model into the owned profile and asserts startup retained isolation. Real capture → local recognition → Copy → file import → second recording passes with networking blocked; the fast startup guard passes independently. Other findings below describe the original baseline; further resolutions are recorded as they land.
+The numbered findings below describe the original audit baseline. Their resolutions on 27 October are recorded after the list; they are retained here to explain the follow-up changes.
 
 1. **Interview smoke profile isolation (priority).** `tests/electron/interview-smoke.cjs` sets userData, then requires main; `electron/main.ts` assigns userData again from appData. The older command can use the real profile despite historical isolation claims. It was not run during this audit. Use the packaged smoke's pre-start appData isolation, or repair/test the older harness before recommending it for valuable profiles.
 2. **Native bootstrap drift.** `setup-whisper.js` uses legacy make/CMake/output assumptions and unpinned setup downloads. `build-whisper.js` writes `native/`, while the app expects the variant layouts. Current guides explicitly verify native paths; a clean-machine bootstrap was not rerun or repaired. A reproducible pinned/checksummed bootstrap needs code work.
@@ -37,7 +37,20 @@ Follow-up on 27 October: the interview smoke isolation defect is fixed. It assig
 5. **Release shortcuts/helper drift.** The npm version shortcuts create a commit/tag before frontend synchronization; use `--no-git-tag-version` and synchronize before tagging. The wizard still has a blanket Windows admin prompt and a top-level artifact search. The new guide explains the manual validation/custom-output path; helper behavior is unchanged.
 6. **Legacy container configurations.** Root Dockerfile/compose still reference a removed backend, Node 18 and HTTP services. They are not current desktop/container support. Added explicit legacy comments, without pretending to repair or validate a container workflow.
 
-Recording/file metadata differences are documented current behavior, not silently changed by this audit. Linux delivery, fresh NSIS installation, uninstall/rollback, the 240px effective-width navigation gap and manual accessibility/screen-reader review remain outside this documentation cleanup.
+### Follow-up resolutions — 27 October 2026
+
+All six tooling findings above have been addressed on `codex/docs-audit`:
+
+1. The interview smoke assigns appData/userData/sessionData before main, links only the selected model into its owned profile and asserts startup retained isolation. Real capture → local recognition → Copy → file import → second recording passes with networking blocked; the fast startup guard passes independently.
+2. Windows x64 setup now pins Whisper's exact commit, verifies Tiny/Base through the app catalog and checks exact size/SHA-256 for pinned Silero and dated FFmpeg artifacts. Staged downloads preserve existing files on failure. FFmpeg notices/provenance are retained. Setup builds current CPU Whisper and Parakeet paths; CPU/Vulkan Parakeet caches are separate. The old Whisper build command delegates to the current builder. End-to-end native setup passed on this development checkout; a fresh-machine bootstrap and other hosts remain unvalidated.
+3. The preload selected-file type now matches `{path, size}`/null.
+4. Unused Tiny/Base weights are excluded from packages. Silero remains bundled; fresh profiles continue using explicit recognition-model downloads. The actual unpacked package was checked for this resource layout.
+5. Version shortcuts synchronize metadata without committing/tagging and enforce main. Synchronization parses all targets before writing. Release discovery handles nested/custom output, rejects ambiguous basenames and excludes backup/runtime/other-version files. Packaging uses structured arguments without an administrator requirement. The wizard uploads into a draft; publication remains a separate verified step. No release/version change or publication was performed.
+6. Obsolete Docker/compose files moved to `docs/archive/legacy-container/`, with an explanation; no container support is claimed.
+
+Verification: 130 frontend tests and 48 Electron tests passed. New regressions cover failed/redirected/oversized downloads, source pins/local edits, FFmpeg staging, metadata synchronization without commits/tags and artifact selection. An actual unpacked Windows package passed offline Base/Parakeet recognition, retained model preference after restart, legacy-profile retention and clean-profile launch, all using isolated temporary profiles. This is not an installer test. Installed user data and recovery backups were not modified. UI was unchanged; no new visual/accessibility review is claimed.
+
+Recording/file metadata differences remain documented current behavior. Linux delivery, fresh NSIS installation, uninstall/rollback, the 240px effective-width navigation gap and manual accessibility/screen-reader review remain outside this work.
 
 ## File inventory and disposition
 
@@ -72,6 +85,8 @@ New organizational files are this report, [Releasing](docs/releasing.md), [archi
 
 ## Verification and limits
 
-Checked 157 repository-local Markdown file/heading destinations across all 28 resulting documents, 40 active npm-script mentions against package.json, all nine IPC request names and the five supported event names against main/preload, and version agreement across manifests/lockfiles. No broken checked links/anchors or missing mentioned npm scripts remain. Native path/feature statements were compared with code. Compared all ten archived records against HEAD: only historical notices and rebased links differ. Current guides were read again after reorganization; `git diff --check` passes. AGENTS.md, package manifests, lockfiles and application behavior are unchanged.
+The initial audit checked 157 repository-local Markdown file/heading destinations across 28 documents, 40 active npm-script mentions against package.json, all nine IPC request names and five supported event names against main/preload, and version agreement across manifests/lockfiles. Native path/feature statements were compared with code. All ten archived records preserved their content apart from historical notices and rebased links. AGENTS.md and lockfiles were unchanged.
 
-Application tests and visual previews were not rerun: no executable application behavior changed. The 172-test / 126-state figures are explicitly attributed to the prior 1.2.0 validation, not claimed as new audit runs. Historical external vendor/model research was not freshly revalidated, and not every incoming external main-branch deep link can be discovered from the repo. Fresh native setup, unsupported platforms and the documented tooling defects remain untested/unfixed here.
+After the tooling follow-up, checked 159 local Markdown destinations across 29 documents and 30 active npm-script mentions outside fenced examples; no broken checked destinations or missing scripts remain. All four manifest/lockfile versions remain 1.2.0. `git diff --check` passes.
+
+For the initial documentation-only audit, application tests and visual previews were not rerun. The 172-test / 126-state figures belong to the prior 1.2.0 validation. The subsequent tooling work and its new checks are recorded above. Historical external vendor/model research was not freshly revalidated, and not every incoming external main-branch deep link can be discovered from the repo.

@@ -39,7 +39,7 @@ If copying fails, try **Save transcript…**. Persistent notifications remain un
 
 ## Source-build and packaging failures
 
-Use [Development](development.md) for the real runtime paths and known legacy setup limitations. `npm run build:whisper` writes a legacy `native/` layout; it is not a repair for missing current app runtimes. Run commands from the repo root and preserve local work when rebuilding.
+Use [Development](development.md) for runtime paths and verified Windows setup. `npm run build:whisper` rebuilds the current CPU baseline. A source-pin or tracked-edit error requires inspecting your native checkout; setup deliberately does not reset local work. Run commands from the repo root.
 
 If Electron behaves like Node, remove `ELECTRON_RUN_AS_NODE` from the shell before launch. A distribution failure mentioning macOS `.dylib` symlink creation inside electron-builder's Windows cache is a tool-extraction privilege issue; see [Releasing](releasing.md#build-environment). Administrator privileges are not a universal requirement for running or building the app. Do not disable antivirus or recursively change ownership of the checkout as a general remedy.
 

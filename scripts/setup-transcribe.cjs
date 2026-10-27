@@ -14,7 +14,7 @@ const status = run('git', ['-C', source, 'status', '--porcelain'], { stdio: 'pip
 if (!status) run('git', ['-C', source, 'apply', patch]);
 const diff = run('git', ['-C', source, 'diff', '--binary'], { stdio: 'pipe', encoding: 'utf8' }).replace(/\r\n/g, '\n').trim();
 if (diff !== fs.readFileSync(patch, 'utf8').replace(/\r\n/g, '\n').trim()) throw new Error('Runtime source differs from the pinned token-JSON adapter patch.');
-const build = path.join(source, 'build');
+const build = path.join(source, process.argv.includes('--cpu') ? 'build-cpu' : 'build-vulkan');
 const args = ['-S', source, '-B', build, '-DTRANSCRIBE_BUILD_TESTS=OFF', '-DGGML_NATIVE=OFF'];
 if (process.platform === 'win32') args.push('-G', 'Visual Studio 17 2022', '-A', 'x64');
 if (process.platform === 'win32' || process.platform === 'linux') args.push(`-DTRANSCRIBE_VULKAN=${process.argv.includes('--cpu') ? 'OFF' : 'ON'}`);

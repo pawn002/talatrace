@@ -17,7 +17,7 @@ Use focused branches and preserve user changes. Codex-created branches use `code
 
 Keep audio local. Do not run a supposedly isolated harness against a valuable profile without checking startup path assignment. The interview smoke now isolates appData/userData/sessionData and asserts the post-start paths; older revisions did not. See Development. `.local-backups/` is ignored recovery material, not a build artifact. `npm run clean:release` deletes `release/`.
 
-Final version bumps and release sections belong on main after feature work merges. The release wizard enforces main. Avoid npm version shortcuts that create a tag before frontend/lockfile synchronization; use the staged procedure in Releasing. Never rename the internal app ID/profile identity merely to match branding.
+Final version bumps and release sections belong on main after feature work merges. The release wizard and version preparation shortcuts enforce main. The shortcuts synchronize metadata without creating commits or tags; follow Releasing before tagging. Never rename the internal app ID/profile identity merely to match branding.
 
 ## Documentation maintenance
 

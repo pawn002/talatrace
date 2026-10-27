@@ -20,7 +20,9 @@ npm version 1.2.1 --no-git-tag-version
 npm run version:sync
 ```
 
-Verify root/frontend manifests and both lockfiles agree before committing/tagging. The `version:patch/minor/major` shortcuts invoke npm version before synchronization; do not treat their initial tag as a synchronized release commit. The interactive release helper enforces main, but its Windows administrator prompt and top-level `release/` artifact lookup do not replace validation. Custom output directories require explicit artifact paths.
+Alternatively, `npm run version:patch`, `npm run version:minor` or `npm run version:major` prepares synchronized versions on main without creating a commit or tag. Verify root/frontend manifests and both lockfiles agree before committing/tagging. Version synchronization parses all target files before writing, so malformed metadata fails before changing versions.
+
+Run the optional wizard through `npm run release:interactive`. It enforces main and discovers artifacts recursively while excluding unpacked runtimes, backups and other versions. Duplicate artifact basenames fail rather than selecting one silently. Set `TALATRACE_ARTIFACTS_DIR` to use a custom build/discovery directory. The wizard creates a draft and uploads assets; verify uploaded hashes before publishing it manually.
 
 ## Build environment
 

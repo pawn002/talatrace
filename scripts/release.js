@@ -171,14 +171,45 @@ function checkGhCli() {
   return execCommand('gh --version', { silent: true, ignoreError: true }).success;
 }
 
-function findArtifacts(version) {
-  const distDir = path.join(process.cwd(), 'release');
+function findArtifacts(version, root = process.cwd()) {
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const distDir = path.resolve(root, process.env.TALATRACE_ARTIFACTS_DIR || pkg.build?.directories?.output || 'release');
   if (!fs.existsSync(distDir)) return [];
-
   const exts = ['.exe', '.zip', '.dmg', '.AppImage', '.deb'];
-  return fs.readdirSync(distDir)
-    .filter((f) => exts.some((ext) => f.endsWith(ext)) && f.includes(version))
-    .map((f) => ({ path: path.join(distDir, f), name: f }));
+  const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const versionPattern = new RegExp(`(?:^|[ ._-])v?${escaped}(?=$|[ ._-])`, 'i');
+  const artifacts = [];
+  function visit(directory) {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isSymbolicLink()) continue;
+      const file = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        if (!entry.name.startsWith('.') && !/unpacked|build-tools|backup|profile/i.test(entry.name)) visit(file);
+        continue;
+      }
+      const ext = exts.find(ext => entry.name.endsWith(ext));
+      if (!ext) continue;
+      const stem = entry.name.slice(0, -ext.length), match = versionPattern.exec(stem);
+      if (!match) continue;
+      const suffix = stem.slice(match.index + match[0].length);
+      // A stable version must not accidentally pick a prerelease or 1.2.01.
+      if (suffix && !/^[ ._-](?:win|windows|linux|mac|macos|darwin|x64|arm64|ia32)(?:[ ._-]|$)/i.test(suffix)) continue;
+      artifacts.push({ path: file, name: entry.name });
+    }
+  }
+  visit(distDir);
+  const names = new Set();
+  for (const artifact of artifacts) {
+    if (names.has(artifact.name)) throw new Error('Duplicate artifact name; select one output with TALATRACE_ARTIFACTS_DIR: ' + artifact.name);
+    names.add(artifact.name);
+  }
+  return artifacts.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+function packagingArguments(platform, output) {
+  const target = { win32: 'dist:win', darwin: 'dist:mac', linux: 'dist:linux' }[platform];
+  if (!target) throw new Error('Unsupported packaging host: ' + platform);
+  return ['run', target, '--', '--publish', 'never', ...(output ? ['--config.directories.output=' + path.resolve(output)] : [])];
 }
 
 function extractVersionSection(changelog, version) {
@@ -329,51 +360,17 @@ async function step4_updateFiles(version) {
 
 async function step5_build(version) {
   console.log('\n🔨 Step 5: Building application...');
-
-  if (process.platform === 'win32') {
-    console.log('\n⚠️  electron-builder requires administrator privileges on Windows.');
-    console.log('\nPlease complete these steps:');
-    console.log('  1. Open a NEW terminal as administrator');
-    console.log('     (Right-click terminal app → "Run as administrator")');
-    console.log('  2. Navigate to this directory:');
-    console.log(`     cd "${process.cwd()}"`);
-    console.log('  3. Run the build command:');
-    console.log('     npm run dist:win');
-    console.log('  4. Wait for the build to complete');
-    console.log('  5. Return here and confirm\n');
-
-    const confirmed = (await question('Have you completed the build? [y/N]: ')).trim().toLowerCase();
-    if (confirmed !== 'y') {
-      console.log('\n⏭️  Skipped build');
-      console.log('⚠️  Run in admin terminal before uploading artifacts: npm run dist:win');
-      return false;
-    }
-
-    const artifacts = findArtifacts(version);
-    if (artifacts.length === 0) {
-      console.log(`\n⚠️  No build artifacts matching version ${version} found in release/`);
-      const continueAnyway = (await question('Continue anyway? [y/N]: ')).trim().toLowerCase();
-      if (continueAnyway !== 'y') {
-        throw new Error('Build artifacts not found. Complete the build and run the script again.');
-      }
-    } else {
-      console.log(`✅ Build artifacts verified (${artifacts.length} file(s) found)`);
-      artifacts.forEach((a) => console.log(`  - ${a.name}`));
-    }
-
-    return true;
-  } else {
-    const proceed = (await question('Run build? [Y/n]: ')).trim().toLowerCase();
-    if (proceed === 'n') {
-      console.log('⏭️  Skipped build');
-      return false;
-    }
-    console.log('\nBuilding...');
-    const result = execCommand('npm run dist', { ignoreError: true });
-    if (!result.success) throw new Error('Build failed.');
-    console.log('✅ Build completed');
-    return true;
+  const proceed = (await question('Run packaging? [Y/n]: ')).trim().toLowerCase();
+  if (proceed !== 'n') {
+    const npmCli = process.env.npm_execpath;
+    if (!npmCli || !fs.existsSync(npmCli)) throw new Error('Run the wizard through npm run release:interactive.');
+    require('child_process').execFileSync(process.execPath, [npmCli, ...packagingArguments(process.platform, process.env.TALATRACE_ARTIFACTS_DIR)], { stdio: 'inherit', windowsHide: true });
   }
+  const artifacts = findArtifacts(version);
+  if (!artifacts.length) throw new Error(`No artifacts for ${version}. Build first or set TALATRACE_ARTIFACTS_DIR to the prepared output directory.`);
+  console.log(`Found ${artifacts.length} artifact(s); packaged/installer verification is still required.`);
+  artifacts.forEach(artifact => console.log('  ' + artifact.path));
+  return true;
 }
 
 async function step6_commit(version) {
@@ -463,7 +460,7 @@ async function step9_release(version) {
     return;
   }
 
-  const createRelease = (await question('Create GitHub release? [Y/n]: ')).trim().toLowerCase();
+  const createRelease = (await question('Create GitHub draft release? [Y/n]: ')).trim().toLowerCase();
   if (createRelease === 'n') {
     console.log('⏭️  Skipped release creation');
     return;
@@ -478,8 +475,8 @@ async function step9_release(version) {
 
   const tagName = `v${version}`;
   try {
-    execCommand(`gh release create ${tagName} --title "Release ${tagName}" --notes-file "${tempFile}"`);
-    console.log(`✅ Created GitHub release: ${tagName}`);
+    require('child_process').execFileSync('gh', ['release', 'create', tagName, '--draft', '--verify-tag', '--title', `TalaTrace ${version}`, '--notes-file', tempFile], { stdio: 'inherit' });
+    console.log(`✅ Created draft release: ${tagName}`);
 
     const uploadArtifacts = (await question('\nUpload distribution files? [Y/n]: ')).trim().toLowerCase();
     if (uploadArtifacts !== 'n') {
@@ -491,9 +488,9 @@ async function step9_release(version) {
         artifacts.forEach((a) => console.log(`  - ${a.name}`));
         for (const artifact of artifacts) {
           console.log(`Uploading ${artifact.name}...`);
-          execCommand(`gh release upload ${tagName} "${artifact.path}"`);
+          require('child_process').execFileSync('gh', ['release', 'upload', tagName, artifact.path], { stdio: 'inherit' });
         }
-        console.log('✅ Artifacts uploaded');
+        console.log('✅ Artifacts uploaded. Verify uploaded hashes before publishing the draft.');
       }
     }
   } finally {
@@ -521,9 +518,7 @@ async function main() {
   const gitCheck = execCommand('git --version', { silent: true, ignoreError: true });
   if (!gitCheck.success) {
     console.error('❌ ERROR: Git is not available in your PATH.');
-    console.error('\nThis script must run in a normal (non-admin) terminal where git is accessible.');
-    console.error('\nIf you opened an admin terminal: close it and run this script from a regular terminal.');
-    console.error('The build step (Step 5) will pause and ask you to open a separate admin terminal for that step only.');
+    console.error('\nRun this script in a terminal where Git is available in PATH.');
     console.error('\nIf git is genuinely missing from PATH:');
     console.error('  - Right-click "This PC" → Properties → Advanced system settings');
     console.error('  - Environment Variables → System variables → Path → Edit');
@@ -532,7 +527,7 @@ async function main() {
   }
 
   if (process.platform === 'win32') {
-    console.log('ℹ️  The build step (Step 5) will pause with instructions to run in a separate admin terminal.');
+    console.log('ℹ️  Packaging runs in this terminal; diagnose any tool-cache symlink permissions separately.');
     console.log('   All other steps run here in this normal terminal.\n');
   }
 
@@ -609,7 +604,7 @@ async function main() {
   }
 }
 
-module.exports = { extractVersionSection, prependChangelog };
+module.exports = { extractVersionSection, prependChangelog, findArtifacts, packagingArguments };
 if (require.main === module) main()
   .then(() => process.exit(0))
   .catch((error) => {

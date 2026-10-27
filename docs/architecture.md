@@ -64,7 +64,7 @@ The actual handlers in `main.ts` and bridge in `preload.ts` are the source of tr
 
 Events are `transcription-progress` (`jobId`, progress, message), `transcription-completed` (result), `transcription-error` (message) and `model-download-progress` (modelName, progress). The bridge also retains a legacy `menu-open-file` listener; the current app has no application menu producing that action.
 
-The bridge's TypeScript declaration for `selectAudioFile` still says string/null, whereas the actual handler returns the object above. That typing mismatch is recorded in the [audit](../AUDIT_REPORT.md); documentation does not substitute a fictional implementation.
+The bridge's TypeScript declaration matches the selected-file object above.
 
 ## State and storage
 
@@ -80,4 +80,4 @@ The Windows resource list in `package.json` includes Parakeet under `transcribe-
 
 In development, the CPU resolver expects `whisper.cpp/build-baseline/bin/Release/`. Vulkan is preferred when its binary exists; this is presence-based selection, not an automatic retry on CPU after a GPU failure. The non-Windows resolver still expects `whisper.cpp/main`, while packaging has Windows-specific resources. [Linux #24](https://github.com/pawn002/talatrace/issues/24) tracks native Linux delivery; macOS/Linux target declarations are not validated releases.
 
-Bundled Tiny/Base resource files are not automatically copied into a fresh packaged profile: the legacy migration checks `app.getAppPath()/models`, while packaged resources live outside app.asar. The verified clean packaged launch reports an empty library and uses explicit downloads. Do not claim automatic packaged model provisioning until code/tests establish it.
+Tiny/Base weights are setup/evaluation inputs and are excluded from the package. A fresh packaged profile has an empty recognition-model library and uses explicit downloads. Silero speech-detector weights remain bundled. Existing profiles retain their downloaded models.

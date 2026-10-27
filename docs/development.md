@@ -13,21 +13,15 @@ npm ci
 npm --prefix frontend ci
 ```
 
-Native scripts are not one reproducible bootstrap yet. The legacy `npm run setup` installs dependencies, clones/builds Whisper and downloads FFmpeg/Tiny/Base/Silero resources, but its build-output assumptions and downloads predate the current runtime catalog. It does not build Parakeet. A clean bootstrap was not rerun in the documentation audit. Verify the outputs below rather than treating Setup complete as proof that the app can transcribe.
-
-For a fresh Windows native checkout, the previously used Whisper source is v1.8.4. Do not reset an existing native checkout with local work. The local variant builder writes the CPU path the app expects:
+Run the Windows x64 bootstrap for dependencies, CPU Whisper, Parakeet CPU, FFmpeg and setup weights:
 
 ```powershell
-# Only when whisper.cpp does not already exist:
-git clone --depth 1 --branch v1.8.4 https://github.com/ggerganov/whisper.cpp.git whisper.cpp
-npm run build:whisper-baseline
-node scripts/setup-ffmpeg.js
-# The legacy helper also obtains Tiny/Base/Silero resources; inspect failures/output paths:
-node scripts/setup-whisper.js
-npm run setup:transcribe -- --cpu
+npm run setup
 ```
 
-For the Parakeet Vulkan build, install the Vulkan SDK and run `npm run setup:transcribe` without `--cpu`. That script pins transcribe.cpp v0.4.1, verifies the adapter patch and stages the executable/version/license notices under `transcribe-runtime/`. No Python is needed for native recognition; Python is only used by evaluation preparation.
+The bootstrap pins Whisper v1.8.4 to an exact commit and rejects unexpected revisions or tracked local edits rather than resetting work. Tiny/Base use the app's verified catalog; Silero and the dated FFmpeg archive require exact sizes and SHA-256 hashes. Downloads are cached under `.native-cache/`; a failed download preserves existing files. FFmpeg notices and provenance are staged with the runtime. Setup was exercised on the existing Windows development checkout; a fresh-machine bootstrap remains to be validated.
+
+For the Parakeet Vulkan build, install the Vulkan SDK and run `npm run setup:transcribe` without `--cpu`. That script pins transcribe.cpp v0.4.1, verifies the adapter patch and stages the executable/version/license notices under `transcribe-runtime/`. CPU and Vulkan use separate build directories. No Python is needed for native recognition; Python is only used by evaluation preparation.
 
 Verify these files before launching or packaging:
 
@@ -40,7 +34,7 @@ Verify these files before launching or packaging:
 | Silero weights | `models/ggml-silero-v5.1.2.bin` |
 | Parakeet | `transcribe-runtime/transcribe-cli.exe`, `version.json` and notices |
 
-`npm run build:whisper` uses a different legacy `native/` output layout and does not populate the current app's runtime paths. Use the variant builder/path checks above for this app. Its default CPU variant enables native CPU optimizations; a locally built binary is not evidence of portability to other CPUs. Packaging portable runtimes needs its own validation.
+`npm run build:whisper` is an alias for the current baseline variant builder. The baseline disables host-native tuning, but a locally built binary is not evidence of portability to every CPU. Packaging portable runtimes needs its own validation. Automated native setup currently rejects unsupported hosts explicitly; Linux work is tracked in #24.
 
 ## Run and debug
 
