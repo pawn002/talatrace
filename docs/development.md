@@ -1,6 +1,6 @@
 # Development
 
-Read [AGENTS.md](../AGENTS.md) before changes. Current behavior is described in [Architecture](architecture.md); UI construction requirements and adaptations live in the [Candor inventory](candor-widget-review.md). Windows x64 is the validated 1.2.0 environment. [Linux #24](https://github.com/pawn002/talatrace/issues/24) covers outstanding Linux work; macOS/Linux packaging is unverified.
+Read [AGENTS.md](../AGENTS.md) before changes. Current behavior is described in [Architecture](architecture.md); UI construction requirements and adaptations live in the [Candor inventory](candor-widget-review.md). Windows x64 is the validated 1.2.0 environment. The [Linux candidate guide](linux.md) covers Ubuntu 24.04 x86_64 build/test work and outstanding desktop validation; macOS packaging is unverified.
 
 ## Dependencies and native setup
 
@@ -34,7 +34,7 @@ Verify these files before launching or packaging:
 | Silero weights | `models/ggml-silero-v5.1.2.bin` |
 | Parakeet | `transcribe-runtime/transcribe-cli.exe`, `version.json` and notices |
 
-`npm run build:whisper` is an alias for the current baseline variant builder. The baseline disables host-native tuning, but a locally built binary is not evidence of portability to every CPU. Packaging portable runtimes needs its own validation. Automated native setup currently rejects unsupported hosts explicitly; Linux work is tracked in #24.
+`npm run build:whisper` builds the current baseline for Windows or Linux. The baseline disables host-native tuning, but a locally built binary is not evidence of portability to every CPU. Packaging portable runtimes needs its own validation. Automated setup supports Windows/Linux x64; the Linux candidate uses static Whisper/ggml and CPU Parakeet. Unsupported hosts are rejected explicitly.
 
 ## Run and debug
 
@@ -60,7 +60,7 @@ Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
 | `npm test` | Frontend Jest followed by compiled Electron/Node tests |
 | `npm run test:electron` | Native service, model integrity/lifecycle, timing, recording storage, release tooling and WER tests |
 | `npm run preview:workflow` | Real built app with isolated fixture IPC; screenshots and metrics in the OS temp `whisper-visual-review` directory |
-| `npm run test:speech-activity` | Windows native speech detector with generated reference audio |
+| `npm run test:speech-activity` | Native speech detector with generated reference audio |
 | `node tests/electron/packaged-release-smoke.cjs <path-to-exe>` | Actual packaged Windows EXE, isolated appData, local Base/Parakeet reference recognition, restart and clean-profile launch |
 | `npm run eval:speech:prepare` / `npm run eval:speech` | Optional corpus preparation/local evaluation; see [Speech evaluation](speech-model-evaluation.md) |
 

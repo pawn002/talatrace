@@ -24,7 +24,7 @@ app.setPath('appData', appData);
 app.setPath('userData', isolatedUserData);
 app.setPath('sessionData', isolatedUserData);
 const fixture = path.join(profile, 'answer-with-pause.wav');
-const fixtureProcess = require('node:child_process').spawnSync(path.join(root, 'ffmpeg/bin/ffmpeg.exe'), [
+const fixtureProcess = require('node:child_process').spawnSync(path.join(root, 'ffmpeg/bin', process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'), [
   '-i', path.join(root, 'whisper.cpp/samples/jfk.wav'),
   '-filter_complex', '[0:a]atrim=0:3,asetpts=PTS-STARTPTS[a];anullsrc=r=16000:cl=mono:d=30[s];[0:a]atrim=3:6,asetpts=PTS-STARTPTS[b];anullsrc=r=16000:cl=mono:d=7[tail];[a][s][b][tail]concat=n=4:v=0:a=1[out]',
   '-map', '[out]', '-c:a', 'pcm_s16le', fixture,

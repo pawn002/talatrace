@@ -10,10 +10,11 @@ if (!fs.existsSync(source)) run('git', ['clone', '--depth', '1', '--branch', 'v0
 const actual = run('git', ['-C', source, 'rev-parse', 'HEAD'], { stdio: 'pipe', encoding: 'utf8' }).trim();
 if (actual !== commit) throw new Error('Unexpected transcribe.cpp revision. Use the pinned v0.4.1 source checkout.');
 const patch = path.join(__dirname, 'patches', 'transcribe-token-json.patch');
+const adapterPatch = fs.readFileSync(patch, 'utf8').replace(/\r\n/g, '\n');
 const status = run('git', ['-C', source, 'status', '--porcelain'], { stdio: 'pipe', encoding: 'utf8' }).trim();
-if (!status) run('git', ['-C', source, 'apply', patch]);
+if (!status) run('git', ['-C', source, 'apply', '-'], { input: adapterPatch, stdio: ['pipe', 'inherit', 'inherit'] });
 const diff = run('git', ['-C', source, 'diff', '--binary'], { stdio: 'pipe', encoding: 'utf8' }).replace(/\r\n/g, '\n').trim();
-if (diff !== fs.readFileSync(patch, 'utf8').replace(/\r\n/g, '\n').trim()) throw new Error('Runtime source differs from the pinned token-JSON adapter patch.');
+if (diff !== adapterPatch.trim()) throw new Error('Runtime source differs from the pinned token-JSON adapter patch.');
 const build = path.join(source, process.argv.includes('--cpu') ? 'build-cpu' : 'build-vulkan');
 const args = ['-S', source, '-B', build, '-DTRANSCRIBE_BUILD_TESTS=OFF', '-DGGML_NATIVE=OFF'];
 if (process.platform === 'win32') args.push('-G', 'Visual Studio 17 2022', '-A', 'x64');
@@ -27,6 +28,7 @@ const candidates = [path.join(build, 'bin', 'Release', binary), path.join(build,
 const found = candidates.find(candidate => fs.existsSync(candidate));
 if (!found) throw new Error('Built runtime CLI was not found.');
 fs.copyFileSync(found, path.join(destination, binary));
+if (process.platform !== 'win32') fs.chmodSync(path.join(destination, binary), 0o755);
 // This build statically links ggml/transcribe. Retain upstream license notices.
 fs.copyFileSync(path.join(source, 'LICENSE'), path.join(destination, 'LICENSE-transcribe.cpp'));
 fs.copyFileSync(path.join(source, 'ggml', 'LICENSE'), path.join(destination, 'LICENSE-ggml'));

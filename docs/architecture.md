@@ -76,7 +76,7 @@ The bridge's TypeScript declaration matches the selected-file object above.
 
 ## Packaged runtime layout and limits
 
-The Windows resource list in `package.json` includes Parakeet under `transcribe-runtime/`, Whisper Vulkan under `whisper.cpp/build-vulkan/bin/`, CPU under `whisper.cpp/build/bin/Release/`, FFmpeg under `ffmpeg/bin/`, and selected model resources including Silero. `app.asar` contains compiled main/preload, renderer and production dependencies.
+The resource list in `package.json` includes Parakeet under `transcribe-runtime/`, FFmpeg under `ffmpeg/bin/`, and Silero weights. Windows-specific resources include Whisper Vulkan under `whisper.cpp/build-vulkan/bin/` and CPU under `whisper.cpp/build/bin/Release/`. Linux candidate resources instead use CPU executables and notices under `whisper.cpp/build/bin/`. `native-paths.ts` distinguishes development `build-baseline` from packaged `build` paths. `app.asar` contains compiled main/preload, renderer and production dependencies. See [Linux candidate validation](linux.md) for current limits.
 
 In development, the CPU resolver expects `whisper.cpp/build-baseline/bin/Release/`. Vulkan is preferred when its binary exists; this is presence-based selection, not an automatic retry on CPU after a GPU failure. The non-Windows resolver still expects `whisper.cpp/main`, while packaging has Windows-specific resources. [Linux #24](https://github.com/pawn002/talatrace/issues/24) tracks native Linux delivery; macOS/Linux target declarations are not validated releases.
 

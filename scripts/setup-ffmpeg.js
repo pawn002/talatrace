@@ -4,19 +4,22 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { verifiedDownload } = require('./verified-download.cjs');
-const { ffmpegWindows } = require('./native-artifacts.cjs');
+const { ffmpegWindows, ffmpegLinux } = require('./native-artifacts.cjs');
 
 async function setupFfmpeg({ root = path.resolve(__dirname, '..'), platform = process.platform, arch = process.arch, download = verifiedDownload, execute = execFileSync } = {}) {
-  if (platform !== 'win32' || arch !== 'x64') throw new Error('Verified FFmpeg setup currently targets Windows x64; Linux delivery is tracked in #24.');
-  const cache = path.join(root, '.native-cache', ffmpegWindows.filename);
-  await download(ffmpegWindows, cache);
+  if (!['win32', 'linux'].includes(platform) || arch !== 'x64') throw new Error('Verified FFmpeg setup targets Windows/Linux x64.');
+  const artifact = platform === 'win32' ? ffmpegWindows : ffmpegLinux;
+  const binaryName = platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+  const cache = path.join(root, '.native-cache', artifact.filename);
+  await download(artifact, cache);
   const parent = path.join(root, 'ffmpeg');
   await fsp.mkdir(parent, { recursive: true });
   const stage = await fsp.mkdtemp(path.join(parent, '.staging-'));
   try {
-    execute('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Expand-Archive -LiteralPath $env:TALATRACE_ARCHIVE -DestinationPath $env:TALATRACE_EXTRACT -Force'], {
+    if (platform === 'win32') execute('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Expand-Archive -LiteralPath $env:TALATRACE_ARCHIVE -DestinationPath $env:TALATRACE_EXTRACT -Force'], {
       env: { ...process.env, TALATRACE_ARCHIVE: cache, TALATRACE_EXTRACT: stage }, stdio: 'inherit', windowsHide: true,
     });
+    else execute('tar', ['-xJf', cache, '-C', stage, '--no-same-owner'], { stdio: 'inherit' });
     const files = [];
     async function scan(directory) {
       for (const entry of await fsp.readdir(directory, { withFileTypes: true })) {
@@ -26,9 +29,10 @@ async function setupFfmpeg({ root = path.resolve(__dirname, '..'), platform = pr
       }
     }
     await scan(stage);
-    const binaries = files.filter(file => path.basename(file) === 'ffmpeg.exe');
+    const binaries = files.filter(file => path.basename(file) === binaryName);
     if (binaries.length !== 1) throw new Error('Expected one FFmpeg executable in verified archive');
     const binary = binaries[0];
+    if (platform === 'linux') await fsp.chmod(binary, 0o755);
     const version = execute(binary, ['-version'], { encoding: 'utf8', windowsHide: true }).split(/\r?\n/)[0];
     const hash = crypto.createHash('sha256');
     for await (const chunk of fs.createReadStream(binary)) hash.update(chunk);
@@ -39,10 +43,10 @@ async function setupFfmpeg({ root = path.resolve(__dirname, '..'), platform = pr
       await fsp.mkdir(path.dirname(target), { recursive: true }); await fsp.copyFile(notice, target);
     }
     await fsp.mkdir(path.join(parent, 'bin'), { recursive: true });
-    await fsp.rename(binary, path.join(parent, 'bin', 'ffmpeg.exe'));
-    await fsp.writeFile(path.join(parent, 'version.json'), JSON.stringify({ ...ffmpegWindows, binarySha256: hash.digest('hex'), version, platform, arch }, null, 2) + '\n');
+    await fsp.rename(binary, path.join(parent, 'bin', binaryName));
+    await fsp.writeFile(path.join(parent, 'version.json'), JSON.stringify({ ...artifact, binarySha256: hash.digest('hex'), version, platform, arch }, null, 2) + '\n');
     console.log('Verified FFmpeg ready:', version);
-    return path.join(parent, 'bin', 'ffmpeg.exe');
+    return path.join(parent, 'bin', binaryName);
   } finally {
     if (!path.resolve(stage).startsWith(path.resolve(parent) + path.sep)) throw new Error('Invalid FFmpeg staging path');
     await fsp.rm(stage, { recursive: true, force: true });

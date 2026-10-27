@@ -1,5 +1,7 @@
 # TalaTrace documentation
 
+[Linux candidate work](linux.md) tracks the initial Ubuntu build and the desktop/installer validation still required by #24.
+
 Current guides describe the released **1.2.0** app. Windows x64 is the validated release target; [Linux support is tracked in #24](https://github.com/pawn002/talatrace/issues/24). Build-target declarations do not establish platform support.
 
 ## Using the app

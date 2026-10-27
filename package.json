@@ -96,31 +96,6 @@
         ]
       },
       {
-        "from": "whisper.cpp/build-vulkan/bin",
-        "to": "whisper.cpp/build-vulkan/bin",
-        "filter": [
-          "whisper-cli.exe",
-          "whisper-vad-speech-segments.exe",
-          "whisper.dll",
-          "ggml.dll",
-          "ggml-base.dll",
-          "ggml-cpu.dll",
-          "ggml-vulkan.dll"
-        ]
-      },
-      {
-        "from": "whisper.cpp/build-baseline/bin/Release",
-        "to": "whisper.cpp/build/bin/Release",
-        "filter": [
-          "whisper-cli.exe",
-          "whisper-vad-speech-segments.exe",
-          "whisper.dll",
-          "ggml.dll",
-          "ggml-base.dll",
-          "ggml-cpu.dll"
-        ]
-      },
-      {
         "from": "models",
         "to": "models",
         "filter": [
@@ -153,6 +128,33 @@
       "target": [
         "nsis",
         "zip"
+      ],
+      "extraResources": [
+        {
+          "from": "whisper.cpp/build-vulkan/bin",
+          "to": "whisper.cpp/build-vulkan/bin",
+          "filter": [
+            "whisper-cli.exe",
+            "whisper-vad-speech-segments.exe",
+            "whisper.dll",
+            "ggml.dll",
+            "ggml-base.dll",
+            "ggml-cpu.dll",
+            "ggml-vulkan.dll"
+          ]
+        },
+        {
+          "from": "whisper.cpp/build-baseline/bin/Release",
+          "to": "whisper.cpp/build/bin/Release",
+          "filter": [
+            "whisper-cli.exe",
+            "whisper-vad-speech-segments.exe",
+            "whisper.dll",
+            "ggml.dll",
+            "ggml-base.dll",
+            "ggml-cpu.dll"
+          ]
+        }
       ]
     },
     "nsis": {
@@ -161,10 +163,51 @@
     },
     "linux": {
       "target": [
-        "AppImage",
-        "deb"
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
-      "category": "Utility"
+      "category": "Utility",
+      "extraResources": [
+        {
+          "from": "whisper.cpp/build-baseline/bin",
+          "to": "whisper.cpp/build/bin",
+          "filter": [
+            "whisper-cli",
+            "whisper-vad-speech-segments",
+            "licenses/**/*"
+          ]
+        }
+      ],
+      "artifactName": "TalaTrace-${version}-linux-${arch}.${ext}",
+      "maintainer": "John R. <pawn002@users.noreply.github.com>"
+    },
+    "deb": {
+      "depends": [
+        "libgtk-3-0t64",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0t64",
+        "libuuid1",
+        "libsecret-1-0",
+        "libasound2t64",
+        "libgbm1",
+        "libstdc++6",
+        "libgcc-s1",
+        "libc6 (>= 2.39)"
+      ]
     }
   }
 }

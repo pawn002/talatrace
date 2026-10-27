@@ -6,7 +6,7 @@ const path = require('node:path');
 const os = require('node:os');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '../..');
-const executable = path.resolve(process.argv[2] || 'release/talatrace-rc1/win-unpacked/TalaTrace.exe');
+const executable = path.resolve(process.argv[2] || (process.platform === 'linux' ? 'release/linux-unpacked/whisper-electron-app' : 'release/talatrace-rc1/win-unpacked/TalaTrace.exe'));
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function launch(appData, expectedProfile, recognize = false, preferencesExist = false, options = {}) {
@@ -120,6 +120,7 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
 
 (async () => {
   if(process.argv.includes('--real-profile')) {
+    assert.equal(process.platform, 'win32', 'Real-profile upgrade check currently supports Windows only.');
     // Explicit opt-in for a backed-up installed-app check. Keep existing preferences.
     const backup = (await fs.readFile(path.join(root,'.local-backups/active-upgrade-backup.txt'),'utf8')).trim();
     const manifest = JSON.parse(await fs.readFile(path.join(backup,'before.json'),'utf8'));

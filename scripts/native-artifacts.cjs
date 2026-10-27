@@ -11,4 +11,9 @@ module.exports = {
     sha256: 'ab827dffa97ba92f1c2f0420ec8187088953cb21110c9461cc42bac18a7cb297',
     url: 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-26-14-25/ffmpeg-N-128100-gceb466cbcd-win64-gpl.zip',
   },
+  ffmpegLinux: {
+    filename: 'ffmpeg-linux-2026-10-26.tar.xz', sizeBytes: 156572396,
+    sha256: 'cd6219478e044024cea76bbd3e053bd85b57485381d5c61e72415c8e8b8db9cd',
+    url: 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-26-14-25/ffmpeg-N-128100-gceb466cbcd-linux64-gpl.tar.xz',
+  },
 };
