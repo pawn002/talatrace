@@ -1,7 +1,7 @@
 /** Reference measurements, not estimates for the device currently running the app.
  * LibriSpeech test-clean: 12 speakers / 265 normalized words / 99.93 s.
  * i7-1260P / Iris Xe, four threads, timing and pause metadata enabled.
- * Provenance and limitations: docs/speech-model-evaluation-2026-10-25.md.
+ * Provenance and limitations: docs/archive/speech-model-evaluation-2026-10-25.md.
  */
 export const REFERENCE_BENCHMARKS: Readonly<Record<string, { processingMs: number; errors: number }>> = {
   tiny: { processingMs: 22623.8078, errors: 13 },

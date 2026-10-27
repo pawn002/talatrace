@@ -1,31 +1,26 @@
-# TalaTrace Documentation
+# TalaTrace documentation
 
-Welcome to the TalaTrace documentation! This folder contains comprehensive guides to help you get started, use, and troubleshoot the application.
+Current guides describe the released **1.2.0** app. Windows x64 is the validated release target; [Linux support is tracked in #24](https://github.com/pawn002/talatrace/issues/24). Build-target declarations do not establish platform support.
 
-## 📚 Documentation Index
+## Using the app
 
-### Getting Started
-- [Installation Guide](installation.md) - Complete setup instructions for all platforms
-- [Usage Guide](usage.md) - Detailed walkthrough of all features
+| Guide | Use it for |
+| --- | --- |
+| [Install and update](installation.md) | Windows downloads, upgrades, profile locations and removal |
+| [Use TalaTrace](usage.md) | Record/import audio, copy/export, settings and session history |
+| [Speech models](models.md) | Implemented models, selection, storage, timing and reference measurements |
+| [Troubleshooting](troubleshooting.md) | Microphone, model, transcription and source-build failures |
 
-### Reference
-- [Model Guide](models.md) - Local speech models, reference measurements and recommendations
-- [Troubleshooting](troubleshooting.md) - Common issues and solutions
+## Working on the project
 
-### Advanced
-- [Development Guide](development.md) - Contributing and development setup
-- [Architecture](architecture.md) - Technical architecture overview
-- [TalaTrace Release and Repository Migration](talatrace-release-migration.md) - Deferred rename, compatibility checks and release sequence
+| Guide | Use it for |
+| --- | --- |
+| [Development](development.md) | Source setup, actual npm commands, tests and packaging |
+| [Architecture](architecture.md) | Capture, IPC, engines, persistence and current limits |
+| [Releasing](releasing.md) | Maintainer release procedure and compatibility checks |
+| [Candor widget inventory](candor-widget-review.md) | Current constructions and deliberate adaptations; read with [AGENTS.md](../AGENTS.md) before UI work |
+| [Speech evaluation](speech-model-evaluation.md) | Reproducible local quality/speed evaluation |
 
-## Quick Links
+[Release notes](releases/1.2.0.md) describe shipped changes. [Archived reviews](archive/README.md) preserve dated research, UI iterations and the completed repository migration; they are evidence, not setup instructions. The [documentation audit](../AUDIT_REPORT.md) records this cleanup and unresolved tooling findings.
 
-- [Main README](../README.md) - Project overview and quick start
-- [GitHub Issues](https://github.com/pawn002/talatrace/issues) - Report bugs or request features
-- [Changelog](../CHANGELOG.md) - Version history and release notes
-
-## Need Help?
-
-If you can't find what you're looking for in these docs:
-1. Check the [Troubleshooting Guide](troubleshooting.md)
-2. Search [existing issues](https://github.com/pawn002/talatrace/issues)
-3. [Open a new issue](https://github.com/pawn002/talatrace/issues/new)
+Start at the [project README](../README.md). For help, check [troubleshooting](troubleshooting.md), then [existing issues](https://github.com/pawn002/talatrace/issues).

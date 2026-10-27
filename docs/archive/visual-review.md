@@ -1,5 +1,7 @@
 # Visual review — 24 October 2026
 
+> Historical record from October 2026. Earlier findings, commands and verification claims may be superseded. Use the [current documentation index](../README.md), [current widget inventory](../candor-widget-review.md) and [documentation audit](../../AUDIT_REPORT.md) for present behavior and known test-harness limits.
+
 ## Baseline critique
 
 The prototype spent too much space on repeated headings, empty status areas and oversized stacked controls. Disabled buttons lost their visible boundaries. Step labels and arrows felt detached from the actions. The transcript appeared after settings and often below the first screen. Serif text, dense interface text and monospaced labels lacked a common hierarchy. Toasts duplicated persistent status and covered useful content. A newly appearing scrollbar shifted the controls horizontally.
@@ -26,4 +28,4 @@ The responsive workspace uses a 6 kB warning / 8 kB error component-style budget
 
 Run `npm run preview:workflow`. Screenshots and layout/contrast metrics are written under the operating system's temporary directory in `whisper-visual-review/current`. Set `WHISPER_VISUAL_PASS` to keep a named pass. The harness renders the real compiled frontend with fixture IPC, synthetic microphone data, a temporary profile and network requests disabled. Use the separate interview smoke test to exercise native audio processing.
 
-Future UI work should follow the review process in [AGENTS.md](../AGENTS.md), rather than treating successful compilation as evidence of visual quality.
+Future UI work should follow the review process in [AGENTS.md](../../AGENTS.md), rather than treating successful compilation as evidence of visual quality.

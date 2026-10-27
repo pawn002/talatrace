@@ -1,4 +1,5 @@
-# Multi-stage build for production deployment
+# Legacy container sketch: references the removed NestJS backend.
+# Not a TalaTrace 1.2.0 build/deployment path; see AUDIT_REPORT.md.
 FROM node:18-alpine AS builder
 
 # Install build dependencies

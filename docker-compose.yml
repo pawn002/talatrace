@@ -1,3 +1,5 @@
+# Legacy container sketch for the removed backend, not current desktop support.
+# See AUDIT_REPORT.md before attempting to use or restore this configuration.
 version: '3.8'
 
 services:

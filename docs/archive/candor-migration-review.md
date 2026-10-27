@@ -1,6 +1,8 @@
 # Candor 3.0.0 to 6.0.0 review
 
-The subsequent [widget construction review](candor-widget-review.md) records the broader Storybook audit, adoption of actual Candor tooltips/toasts, native-widget corrections and the latest verification results.
+> Historical record from October 2026. Earlier findings, commands and verification claims may be superseded. Use the [current documentation index](../README.md), [current widget inventory](../candor-widget-review.md) and [documentation audit](../../AUDIT_REPORT.md) for present behavior and known test-harness limits.
+
+The subsequent [widget construction review](../candor-widget-review.md) records the broader Storybook audit, adoption of actual Candor tooltips/toasts, native-widget corrections and the latest verification results.
 
 Reviewed and migrated on 24 October 2026 for issue [#21](https://github.com/pawn002/whisper-electron-app/issues/21). The frontend now pins tokens to 6.0.0 and uses the supported CSS export.
 

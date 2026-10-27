@@ -1,5 +1,7 @@
 # TalaTrace repository migration and release plan
 
+> Historical record from October 2026. Earlier findings, commands and verification claims may be superseded. Use the [current documentation index](../README.md), [current widget inventory](../candor-widget-review.md) and [documentation audit](../../AUDIT_REPORT.md) for present behavior and known test-harness limits.
+
 Recorded: 26 October 2026.
 
 Status: complete. PR #23 merged, the existing repository renamed to `pawn002/talatrace`, and 1.2.0 published as Latest on 26 October 2026 (27 October UTC). Checkpoint, upgrade evidence and remaining test limits are retained below.
@@ -46,7 +48,7 @@ The app's display name is already TalaTrace. Internal package identifiers and th
 - ZIP SHA-256: `DBDB1FFC4D34790D834B6C74E9BFFD24260562F2FC345010B17C4E05FEA8A2D4`.
 - `node tests/electron/packaged-release-smoke.cjs` tests the actual packaged EXE. A debugger isolates appData before application code executes, with no production test hook. Both Whisper Base and Parakeet recognize the bundled reference sample with HTTP(S) blocked, returning duration/processing/timing data. A temporary legacy profile and marker survive, model selection persists over restart, and a clean profile launches. Temporary test profiles are retained for inspection. This does not install the app or validate NSIS upgrade behavior.
 - Static installer-identity review: the app ID remains `com.yourcompany.whisper-electron`, as in 1.1.5; electron-builder derives its NSIS GUID from that ID. Product/executable names change. This supports continuity but does not substitute for an installed upgrade test.
-- Release notes: [1.2.0](releases/1.2.0.md).
+- Release notes: [1.2.0](../releases/1.2.0.md).
 
 The initial plan called for a disposable Windows machine/VM, but the user only has this system and confirmed that 1.1.5 is installed. A native-context registry check found the installation (the earlier sandbox-limited check did not expose it). The in-place upgrade results are recorded below. The exact blog destinations are recorded for post-rename verification. Repository rename and public release remain pending review of these results and remaining limitations.
 

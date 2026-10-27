@@ -1,5 +1,7 @@
 # Candor disabled-state guidance and app review
 
+> Historical record from October 2026. Earlier findings, commands and verification claims may be superseded. Use the [current documentation index](../README.md), [current widget inventory](../candor-widget-review.md) and [documentation audit](../../AUDIT_REPORT.md) for present behavior and known test-harness limits.
+
 Initially reviewed 25 October 2026 against current Candor main, commit `a4d27af8edc503aa801b7b336e1e23b41287c9e5`. The app remains pinned to Candor 6.0.0. The initial review changed no app behavior; subsequent implementation and rendered verification are recorded below. No manual screen-reader audit is claimed.
 
 ## Candor's requirements

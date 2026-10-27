@@ -1,445 +1,85 @@
-# Development Guide
+# Development
 
-Guide for developers who want to contribute to the TalaTrace or understand the development workflow.
+Read [AGENTS.md](../AGENTS.md) before changes. Current behavior is described in [Architecture](architecture.md); UI construction requirements and adaptations live in the [Candor inventory](candor-widget-review.md). Windows x64 is the validated 1.2.0 environment. [Linux #24](https://github.com/pawn002/talatrace/issues/24) covers outstanding Linux work; macOS/Linux packaging is unverified.
 
-## Table of Contents
+## Dependencies and native setup
 
-- [Setting Up Development Environment](#setting-up-development-environment)
-- [Project Architecture](#project-architecture)
-- [Development Workflow](#development-workflow)
-- [Code Structure](#code-structure)
-- [Testing](#testing)
-- [Building and Packaging](#building-and-packaging)
-- [Contributing Guidelines](#contributing-guidelines)
-- [Code Style](#code-style)
+Use Node.js 20.19+, 22.12+ or 24+, npm 10+, Git, CMake and Visual Studio 2022 C++ Build Tools for Windows native builds. These Node ranges match the installed Angular 21 package's engine requirement. A source build needs native runtimes; installing npm packages alone is insufficient.
 
-## Setting Up Development Environment
-
-### Prerequisites
-
-Ensure you have all the prerequisites installed as described in the [Installation Guide](installation.md).
-
-### Clone and Setup
-
-```bash
-# Clone the repository
+```powershell
 git clone https://github.com/pawn002/talatrace.git
 cd talatrace
-
-# Run complete setup
-npm run setup
+npm ci
+npm --prefix frontend ci
 ```
 
-This will:
-1. Install all dependencies (root, frontend)
-2. Clone and build whisper.cpp
-3. Download FFmpeg
-4. Download base Whisper models
+Native scripts are not one reproducible bootstrap yet. The legacy `npm run setup` installs dependencies, clones/builds Whisper and downloads FFmpeg/Tiny/Base/Silero resources, but its build-output assumptions and downloads predate the current runtime catalog. It does not build Parakeet. A clean bootstrap was not rerun in the documentation audit. Verify the outputs below rather than treating Setup complete as proof that the app can transcribe.
 
-### IDE Setup
+For a fresh Windows native checkout, the previously used Whisper source is v1.8.4. Do not reset an existing native checkout with local work. The local variant builder writes the CPU path the app expects:
 
-**Recommended IDEs:**
-- Visual Studio Code
-- WebStorm
-- Any editor with TypeScript support
-
-**VS Code Extensions:**
-```json
-{
-  "recommendations": [
-    "angular.ng-template",
-    "esbenp.prettier-vscode",
-    "dbaeumer.vscode-eslint",
-    "ms-vscode.vscode-typescript-next"
-  ]
-}
+```powershell
+# Only when whisper.cpp does not already exist:
+git clone --depth 1 --branch v1.8.4 https://github.com/ggerganov/whisper.cpp.git whisper.cpp
+npm run build:whisper-baseline
+node scripts/setup-ffmpeg.js
+# The legacy helper also obtains Tiny/Base/Silero resources; inspect failures/output paths:
+node scripts/setup-whisper.js
+npm run setup:transcribe -- --cpu
 ```
 
-### Environment Configuration
+For the Parakeet Vulkan build, install the Vulkan SDK and run `npm run setup:transcribe` without `--cpu`. That script pins transcribe.cpp v0.4.1, verifies the adapter patch and stages the executable/version/license notices under `transcribe-runtime/`. No Python is needed for native recognition; Python is only used by evaluation preparation.
 
-**frontend/src/environments/environment.ts** (already configured)
-```typescript
-export const environment = {
-  production: false
-};
+Verify these files before launching or packaging:
+
+| Resource | Windows development path |
+| --- | --- |
+| CPU Whisper | `whisper.cpp/build-baseline/bin/Release/whisper-cli.exe` and its DLLs |
+| Speech detector | `whisper.cpp/build-baseline/bin/Release/whisper-vad-speech-segments.exe` |
+| Optional Whisper Vulkan | `whisper.cpp/build-vulkan/bin/whisper-cli.exe` and its DLLs |
+| FFmpeg | `ffmpeg/bin/ffmpeg.exe` |
+| Silero weights | `models/ggml-silero-v5.1.2.bin` |
+| Parakeet | `transcribe-runtime/transcribe-cli.exe`, `version.json` and notices |
+
+`npm run build:whisper` uses a different legacy `native/` output layout and does not populate the current app's runtime paths. Use the variant builder/path checks above for this app. Its default CPU variant enables native CPU optimizations; a locally built binary is not evidence of portability to other CPUs. Packaging portable runtimes needs its own validation.
+
+## Run and debug
+
+```powershell
+npm run start   # Build renderer/main, then run Electron with built files
+npm run dev     # Angular server on :4200 and rebuilt main process
 ```
 
-Note: The application no longer requires a backend server. All business logic runs directly in the Electron main process via services.
+Alternatively run `npm run dev:frontend` and `npm run dev:electron` in separate terminals. Renderer changes hot-reload through Angular; restart Electron for main/preload/service changes. A renderer reload does not reload the main-process code. Browser-only Angular views do not provide the Electron bridge/native behavior.
 
-## Project Architecture
+If Electron launches as Node, remove the inherited flag in PowerShell before starting it:
 
-### Technology Stack
-
-**Frontend:**
-- Angular 21
-- Candor design system (CSS design tokens + component layer)
-- Phosphor Icons (light weight icon set)
-- Fontsource (bundled fonts: Roboto Flex, Roboto Mono, Noto Serif)
-- RxJS (reactive programming)
-
-**Electron:**
-- Electron 35
-- Context isolation enabled
-- IPC for secure communication
-- Services (TranscriptionService, WhisperService) in main process
-- TypeScript throughout
-
-**Transcription Engine:**
-- whisper.cpp (C++ implementation)
-- FFmpeg (audio conversion)
-
-### Component Communication
-
-```
-Renderer Process (Angular)
-    ↕️ (IPC via Preload)
-Main Process (Electron)
-    ├── TranscriptionService (job management)
-    └── WhisperService (whisper.cpp integration)
-            ↕️ (Child Process)
-        Whisper.cpp Binary / FFmpeg
-            ↕️ (File I/O)
-        Audio Files & Models
+```powershell
+Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
 ```
 
-**Key Points:**
-- Direct IPC communication (no HTTP/WebSocket)
-- Services run in Electron main process
-- Child processes for whisper-cli and FFmpeg
-- Models stored in user data directory
+`npm run start` prints native paths and diagnostics in its terminal. Whisper currently prints recognition stdout as well; inspect/redact logs before sharing them. Parakeet keeps transcript JSON separate from its lifecycle/engine diagnostic logs. The current application menu is removed; do not promise a menu-driven DevTools shortcut. Main-process debugging can use Electron's inspector flags.
 
-## Development Workflow
+## Verify changes
 
-### Running in Development Mode
+| Command | Coverage / limits |
+| --- | --- |
+| `npm test` | Frontend Jest followed by compiled Electron/Node tests |
+| `npm run test:electron` | Native service, model integrity/lifecycle, timing, recording storage, release tooling and WER tests |
+| `npm run preview:workflow` | Real built app with isolated fixture IPC; screenshots and metrics in the OS temp `whisper-visual-review` directory |
+| `npm run test:speech-activity` | Windows native speech detector with generated reference audio |
+| `node tests/electron/packaged-release-smoke.cjs <path-to-exe>` | Actual packaged Windows EXE, isolated appData, local Base/Parakeet reference recognition, restart and clean-profile launch |
+| `npm run eval:speech:prepare` / `npm run eval:speech` | Optional corpus preparation/local evaluation; see [Speech evaluation](speech-model-evaluation.md) |
 
-**Start all services at once:**
-```bash
-npm run dev
-```
+Release 1.2.0 passed 130 frontend and 42 Electron tests; counts are a dated baseline, not a fixed promise for future revisions. Native/file-replacement tests must run in a normal writable Windows temp environment; a sandbox's EPERM on replacement is not automatically an app failure. Fixture previews are not real model inference or an installer upgrade test.
 
-This starts:
-- Frontend on http://localhost:4200
-- Electron app (instant startup, no delay!)
+The older `npm run test:interview-smoke` has a profile-isolation defect: it sets userData before requiring main, but main assigns userData again. Do not assume that command protects the real profile. The packaged smoke isolates appData before startup instead. Its explicit `--real-profile` mode requires an existing backup manifest under ignored `.local-backups/`; use it only for a deliberate installed-app check with the app closed.
 
-**Start services individually:**
+For UI changes, follow AGENTS.md's rendered-review matrix; a passing Jest run/build is not visual review or a complete accessibility audit. The recorded extreme-zoom navigation gap and historical contrast/render evidence are in the [Candor inventory](candor-widget-review.md).
 
-```bash
-# Terminal 1 - Frontend
-npm run dev:frontend
+## Package and contribute
 
-# Terminal 2 - Electron
-npm run dev:electron
-```
+`npm run build` writes renderer output to `frontend/dist/` and main/preload/services to `dist/electron/`. `npm run dist:win` builds and invokes electron-builder; its Windows target is per-user NSIS plus ZIP. Native resources must already exist. See [Releasing](releasing.md) for artifact checks, the symlink-cache issue and upgrade validation. macOS/Linux target scripts exist but are not proof of support.
 
-### Hot Reload
+`npm run clean` removes compiled/Angular intermediates. `npm run clean:release` deletes `release/`; it is not safe storage for a recovery backup. Native checkouts, model files and `.local-backups/` remain separate.
 
-- **Frontend**: Automatic reload on file changes (Angular dev server)
-- **Electron Services**: Requires Electron restart to pick up changes
-- **Electron Main**: Manual reload (`Ctrl+R` / `Cmd+R`) or restart process
-
-### Debugging
-
-**Frontend Debugging:**
-- Open browser DevTools (http://localhost:4200)
-- Use Angular DevTools extension
-
-**Electron Debugging:**
-- Main process (including services): `--inspect` flag or VS Code debugger
-- Renderer process: DevTools (`Ctrl+Shift+I` / `Cmd+Option+I`)
-
-**VS Code Launch Configuration:**
-```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "Debug Electron Main",
-      "type": "node",
-      "request": "launch",
-      "cwd": "${workspaceFolder}",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:electron"],
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "Debug Frontend",
-      "type": "chrome",
-      "request": "launch",
-      "url": "http://localhost:4200",
-      "webRoot": "${workspaceFolder}/frontend/src"
-    }
-  ]
-}
-```
-
-## Code Structure
-
-### Frontend (Angular)
-
-```
-frontend/src/
-├── app.component.ts          # Root component
-├── components/
-│   ├── transcription/        # Main transcription UI
-│   │   ├── transcription.component.ts
-│   │   ├── transcription.component.html
-│   │   └── transcription.component.scss
-│   ├── model-selector/       # Model management
-│   │   ├── model-selector.component.ts
-│   │   ├── model-selector.component.html
-│   │   └── model-selector.component.scss
-│   └── history/              # Transcription history
-│       ├── history.component.ts
-│       ├── history.component.html
-│       └── history.component.scss
-└── services/                 # Note: services/ is at src/ level, not app/ level
-    └── electron.service.ts   # Electron IPC wrapper
-```
-
-**Key Patterns:**
-- Component-based architecture
-- Services for business logic
-- RxJS Observables for async operations
-- Candor design system (tokens-based CSS, no `::ng-deep`)
-
-### Electron
-
-```
-electron/
-├── main.ts            # Main process (Node.js environment)
-│                      # - Window management
-│                      # - IPC handlers
-│                      # - Service initialization
-├── preload.ts         # Preload script (sandboxed)
-│                      # - Exposes safe APIs to renderer
-└── services/          # Business logic services
-    ├── types.ts       # Shared TypeScript interfaces
-    ├── transcription.service.ts  # Job management, orchestration
-    └── whisper.service.ts        # Whisper.cpp integration
-```
-
-**Key Patterns:**
-- Context isolation enabled
-- IPC for secure communication
-- Preload script as bridge
-- Service classes for business logic
-- Direct child process spawning
-
-## Testing
-
-### Running Tests
-
-**Frontend Tests (Jest):**
-```bash
-cd frontend
-npm test                    # Run all 70 tests (Jest, no browser required)
-```
-
-Tests cover: component formatters, IPC callback closures (`onTranscriptionCompleted`,
-`onTranscriptionError`, `onTranscriptionProgress`), model lifecycle, toast service,
-and history auto-refresh. See `frontend/src/**/*.spec.ts`.
-
-**Electron/Service Tests:**
-Testing infrastructure for Electron services is minimal. Future improvements could include:
-- Unit tests for service methods
-- Integration tests for IPC handlers
-- E2E tests for transcription workflow
-
-### Writing Tests
-
-**Framework Testing Guides:**
-- [jest-preset-angular](https://thymikee.github.io/jest-preset-angular/) - Jest + Angular TestBed
-- [Electron Testing](https://www.electronjs.org/docs/latest/tutorial/automated-testing)
-
-**Project-Specific Testing Areas:**
-- Test IPC handlers
-- Test service methods (TranscriptionService, WhisperService)
-- Test Whisper.cpp and FFmpeg process spawning
-- Test error handling and edge cases
-- Test progress event emission
-
-## Building and Packaging
-
-### Development Build
-
-```bash
-npm run build
-```
-
-Builds:
-- Frontend: `frontend/dist/`
-- Electron (including services): `dist/electron/`
-
-### Production Package
-
-> **⚠️ Windows Users**: All distribution commands require **administrator privileges**. Run your terminal as administrator before executing these commands.
-
-```bash
-# Build and package for current platform
-npm run dist          # Requires admin on Windows
-
-# Specific platforms
-npm run dist:win      # Windows (requires admin)
-npm run dist:mac      # macOS
-npm run dist:linux    # Linux
-```
-
-Output: `release/` directory
-
-### Build Configuration
-
-**electron-builder** configuration in `package.json`:
-- File inclusion/exclusion
-- Resource bundling
-- Platform-specific settings
-- Signing configuration
-
-## Contributing Guidelines
-
-### Branching Strategy
-
-- `main` - Production-ready code
-- `feature/*` - New features
-- `fix/*` - Bug fixes
-- `docs/*` - Documentation updates
-
-### Commit Messages
-
-Follow conventional commits:
-```
-feat: add new feature
-fix: resolve bug
-docs: update documentation
-style: formatting changes
-refactor: code restructuring
-test: add tests
-chore: maintenance tasks
-```
-
-### Pull Request Process
-
-1. **Fork** the repository
-2. **Create** a feature branch
-3. **Make** your changes
-4. **Test** thoroughly
-5. **Commit** with clear messages
-6. **Push** to your fork
-7. **Open** a pull request
-
-**PR Checklist:**
-- [ ] Code follows style guidelines
-- [ ] Tests pass
-- [ ] No new warnings/errors
-- [ ] Documentation updated
-- [ ] Commit messages follow convention
-
-### Code Review
-
-All PRs require:
-- At least one approval
-- Passing CI checks
-- No merge conflicts
-
-## Code Style
-
-### Code Style Guidelines
-
-**TypeScript:**
-- Use strict mode
-- Explicit types for public APIs
-- Avoid `any`
-
-**Framework Style Guides:**
-- [Angular Style Guide](https://angular.dev/style-guide)
-- [Electron Security Best Practices](https://www.electronjs.org/docs/latest/tutorial/security)
-
-**Project-Specific Rules:**
-- Always validate file paths in IPC handlers
-- Use OnPush change detection in Angular
-- Unsubscribe from observables
-- Clean up child processes (whisper-cli)
-- Handle FFmpeg conversion errors gracefully
-
-### Formatting
-
-**Prettier** configuration (automated):
-```json
-{
-  "semi": true,
-  "trailingComma": "all",
-  "singleQuote": false,
-  "printWidth": 80,
-  "tabWidth": 2
-}
-```
-
-Run formatting:
-```bash
-npm run format
-```
-
-### Linting
-
-**ESLint** configuration:
-```bash
-npm run lint          # Check for issues
-npm run lint:fix      # Auto-fix issues
-```
-
-## Development Best Practices
-
-### Performance
-
-- Lazy load Angular modules when possible
-- Use OnPush change detection
-- Debounce user input
-- Cache model downloads
-- Stream large files
-
-### Security
-
-- Never disable context isolation
-- Validate all IPC messages
-- Sanitize file paths
-- Use TypeScript strict mode
-- Keep dependencies updated
-
-### Error Handling
-
-- Use try-catch for async operations
-- Provide meaningful error messages
-- Log errors appropriately
-- Show user-friendly messages in UI
-
-### Accessibility
-
-- Use semantic HTML
-- Provide ARIA labels
-- Ensure keyboard navigation
-- Maintain focus states
-- Test with screen readers
-
-## Resources
-
-### Documentation
-
-- [Angular Docs](https://angular.dev/docs)
-- [Electron Docs](https://www.electronjs.org/docs)
-- [Electron IPC Guide](https://www.electronjs.org/docs/latest/tutorial/ipc)
-- [whisper.cpp](https://github.com/ggerganov/whisper.cpp)
-- [FFmpeg Documentation](https://ffmpeg.org/documentation.html)
-- [Candor Design System](https://github.com/pawn002/candor)
-
-### Community
-
-- [GitHub Issues](https://github.com/pawn002/talatrace/issues)
-- [Discussions](https://github.com/pawn002/talatrace/discussions)
-
-## Getting Help
-
-If you're stuck:
-
-1. Check existing [documentation](README.md)
-2. Search [issues](https://github.com/pawn002/talatrace/issues)
-3. Ask in [discussions](https://github.com/pawn002/talatrace/discussions)
-4. Open a new issue with details
+Use a focused branch (Codex branches use `codex/`), make changes reviewable and run checks appropriate to the behavior. There are currently no npm `format`, `lint` or `lint:fix` scripts and no checked-in GitHub CI workflow. Do not tell contributors those checks ran or are enforced. Keep final version bumps/release sections on main after merge; ongoing feature notes can be collected in the PR. The release wizard enforces main.
