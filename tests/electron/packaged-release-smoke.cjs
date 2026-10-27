@@ -9,7 +9,7 @@ const root = path.resolve(__dirname, '../..');
 const executable = path.resolve(process.argv[2] || 'release/talatrace-rc1/win-unpacked/TalaTrace.exe');
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function launch(appData, expectedProfile, recognize = false, preferencesExist = false) {
+async function launch(appData, expectedProfile, recognize = false, preferencesExist = false, options = {}) {
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
   const child = spawn(executable, ['--inspect-brk=127.0.0.1:0'], { windowsHide: true, env });
   let diagnostics = '';
@@ -76,22 +76,24 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
     const identity = await evaluate(`(async () => { const {app}=globalThis.__releaseElectron; await app.whenReady(); return { packaged: app.isPackaged, name: app.getName(), version: app.getVersion(), profile: app.getPath('userData') }; })()`);
     assert.equal(identity.packaged, true); assert.equal(identity.name, 'TalaTrace'); assert.equal(identity.profile, expectedProfile);
     const models = await renderer('window.electronAPI.getAvailableModels()');
-    for(const model of ['base', 'parakeet-tdt-0.6b-v3']) {
+    const recognitionModels = options.models || ['base', 'parakeet-tdt-0.6b-v3'];
+    for(const model of recognitionModels) {
       if(recognize) assert.ok(models.some(m=>m.name===model && m.installed && m.available), model + ' unavailable in package');
     }
     await renderer(`(async () => {
-      for(let i=0;i<100 && !document.querySelector('#model-select option[value="base"]');i++) await new Promise(r=>setTimeout(r,50));
+      for(let i=0;i<100 && !document.querySelector('#model-select option');i++) await new Promise(r=>setTimeout(r,50));
       if(${preferencesExist}) {
         if(localStorage.getItem('talatrace.model')!=='parakeet-tdt-0.6b-v3') throw new Error('Model preference lost on restart');
         if(document.querySelector('#model-select').value!=='parakeet-tdt-0.6b-v3') throw new Error('Saved model not selected');
       }
-      if(${recognize}) {
+      if(${recognize && !options.keepPreference}) {
         const select=document.querySelector('#model-select'); select.value='parakeet-tdt-0.6b-v3'; select.dispatchEvent(new Event('change',{bubbles:true}));
       }
       return document.querySelector('h1, .app-title').textContent;
     })()`);
+    const preferenceBefore = await renderer("localStorage.getItem('talatrace.model')");
     const results = [];
-    if(recognize) for(const model of ['base', 'parakeet-tdt-0.6b-v3']) {
+    if(recognize) for(const model of recognitionModels) {
       const result = await renderer(`(async () => await new Promise((resolve,reject)=>{
         const timer=setTimeout(()=>reject(new Error('Packaged recognition timed out')),90000);
         window.electronAPI.onTranscriptionCompleted(result=>{clearTimeout(timer);resolve(result)});
@@ -102,7 +104,14 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
       assert.ok(result.segments?.length && result.duration > 0 && result.processingTimeMs > 0);
       results.push({ model, engine: result.engine, seconds: result.duration, processingMs: result.processingTimeMs, segments: result.segments.length });
     }
-    console.log(JSON.stringify({ ...identity, models: models.filter(m=>m.installed).map(m=>m.name), results }));
+    const preferenceAfter = await renderer("localStorage.getItem('talatrace.model')");
+    assert.equal(preferenceAfter, preferenceBefore, 'Transcription unexpectedly changed the saved model');
+    if(options.screenshot) {
+      await renderer("(async () => { document.querySelector('#app-tab-models').click(); await document.fonts.ready; await new Promise(r=>setTimeout(r,350)); })()");
+      const png = await evaluate("(async () => { const win=globalThis.__releaseElectron.BrowserWindow.getAllWindows()[0]; const image=await win.webContents.capturePage(); return image.toPNG().toString('base64'); })()");
+      await fs.writeFile(options.screenshot, Buffer.from(png,'base64'));
+    }
+    console.log(JSON.stringify({ ...identity, models: models.filter(m=>m.installed).map(m=>m.name), preference: preferenceAfter, results }));
     // Inspector clients keep Node alive until detached; do not await app.quit through it.
     await command('Runtime.evaluate', { expression: 'setImmediate(()=>globalThis.__releaseElectron.app.quit()); true' });
   } catch(error) { throw new Error(error.message + '\n' + diagnostics); }
@@ -110,6 +119,15 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
 }
 
 (async () => {
+  if(process.argv.includes('--real-profile')) {
+    // Explicit opt-in for a backed-up installed-app check. Keep existing preferences.
+    const backup = (await fs.readFile(path.join(root,'release/active-upgrade-backup.txt'),'utf8')).trim();
+    const manifest = JSON.parse(await fs.readFile(path.join(backup,'before.json'),'utf8'));
+    assert.equal(manifest.Profile,path.join(process.env.APPDATA,'whisper-electron-app'));
+    await launch(process.env.APPDATA,manifest.Profile,true,false,{ keepPreference:true,models:['tiny','parakeet-tdt-0.6b-v3'],screenshot:path.join(backup,'installed-models.png') });
+    console.log('Installed upgrade: original profile, local engines and unchanged model preference passed.');
+    return;
+  }
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'talatrace-package-smoke-'));
   // Deliberately retain this isolated directory for inspection; it contains hardlinks to local weights.
   console.log('Isolated package test:', directory);

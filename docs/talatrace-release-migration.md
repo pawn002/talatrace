@@ -30,7 +30,7 @@ The app's display name is already TalaTrace. Internal package identifiers and th
 ## Outstanding checks
 
 - App iteration and release readiness are not complete.
-- Packaged clean-install and upgrade checks remain to be performed.
+- Windows in-place upgrade is verified below. Fresh NSIS installation, uninstall and rollback remain untested; clean-profile packaged launch passes.
 - Recheck the exact blog destinations recorded below after renaming; repair the existing Quick Start fragment when updating the blog.
 - Reassess release tooling, integrations and platform coverage at execution time.
 - No remote repository rename or release has been performed by recording this plan.
@@ -48,7 +48,19 @@ The app's display name is already TalaTrace. Internal package identifiers and th
 - Static installer-identity review: the app ID remains `com.yourcompany.whisper-electron`, as in 1.1.5; electron-builder derives its NSIS GUID from that ID. Product/executable names change. This supports continuity but does not substitute for an installed upgrade test.
 - Reviewable release notes: [1.2.0 draft](releases/1.2.0-draft.md).
 
-Next gate: test clean install and 1.1.5 → candidate upgrade on a disposable Windows machine/VM, checking the executable and shortcuts, one uninstall entry, downloaded weights, preferences and uninstall/rollback behavior. Windows Sandbox is unavailable on this host; no existing Whisper/TalaTrace per-user uninstall entry was found. The real installed-user workflow has not been exercised. The exact blog destinations are now recorded below for post-rename verification. Repository rename and public release wait for these checks.
+The initial plan called for a disposable Windows machine/VM, but the user only has this system and confirmed that 1.1.5 is installed. A native-context registry check found the installation (the earlier sandbox-limited check did not expose it). The in-place upgrade results are recorded below. The exact blog destinations are recorded for post-rename verification. Repository rename and public release remain pending review of these results and remaining limitations.
+
+## Installed Windows upgrade — 26 October 2026
+
+- Located the per-user 1.1.5 installation at `%LOCALAPPDATA%\Programs\whisper-electron-app`, using uninstall key `72457f39-6610-52b7-a891-b0bdbbb40dac`. No application process was running.
+- Before installation, independently copied the complete profile (93 files, approximately 4.2 GiB), including Local Storage and models, to the ignored local directory `release/upgrade-backup-20261026-195532/profile`. All four copied model files were verified against their originals by SHA-256. Saved the old uninstall entry, shortcut targets and model hash manifest beside the backup. The 1.1.5 installer remains available locally and on GitHub.
+- Rechecked the candidate installer hash and performed the NSIS in-place upgrade (`/S`); exit code 0. Installed Apps now reports `TalaTrace 1.2.0-rc.1` under the same single uninstall key and installation folder. Both Desktop and Start Menu links are renamed TalaTrace and target the existing `TalaTrace.exe`; old Whisper Transcription links are absent from those locations.
+- Before launching, verified that all four installed model hashes are unchanged and all six backed-up Local Storage files match byte-for-byte. Tiny, Large v3, Large v3 Turbo and Parakeet remain discoverable in the actual installed app.
+- The explicit `--real-profile` mode of the packaged smoke helper, guarded by the backup manifest, launches the installed executable with its real Roaming profile. HTTP(S) is blocked during the test. Tiny and Parakeet both transcribe the bundled JFK sample and return timing/duration metadata; saved model selection remains Parakeet. No test preference is substituted. Inspected the installed Models screenshot with the image viewer.
+- Installed upgrade smoke passes; the candidate remains installed. Screenshot, before/after manifests and backup are local ignored artifacts, not included in the PR. No real user audio was transcribed for this test.
+- Fresh NSIS installation, uninstall and rollback have not been exercised. The user's installed app was left intact rather than removed for an uninstall test. Windows Sandbox remains unavailable. Keep this limitation in the release decision; do not describe the packaged clean-profile launch as a clean installer test.
+
+Recovery material: retain `release/upgrade-backup-20261026-195532/` and `release/Whisper Transcription Setup 1.1.5.exe` until the release is accepted. If recovery becomes necessary, close the app first and use the prior installer and profile backup; any downgrade/uninstall sequence must preserve the data backup and be verified separately. The exported registry entry is diagnostic evidence, not an instruction to import it over a live installation.
 
 ## Exact blog-link baseline
 
