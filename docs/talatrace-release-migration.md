@@ -2,7 +2,7 @@
 
 Recorded: 26 October 2026.
 
-Status: PR #23 merged and the existing repository renamed to `pawn002/talatrace` on 26 October 2026. Final 1.2.0 validation and publication are in progress. Checkpoint and upgrade evidence are retained below.
+Status: complete. PR #23 merged, the existing repository renamed to `pawn002/talatrace`, and 1.2.0 published as Latest on 26 October 2026 (27 October UTC). Checkpoint, upgrade evidence and remaining test limits are retained below.
 
 ## Recommended approach
 
@@ -29,11 +29,11 @@ The app's display name is already TalaTrace. Internal package identifiers and th
 
 ## Outstanding checks
 
-- App iteration and release readiness are not complete.
+- Release 1.2.0 is published; the test limitations below remain documented follow-up work.
 - Windows in-place upgrade is verified below. Fresh NSIS installation, uninstall and rollback remain untested; clean-profile packaged launch passes.
 - Post-rename redirects are verified below. A README compatibility anchor restores the original Quick Start fragment; modernizing the blog's link is optional.
 - Reassess release tooling, integrations and platform coverage at execution time.
-- Repository rename is complete; final release validation and publication are in progress.
+- Repository rename, final validation and publication are complete.
 
 ## Preparation results — 26 October 2026
 
@@ -96,4 +96,6 @@ Moved the recovery directory to the ignored `.local-backups/upgrade-backup-20261
 | `TalaTrace-Setup-1.2.0.exe` | `9391ae53e920550ae5eabbeda7f2ff51a09f713ad4e4a8d111b2ae18ed818e64` |
 | `TalaTrace-1.2.0-win.zip` | `024ac48b495e9b54d2820e53dfee4c490ecdd7bc5bb959672affce189fa4e0d7` |
 
-Publication target: [v1.2.0](https://github.com/pawn002/talatrace/releases/tag/v1.2.0), with both artifacts and `SHA256SUMS.txt`. Preserve the old repository redirects and the previous release.
+Published [v1.2.0](https://github.com/pawn002/talatrace/releases/tag/v1.2.0) as Latest from tag `v1.2.0` at `1098184d120803cc36696831fb4aef3e4c6d2641`. Both Windows artifacts and the portable LF `SHA256SUMS.txt` are uploaded. GitHub's server-reported SHA-256 digests and sizes match every local artifact. The checksum manifest's own SHA-256 is `59bd4d769de625a6f49cceb7ec00c6e703301dc8d5608e38adfedccb02b5e994`.
+
+Unauthenticated public checks pass: both old/new repository `/releases/latest` URLs reach v1.2.0, installer/ZIP downloads return HTTP 200, and the downloaded public checksum manifest matches the local copy. The current system has final 1.2.0 installed. The protected backup also contains a checksum-verified `Whisper-Transcription-Setup-1.1.5.exe` for offline recovery; rollback itself remains untested. Preserve the old repository redirects and previous release, and never reuse the old repository name.
