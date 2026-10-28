@@ -75,6 +75,12 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
     })()`);
     const identity = await evaluate(`(async () => { const {app}=globalThis.__releaseElectron; await app.whenReady(); return { packaged: app.isPackaged, name: app.getName(), version: app.getVersion(), profile: app.getPath('userData') }; })()`);
     assert.equal(identity.packaged, true); assert.equal(identity.name, 'TalaTrace'); assert.equal(identity.profile, expectedProfile);
+    if (process.env.TALATRACE_EXPECT_APPARMOR === '1') {
+      assert.equal(process.platform, 'linux');
+      const label = await evaluate("require('node:fs').readFileSync('/proc/self/attr/current','utf8').trim()");
+      assert.match(label, /^talatrace(?:\s|$)/, 'Installed app is not running under its shipped AppArmor profile: ' + label);
+      console.log('Installed AppArmor profile:', label);
+    }
     const models = await renderer('window.electronAPI.getAvailableModels()');
     const recognitionModels = options.models || ['base', 'parakeet-tdt-0.6b-v3'];
     for(const model of recognitionModels) {

@@ -1,0 +1,9 @@
+abi <abi/4.0>,
+include <tunables/global>
+
+# Namespace permission for the installed app, not a full confinement policy.
+profile talatrace /opt/TalaTrace/whisper-electron-app flags=(unconfined) {
+  userns,
+  network,
+  include if exists <local/talatrace>
+}

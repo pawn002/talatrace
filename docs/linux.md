@@ -32,6 +32,10 @@ The smoke commands use isolated temporary profiles and known public audio. Insta
 
 `.github/workflows/linux.yml` builds candidates and runs unit/native, packaged offline-recognition and fake-microphone workflow checks. On AppArmor hosts it grants user namespaces to the two explicit CI executable paths, rather than disabling the system restriction or Chromium sandbox. That runner-only policy is not installer validation. Its artifacts are CI candidates, not public releases. Keep #24 open until the desktop and installer matrix below passes.
 
+The deb now ships `/etc/apparmor.d/talatrace` as a dpkg conffile, granting user namespaces to `/opt/TalaTrace/whisper-electron-app`. It preserves administrator edits on upgrade and loads the profile during installation when AppArmor is active. The bundled Chromium helper is provisioned as root-owned mode 4755; root's own namespace access no longer decides its permissions. This follows [Ubuntu's executable-specific namespace guidance](https://documentation.ubuntu.com/release-notes/24.04/), keeps Chromium sandboxing enabled and does not disable the system-wide restriction. It is not a full AppArmor confinement policy. CI separately installs the deb and tests the `/opt` executable using the shipped profile; its test-directory exception does not cover that executable.
+
+If replacing an earlier testing deb that also identifies as 1.2.0, use `sudo apt install --reinstall ./TalaTrace-1.2.0-linux-amd64.deb`. Ordinary installation may otherwise retain the already installed same-version candidate. [Issue #28](https://github.com/pawn002/talatrace/issues/28) records the original launch failure on Ubuntu 26.04.1; that report does not establish support for 26.04, and the corrected package needs desktop retesting.
+
 ## Required release evidence
 
 - Record the exact distro, architecture, kernel, CPU, X11/Wayland session and audio stack.
