@@ -104,6 +104,7 @@ app.whenReady().then(async () => {
         : { x: r.right - parseFloat(s.borderRightWidth || 0) - 21, y: r.top + center };
     })()`);
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point });
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', button: 'left', buttons: 1, x: point.x + (horizontal ? 70 : 0), y: point.y + (horizontal ? 0 : 70) });
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, x: point.x + (horizontal ? 70 : 0), y: point.y + (horizontal ? 0 : 70) });

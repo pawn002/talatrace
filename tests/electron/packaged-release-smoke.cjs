@@ -116,8 +116,9 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
     }
     const preferenceAfter = await renderer("localStorage.getItem('talatrace.model')");
     if (recognize) {
-      const exportsDirectory = path.join(appData, 'export-test');
-      await fs.mkdir(exportsDirectory, { recursive: true });
+      // Also keep explicit --real-profile checks from placing test exports in
+      // the user's appData tree. This directory is owned by the test run.
+      const exportsDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'talatrace-export-smoke-'));
       await evaluate(`(() => {
         globalThis.__exportDefaults = [];
         globalThis.__releaseElectron.dialog.showSaveDialog = async (_window, options) => {
