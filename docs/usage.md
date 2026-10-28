@@ -36,6 +36,8 @@ The transcript is a read-only output, not an editor. Edit the copied or saved te
 
 **Include timing and pauses** controls Copy and TXT content. With it enabled, available speech timestamps and pause metadata are formatted as a readable timeline; with it disabled, Copy/TXT contain the recognized words. **Save transcript…** opens the system save dialog:
 
+In the development/Linux testing build, first choose **File format** beside **Save transcript…**. The app supplies that extension and remembers the last successful export folder/name for the current session. If a native dialog omits the extension or returns another supported suffix, the app corrects it and confirms before replacing an existing file at the corrected name. Released Windows 1.2.0 uses the earlier filename-based selection.
+
 | Format | Content |
 | --- | --- |
 | TXT | Same current readable/plain text as Copy |

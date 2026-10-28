@@ -44,6 +44,7 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
   recordingError = '';
   includeTimestamps = true;
   settingsOpen = false;
+  exportFormat: 'txt' | 'srt' | 'vtt' | 'json' = 'txt';
 
   openSettings(): void {
     if (!this.busy && this.hasInstalledModel) this.settingsOpen = true;
@@ -277,7 +278,7 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
         {
           ...this.transcriptionResult, timestampedText: this.getTranscriptText(),
           pauseRegions: groupQuietIntervals(this.transcriptionResult.quietIntervals || []),
-        }
+        }, this.exportFormat
       );
       if (savedPath) {
         this.toastService.show(`Saved to: ${savedPath}`, 'success');

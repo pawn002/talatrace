@@ -30,8 +30,8 @@ export class ElectronService {
     return result;
   }
 
-  async saveTranscript(resultData: any): Promise<string | null> {
-    return await this.electron.saveTranscript(resultData);
+  async saveTranscript(resultData: any, format: 'txt' | 'srt' | 'vtt' | 'json' = 'txt'): Promise<string | null> {
+    return await this.electron.saveTranscript(resultData, format);
   }
 
   async getAvailableModels(): Promise<any[]> {

@@ -57,3 +57,9 @@ Ubuntu 24.04.5 x86_64 on WSL2, kernel 6.6.87.2, Node 24.21.0; headless Xvfb and 
 - Windows: 50 Electron tests and a rebuilt unpacked package passed both engines, preference restart, profile retention and clean launch.
 
 AppImage/deb artifacts are development candidates at version 1.2.0; no Linux release was published. Desktop audio, Wayland, sandbox policy on a stock Ubuntu kernel and clean-desktop installer lifecycle remain outstanding.
+
+## Candidate 2 desktop review follow-up
+
+The [review on #24](https://github.com/pawn002/talatrace/issues/24#issuecomment-6459673572) reports successful deb launch under its AppArmor profile with the namespace restriction enabled, physical microphone recording on both engines, copy to another app, exports, model download/deletion and preference retention on Ubuntu 26.04.1/XFCE/X11/PipeWire at 150% scale. This is evidence for that configuration, not a blanket Ubuntu 26.04 support claim. Tiny's presence was subsequently explained by the user's separate manual download.
+
+The review found export suffix/folder problems, addressed in development with explicit format selection and session folder/name reuse. A reported partial-width spectrum was not reproduced with a full-band fixture at DPR 1.5 on either platform. The AppImage mounts through FUSE on that desktop but fails under the namespace policy; prefer the deb on that Ubuntu configuration pending a separate AppImage solution. Actual network-disconnected operation, Wayland and the desktop installer lifecycle remain unverified by this review; socket monitoring alone does not establish offline behavior.

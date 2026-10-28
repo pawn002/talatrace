@@ -50,7 +50,13 @@
         @if (inputMode === 'record' && recordedAudio && recordingError && !busy) {
           <button data-action="transcribe" class="button button--primary button--small" (click)="startTranscription()" [disabled]="!hasInstalledModel" aria-describedby="workflow-help"><i class="ph-bold ph-arrow-clockwise" aria-hidden="true"></i> Retry transcription</button>
         }
-        <button class="button button--ghost button--small" (click)="exportTranscript()" [disabled]="!transcriptionResult || busy" aria-describedby="workflow-help"><i class="ph-fill ph-floppy-disk" aria-hidden="true"></i> Save transcript…</button>
+        <div class="export-controls">
+          <label for="export-format">File format</label>
+          <div class="select-control"><select id="export-format" class="input" [(ngModel)]="exportFormat">
+            <option value="txt">TXT</option><option value="srt">SRT</option><option value="vtt">VTT</option><option value="json">JSON</option>
+          </select><i class="ph-bold ph-caret-down select-caret" aria-hidden="true"></i></div>
+          <button data-action="save" class="button button--ghost button--small" (click)="exportTranscript()" [disabled]="!transcriptionResult || busy" aria-describedby="workflow-help"><i class="ph-fill ph-floppy-disk" aria-hidden="true"></i> Save transcript…</button>
+        </div>
       <div class="workflow-options">
         <button type="button" data-action="settings" class="button button--ghost button--small" (click)="openSettings()" [disabled]="busy || !hasInstalledModel" aria-haspopup="dialog" aria-controls="transcription-settings" aria-describedby="workflow-help"><i class="ph-fill ph-gear" aria-hidden="true"></i> Transcription settings</button>
         <label class="copy-option"><input class="checkbox-input" type="checkbox" [(ngModel)]="includeTimestamps" (ngModelChange)="copied = false"><span class="checkbox-box" aria-hidden="true"></span><span>Include timing and pauses</span></label>

@@ -37,6 +37,14 @@ Story paths below are relative to Candor's `src/web-components/components/`; com
 
 ## Evidence and limits
 
+### Development export follow-up
+
+The export format is a short native select with an explicit `label`/`for` association, following the Select story/construction and the app's existing native-select adaptation. Four values (TXT/SRT/VTT/JSON) determine the subsequent native save dialog's extension and filter. Menu was considered against its story but not used: this is a bound field value, and the pinned menu lacks the trigger-disabled/ghost construction needed here. The field remains available to preset while the Save action uses the workflow's existing disabled reason. Values and label are 16px; caret uses control-border/focus tokens, while text uses semantic text tokens. On small screens, the label sits above a shared selector/Save row with wrapping allowed. Record/Stop/Copy positions remain stable.
+
+Local Storybook Select/Menu/Button/Card source and typography contrast guidance were read before editing. The published Chromatic URLs could not be retrieved by the web tool. Render review includes the existing app at 150% scale, the first export row, its mobile refinement and Linux rendering/keyboard checks. Full-band fixtures fill all 14 bars across all 102 backing pixels of the 68px canvas at DPR 1.5 on Windows and Linux; no production spectrum change is justified by that result alone. Speech can leave high-frequency bands quiet. This is sampled visual/contrast evidence, not an accessibility conformance audit.
+
+The final Linux fixture run generated 129 states and passed its layout/keyboard/state assertions after correcting asynchronous resize hit testing in the harness. Sampled screenshots were inspected for desktop, 360/480px layouts, light/dark, recording, full-band signal, long file names, format focus and zoom. Klar 3.1.0 measured the shared export label/value pairings at OKCA 12.9 dark and 11.9 light (16px regular); forced-colour black/white measured 20. The pre-existing extreme-zoom settings/navigation overflow remains recorded separately.
+
 The final pre-release workflow preview covered 126 states, including desktop/360/480px, short windows, themes, focus, capture/processing/result/copy/failure/import, settings and native scrollbar dragging/keyboard checks. The detailed [historical log](archive/candor-widget-review-2026-10.md) records sampled Klar 3.1.0 pairings and screenshots inspected. The 240px effective-width navigation overflow fixture remains a known gap; this is not a complete accessibility or screen-reader audit.
 
 The [documentation audit](../AUDIT_REPORT.md) changed no UI. It found that older interview-smoke revisions did not isolate startup correctly. The repaired harness asserts appData/userData/sessionData after main loads; use [Development](development.md#verify-changes) for current behavior. Historical verification claims remain tied to their original revisions.

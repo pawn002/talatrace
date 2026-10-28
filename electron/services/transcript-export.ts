@@ -1,0 +1,159 @@
+import * as path from 'path';
+import * as fs from 'fs/promises';
+import type { SaveDialogOptions, SaveDialogReturnValue } from 'electron';
+
+export type TranscriptFormat = 'txt' | 'srt' | 'vtt' | 'json';
+const formats = { txt: 'Text', srt: 'SRT subtitles', vtt: 'WebVTT subtitles', json: 'JSON' };
+
+export function exportPath(selected: string, format: TranscriptFormat): string {
+  const ext = path.extname(selected).toLowerCase();
+  if (ext === '.' + format) return selected;
+  if (Object.prototype.hasOwnProperty.call(formats, ext.slice(1))) return selected.slice(0, -ext.length) + '.' + format;
+  return selected.replace(/\.+$/, '') + '.' + format;
+}
+
+export function serializeTranscript(data: any, format: TranscriptFormat): string {
+  const segments = Array.isArray(data?.segments) && data.segments.length ? data.segments : null;
+  if (format === 'json') return JSON.stringify(data, null, 2);
+  if (format === 'srt') return segments ? convertSegmentsToSRT(segments) : convertToSRT(data?.text || '');
+  if (format === 'vtt') return segments ? convertSegmentsToVTT(segments) : convertToVTT(data?.text || '');
+  return typeof data?.timestampedText === 'string' ? data.timestampedText : segments ? segments.map((s: any) => s.text).join(' ') : data?.text || JSON.stringify(data);
+}
+
+export class TranscriptExporter {
+  private lastDirectory?: string;
+  private lastStem = 'transcript';
+  constructor(private dialogs: {
+    directory: () => string;
+    choose: (options: SaveDialogOptions) => Promise<SaveDialogReturnValue>;
+    confirmOverwrite: (file: string) => Promise<boolean>;
+  }) {}
+
+  async save(data: any, requested: unknown = 'txt'): Promise<string | null> {
+    if (typeof requested !== 'string' || !Object.prototype.hasOwnProperty.call(formats, requested)) throw new Error('Unsupported transcript format');
+    const format = requested as TranscriptFormat;
+    const result = await this.dialogs.choose({
+      defaultPath: path.join(this.lastDirectory || this.dialogs.directory(), this.lastStem + '.' + format),
+      filters: [{ name: formats[format], extensions: [format] }],
+      properties: ['showOverwriteConfirmation'],
+    });
+    if (result.canceled || !result.filePath) return null;
+    if (!path.isAbsolute(result.filePath)) throw new Error('Expected an absolute export path');
+    const file = exportPath(result.filePath, format);
+    const content = serializeTranscript(data, format);
+    if (file === result.filePath) {
+      // Native overwrite confirmation covers this exact name.
+      await fs.writeFile(file, content, 'utf8');
+    } else {
+      // GTK can omit or retain another suffix. Its confirmation did not cover
+      // the normalized name, so don't overwrite that name without permission.
+      try { await fs.writeFile(file, content, { encoding: 'utf8', flag: 'wx' }); }
+      catch (error: any) {
+        if (error.code !== 'EEXIST') throw error;
+        if (!await this.dialogs.confirmOverwrite(file)) return null;
+        await fs.writeFile(file, content, 'utf8');
+      }
+    }
+    this.lastDirectory = path.dirname(file);
+    this.lastStem = path.basename(file, path.extname(file));
+    return file;
+  }
+}
+
+// Helper function to format seconds to SRT timestamp (HH:MM:SS,mmm)
+function formatTimestampForSRT(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  const milliseconds = Math.floor((secs % 1) * 1000);
+
+  const hh = hours.toString().padStart(2, '0');
+  const mm = minutes.toString().padStart(2, '0');
+  const ss = Math.floor(secs).toString().padStart(2, '0');
+  const mmm = milliseconds.toString().padStart(3, '0');
+
+  return `${hh}:${mm}:${ss},${mmm}`;
+}
+
+// Helper function to format seconds to VTT timestamp (HH:MM:SS.mmm)
+function formatTimestampForVTT(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  const milliseconds = Math.floor((secs % 1) * 1000);
+
+  const hh = hours.toString().padStart(2, '0');
+  const mm = minutes.toString().padStart(2, '0');
+  const ss = Math.floor(secs).toString().padStart(2, '0');
+  const mmm = milliseconds.toString().padStart(3, '0');
+
+  return `${hh}:${mm}:${ss}.${mmm}`;
+}
+
+// Helper function to convert segments array to SRT format
+function convertSegmentsToSRT(segments: any[]): string {
+  return segments.map((segment, index) => {
+    const startTime = formatTimestampForSRT(segment.start);
+    const endTime = formatTimestampForSRT(segment.end);
+    const text = segment.text.trim();
+
+    return `${index + 1}\n${startTime} --> ${endTime}\n${text}\n`;
+  }).join('\n');
+}
+
+// Helper function to convert segments array to VTT format
+function convertSegmentsToVTT(segments: any[]): string {
+  let vttContent = 'WEBVTT\n\n';
+
+  vttContent += segments.map(segment => {
+    const startTime = formatTimestampForVTT(segment.start);
+    const endTime = formatTimestampForVTT(segment.end);
+    const text = segment.text.trim();
+
+    return `${startTime} --> ${endTime}\n${text}\n`;
+  }).join('\n');
+
+  return vttContent;
+}
+
+// Helper function to convert Whisper timestamp format to SRT (for backward compatibility)
+function convertToSRT(text: string): string {
+  const lines = text.split('\n').filter((line) => line.trim());
+  let srtContent = '';
+  let index = 1;
+
+  for (const line of lines) {
+    const match = line.match(
+      /\[(\d{2}:\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}\.\d{3})\]\s*(.+)/
+    );
+    if (match) {
+      const [, start, end, subtitle] = match;
+      // Convert milliseconds format from . to ,
+      const srtStart = start.replace('.', ',');
+      const srtEnd = end.replace('.', ',');
+      srtContent += `${index}\n${srtStart} --> ${srtEnd}\n${subtitle.trim()}\n\n`;
+      index++;
+    }
+  }
+
+  return srtContent || text; // Fallback to original if no matches
+}
+
+// Helper function to convert Whisper timestamp format to VTT
+function convertToVTT(text: string): string {
+  const lines = text.split('\n').filter((line) => line.trim());
+  let vttContent = 'WEBVTT\n\n';
+
+  for (const line of lines) {
+    const match = line.match(
+      /\[(\d{2}:\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}\.\d{3})\]\s*(.+)/
+    );
+    if (match) {
+      const [, start, end, subtitle] = match;
+      vttContent += `${start} --> ${end}\n${subtitle.trim()}\n\n`;
+    }
+  }
+
+  return vttContent === 'WEBVTT\n\n' ? text : vttContent; // Fallback to original if no matches
+}
+

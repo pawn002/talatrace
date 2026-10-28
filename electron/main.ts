@@ -6,6 +6,7 @@ import { existsSync } from 'fs';
 import { TranscriptionService } from './services/transcription.service';
 import { storeRecording, removeStaleRecordings } from './services/recording-storage';
 import { pathToFileURL } from 'url';
+import { TranscriptExporter } from './services/transcript-export';
 
 // Import package.json for app version
 const packageJson = require(path.join(__dirname, '../../package.json'));
@@ -19,103 +20,6 @@ app.setName('TalaTrace');
 
 let mainWindow: BrowserWindow | null = null;
 let transcriptionService: TranscriptionService | null = null;
-
-// Helper function to format seconds to SRT timestamp (HH:MM:SS,mmm)
-function formatTimestampForSRT(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  const milliseconds = Math.floor((secs % 1) * 1000);
-
-  const hh = hours.toString().padStart(2, '0');
-  const mm = minutes.toString().padStart(2, '0');
-  const ss = Math.floor(secs).toString().padStart(2, '0');
-  const mmm = milliseconds.toString().padStart(3, '0');
-
-  return `${hh}:${mm}:${ss},${mmm}`;
-}
-
-// Helper function to format seconds to VTT timestamp (HH:MM:SS.mmm)
-function formatTimestampForVTT(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  const milliseconds = Math.floor((secs % 1) * 1000);
-
-  const hh = hours.toString().padStart(2, '0');
-  const mm = minutes.toString().padStart(2, '0');
-  const ss = Math.floor(secs).toString().padStart(2, '0');
-  const mmm = milliseconds.toString().padStart(3, '0');
-
-  return `${hh}:${mm}:${ss}.${mmm}`;
-}
-
-// Helper function to convert segments array to SRT format
-function convertSegmentsToSRT(segments: any[]): string {
-  return segments.map((segment, index) => {
-    const startTime = formatTimestampForSRT(segment.start);
-    const endTime = formatTimestampForSRT(segment.end);
-    const text = segment.text.trim();
-
-    return `${index + 1}\n${startTime} --> ${endTime}\n${text}\n`;
-  }).join('\n');
-}
-
-// Helper function to convert segments array to VTT format
-function convertSegmentsToVTT(segments: any[]): string {
-  let vttContent = 'WEBVTT\n\n';
-
-  vttContent += segments.map(segment => {
-    const startTime = formatTimestampForVTT(segment.start);
-    const endTime = formatTimestampForVTT(segment.end);
-    const text = segment.text.trim();
-
-    return `${startTime} --> ${endTime}\n${text}\n`;
-  }).join('\n');
-
-  return vttContent;
-}
-
-// Helper function to convert Whisper timestamp format to SRT (for backward compatibility)
-function convertToSRT(text: string): string {
-  const lines = text.split('\n').filter((line) => line.trim());
-  let srtContent = '';
-  let index = 1;
-
-  for (const line of lines) {
-    const match = line.match(
-      /\[(\d{2}:\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}\.\d{3})\]\s*(.+)/
-    );
-    if (match) {
-      const [, start, end, subtitle] = match;
-      // Convert milliseconds format from . to ,
-      const srtStart = start.replace('.', ',');
-      const srtEnd = end.replace('.', ',');
-      srtContent += `${index}\n${srtStart} --> ${srtEnd}\n${subtitle.trim()}\n\n`;
-      index++;
-    }
-  }
-
-  return srtContent || text; // Fallback to original if no matches
-}
-
-// Helper function to convert Whisper timestamp format to VTT
-function convertToVTT(text: string): string {
-  const lines = text.split('\n').filter((line) => line.trim());
-  let vttContent = 'WEBVTT\n\n';
-
-  for (const line of lines) {
-    const match = line.match(
-      /\[(\d{2}:\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}\.\d{3})\]\s*(.+)/
-    );
-    if (match) {
-      const [, start, end, subtitle] = match;
-      vttContent += `${start} --> ${end}\n${subtitle.trim()}\n\n`;
-    }
-  }
-
-  return vttContent === 'WEBVTT\n\n' ? text : vttContent; // Fallback to original if no matches
-}
 
 function createWindow() {
   Menu.setApplicationMenu(null);
@@ -282,74 +186,17 @@ ipcMain.handle('transcribe-recording', async (event, bytes: unknown, options: an
   }
 });
 
-ipcMain.handle('save-transcript', async (event, resultData: any) => {
-  const saveResult = await dialog.showSaveDialog({
-    defaultPath: `transcript.txt`,
-    filters: [
-      { name: 'Text Files', extensions: ['txt'] },
-      { name: 'JSON', extensions: ['json'] },
-      { name: 'SRT Subtitles', extensions: ['srt'] },
-      { name: 'VTT Subtitles', extensions: ['vtt'] },
-      { name: 'All Files', extensions: ['*'] },
-    ],
-  });
-
-  if (!saveResult.canceled && saveResult.filePath) {
-    const selectedPath = saveResult.filePath;
-    const ext = path.extname(selectedPath).toLowerCase();
-
-    let content: string;
-
-    // Extract segments if available
-    const segments = resultData?.segments;
-    const hasSegments = segments && Array.isArray(segments) && segments.length > 0;
-
-    // Format content based on selected extension
-    if (ext === '.json') {
-      // Full structured JSON
-      content = JSON.stringify(resultData, null, 2);
-
-    } else if (ext === '.txt') {
-      // Plain text without timestamps
-      if (typeof resultData?.timestampedText === 'string') {
-        content = resultData.timestampedText;
-      } else if (hasSegments) {
-        content = segments.map((seg: any) => seg.text).join(' ');
-      } else {
-        content = resultData?.text || JSON.stringify(resultData);
-      }
-
-    } else if (ext === '.srt') {
-      // SRT subtitle format
-      if (hasSegments) {
-        content = convertSegmentsToSRT(segments);
-      } else {
-        // Fallback: try to parse timestamped text
-        const text = resultData?.text || '';
-        content = convertToSRT(text);
-      }
-
-    } else if (ext === '.vtt') {
-      // WebVTT subtitle format
-      if (hasSegments) {
-        content = convertSegmentsToVTT(segments);
-      } else {
-        // Fallback: try to parse timestamped text
-        const text = resultData?.text || '';
-        content = convertToVTT(text);
-      }
-
-    } else {
-      // Default: plain text
-      content = resultData?.text || JSON.stringify(resultData);
-    }
-
-    const fsSync = require('fs');
-    fsSync.writeFileSync(selectedPath, content, 'utf-8');
-    return selectedPath;
-  }
-  return null;
+const transcriptExporter = new TranscriptExporter({
+  directory: () => app.getPath('documents'),
+  choose: options => mainWindow ? dialog.showSaveDialog(mainWindow, options) : dialog.showSaveDialog(options),
+  confirmOverwrite: async filePath => {
+    const options = { type: 'warning' as const, buttons: ['Cancel', 'Replace'], defaultId: 0, cancelId: 0,
+      message: 'Replace existing transcript?', detail: filePath };
+    const result = mainWindow ? await dialog.showMessageBox(mainWindow, options) : await dialog.showMessageBox(options);
+    return result.response === 1;
+  },
 });
+ipcMain.handle('save-transcript', (_event, resultData: any, format: unknown = 'txt') => transcriptExporter.save(resultData, format));
 
 ipcMain.handle('get-available-models', async () => {
   try {

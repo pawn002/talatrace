@@ -520,7 +520,7 @@ describe('TranscriptionComponent', () => {
       await component.saveTranscript();
       expect(electronStub.saveTranscript).toHaveBeenCalledWith(expect.objectContaining({
         noSpeechIntervals: [{ start: 6, end: 36 }], quietIntervals: [{ start: 12, end: 14 }],
-      }));
+      }), 'txt');
     });
 
     it('copies the detector warning when only quiet measurements are available', () => {
@@ -562,7 +562,7 @@ describe('TranscriptionComponent', () => {
       await component.saveTranscript();
       expect(electronStub.saveTranscript).toHaveBeenCalledWith(expect.objectContaining({
         timestampedText: '[00:00:02.000 → 00:00:04.000] Answer',
-      }));
+      }), 'txt');
     });
 
     it('copies audio-aligned times while retaining original recognition times in exports', async () => {
@@ -576,7 +576,7 @@ describe('TranscriptionComponent', () => {
       await component.saveTranscript();
       expect(electronStub.saveTranscript).toHaveBeenCalledWith(expect.objectContaining({
         originalSegments: [{ start: 59, end: 82, text: 'Resumed speech' }],
-      }));
+      }), 'txt');
     });
 
     it('blocks new file selection during a transcription', async () => {
@@ -623,6 +623,12 @@ describe('TranscriptionComponent', () => {
   });
 
   describe('saveTranscript()', () => {
+    it('passes the chosen file format alongside the full transcript', async () => {
+      component.transcriptionResult = { text: 'Answer', segments: [{ start: 1, end: 2, text: 'Answer' }] };
+      component.exportFormat = 'srt';
+      await component.saveTranscript();
+      expect(electronStub.saveTranscript).toHaveBeenCalledWith(expect.objectContaining({ text: 'Answer' }), 'srt');
+    });
     it('shows info toast and does not call electron when there is no result', async () => {
       component.transcriptionResult = null;
 

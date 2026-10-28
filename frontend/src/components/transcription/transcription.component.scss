@@ -32,6 +32,11 @@
 #workflow-help { min-height: 1.6em; }
 .record-actions { display: flex; gap: var(--spacing-xs); flex-wrap: wrap; padding-top: var(--spacing-sm); border-top: 1px solid var(--color-border-default); }
 .record-actions .button { min-height: var(--hit-target-aaa); padding: var(--spacing-xs) var(--spacing-sm); }
+.export-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--spacing-xs); max-width: 100%; }
+.export-controls label { font: var(--font-size-md)/var(--line-height-normal) var(--font-family-accessible); color: var(--color-text-default); }
+.export-controls .select-control { width: 104px; max-width: 100%; }
+.export-controls .select-caret { color: var(--color-border-control); }
+.export-controls .select-control:focus-within .select-caret { color: var(--color-focus); }
 .workflow-options { display: flex; align-items: center; flex-wrap: wrap; gap: var(--spacing-sm); margin-left: auto; }
 .copy-option { display: flex; align-items: center; gap: var(--spacing-sm); min-height: var(--hit-target-aaa); cursor: pointer; font-family: var(--font-family-accessible); letter-spacing: var(--letter-spacing-body); font-size: var(--font-size-md); position: relative; }
 .disclosure--inline { max-inline-size: 65ch; font: var(--font-size-md)/var(--line-height-normal) var(--font-family-reading); }
@@ -55,6 +60,9 @@ candor-disclosure::part(panel) { overflow: visible; }
 .file-name i { margin-inline-end: var(--spacing-xs); }
 .file-size { margin: var(--spacing-2xs) 0 0; font-size: var(--font-size-sm); }
 @media (max-width: 640px) {
+  .export-controls { display: grid; grid-template-columns: 104px minmax(0, 1fr); width: 100%; align-items: stretch; }
+  .export-controls label { grid-column: 1 / -1; }
+  .export-controls .button { padding-inline: var(--spacing-xs); white-space: normal; min-width: 0; }
   .disclosure--subtle { margin-left: 0; }
   .transcription-page .page-heading { align-items: flex-start; flex-direction: column; gap: var(--spacing-sm); }
   .workflow-status { flex-direction: column; align-items: stretch; }

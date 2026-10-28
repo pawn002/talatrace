@@ -115,6 +115,35 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
       results.push({ model, engine: result.engine, seconds: result.duration, processingMs: result.processingTimeMs, segments: result.segments.length });
     }
     const preferenceAfter = await renderer("localStorage.getItem('talatrace.model')");
+    if (recognize) {
+      const exportsDirectory = path.join(appData, 'export-test');
+      await fs.mkdir(exportsDirectory, { recursive: true });
+      await evaluate(`(() => {
+        globalThis.__exportDefaults = [];
+        globalThis.__releaseElectron.dialog.showSaveDialog = async (_window, options) => {
+          globalThis.__exportDefaults.push(options.defaultPath);
+          // Simulate GTK retaining .txt even after another format was chosen.
+          return { canceled: false, filePath: ${JSON.stringify(path.join(exportsDirectory, 'answer.txt'))} };
+        };
+      })()`);
+      for (const format of ['txt', 'srt', 'vtt', 'json']) {
+        const output = path.join(exportsDirectory, 'answer.' + format);
+        await renderer(`(() => {
+          const select = document.querySelector('#export-format'); select.value = ${JSON.stringify(format)};
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          document.querySelector('[data-action=save]').click();
+        })()`);
+        for (let i = 0; i < 100; i++) { try { await fs.access(output); break; } catch { await wait(50); } }
+        const content = await fs.readFile(output, 'utf8');
+        if (format === 'json') assert.match(JSON.parse(content).text, /country/i);
+        else if (format === 'vtt') assert.match(content, /^WEBVTT\n/);
+        else if (format === 'srt') assert.match(content, /\d\d:\d\d:\d\d,\d{3} -->/);
+        else assert.match(content, /country/i);
+      }
+      const defaults = await evaluate('globalThis.__exportDefaults');
+      assert.deepEqual(defaults.slice(1), ['srt','vtt','json'].map(format => path.join(exportsDirectory, 'answer.' + format)));
+      console.log('Packaged TXT/SRT/VTT/JSON exports and folder/name reuse passed with a GTK-style wrong suffix.');
+    }
     assert.equal(preferenceAfter, preferenceBefore, 'Transcription unexpectedly changed the saved model');
     if(options.screenshot) {
       await renderer("(async () => { document.querySelector('#app-tab-models').click(); await document.fonts.ready; await new Promise(r=>setTimeout(r,350)); })()");
