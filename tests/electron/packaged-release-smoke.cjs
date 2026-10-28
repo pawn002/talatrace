@@ -134,7 +134,15 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
           select.dispatchEvent(new Event('change', { bubbles: true }));
           document.querySelector('[data-action=save]').click();
         })()`);
-        for (let i = 0; i < 100; i++) { try { await fs.access(output); break; } catch { await wait(50); } }
+        let saved = false;
+        // Creation alone is insufficient: fs.writeFile can still be in flight.
+        // Wait for the UI's confirmation of the completed IPC/save operation.
+        for (let i = 0; i < 100; i++) {
+          saved = await renderer(`Array.from(document.querySelectorAll('candor-toast')).some(toast => toast.message === ${JSON.stringify('Saved to: ' + output)})`);
+          if (saved) break;
+          await wait(50);
+        }
+        assert.ok(saved, 'No save completion for ' + format);
         const content = await fs.readFile(output, 'utf8');
         if (format === 'json') assert.match(JSON.parse(content).text, /country/i);
         else if (format === 'vtt') assert.match(content, /^WEBVTT\n/);
