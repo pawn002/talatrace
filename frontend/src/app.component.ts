@@ -14,6 +14,22 @@ export class AppComponent implements OnInit {
   title = "TalaTrace";
   systemInfo: any = null;
   activeTab = 0;
+  overwriteRequest?: { filePath: string; respond: (replace: boolean) => void };
+
+  finishOverwrite(replace = false): void {
+    const request = this.overwriteRequest;
+    this.overwriteRequest = undefined;
+    request?.respond(replace);
+  }
+
+  onOverwriteKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'Tab') return;
+    const modal = event.currentTarget as HTMLElement;
+    const first = modal.shadowRoot?.querySelector<HTMLButtonElement>('dialog button');
+    const last = modal.querySelector<HTMLButtonElement>('[data-action=replace]');
+    if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    else if (event.shiftKey && modal.shadowRoot?.activeElement === first) { event.preventDefault(); last?.focus(); }
+  }
   themePreference = readThemePreference();
   readonly themeOptions = [{ value: 'light', label: 'Light', icon: 'sun' }, { value: 'dark', label: 'Dark', icon: 'moon' }, { value: 'system', label: 'System', icon: 'desktop' }];
 
@@ -51,6 +67,7 @@ export class AppComponent implements OnInit {
   ) {}
 
   async ngOnInit() {
+    this.electronService.overwriteRequested.subscribe(request => { this.overwriteRequest = request; });
     try {
       this.systemInfo = await this.electronService.getSystemInfo();
       console.log("System Info:", this.systemInfo);

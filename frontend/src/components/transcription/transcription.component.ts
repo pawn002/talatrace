@@ -45,6 +45,7 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
   includeTimestamps = true;
   settingsOpen = false;
   exportFormat: 'txt' | 'srt' | 'vtt' | 'json' = 'txt';
+  isSaving = false;
 
   openSettings(): void {
     if (!this.busy && this.hasInstalledModel) this.settingsOpen = true;
@@ -268,11 +269,13 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
   }
 
   async saveTranscript() {
+    if (this.isSaving) return;
     if (!this.transcriptionResult) {
       this.toastService.show('No transcript to save', 'info');
       return;
     }
 
+    this.isSaving = true;
     try {
       const savedPath = await this.electronService.saveTranscript(
         {
@@ -285,6 +288,8 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
       }
     } catch (error) {
       this.toastService.show('Failed to save transcript', 'error');
+    } finally {
+      this.isSaving = false;
     }
   }
 

@@ -56,6 +56,7 @@
             <option value="txt">TXT</option><option value="srt">SRT</option><option value="vtt">VTT</option><option value="json">JSON</option>
           </select><i class="ph-bold ph-caret-down select-caret" aria-hidden="true"></i></div>
           <button data-action="save" class="button button--ghost button--small" (click)="exportTranscript()" [disabled]="!transcriptionResult || busy" aria-describedby="workflow-help"><i class="ph-fill ph-floppy-disk" aria-hidden="true"></i> Save transcript…</button>
+          @if (isSaving) { <span role="status" class="export-status">Finish saving in the open dialog.</span> }
         </div>
       <div class="workflow-options">
         <button type="button" data-action="settings" class="button button--ghost button--small" (click)="openSettings()" [disabled]="busy || !hasInstalledModel" aria-haspopup="dialog" aria-controls="transcription-settings" aria-describedby="workflow-help"><i class="ph-fill ph-gear" aria-hidden="true"></i> Transcription settings</button>

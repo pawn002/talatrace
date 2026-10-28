@@ -151,6 +151,28 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
       }
       const defaults = await evaluate('globalThis.__exportDefaults');
       assert.deepEqual(defaults.slice(1), ['srt','vtt','json'].map(format => path.join(exportsDirectory, 'answer.' + format)));
+      if (process.platform === 'linux') {
+        const destination = path.join(exportsDirectory, 'answer.json');
+        await fs.writeFile(destination, 'keep existing JSON');
+        for (const replace of [false, true]) {
+          await renderer("document.querySelector('[data-action=save]').click()");
+          let opened = false;
+          for (let i = 0; i < 100; i++) {
+            opened = await renderer("document.querySelector('.overwrite-modal').shadowRoot.querySelector('dialog').open");
+            if (opened) break; await wait(50);
+          }
+          assert.ok(opened, 'Linux overwrite confirmation did not open, including immediately after cancellation');
+          assert.equal(await renderer("document.querySelector('.overwrite-modal .overwrite-path').textContent.trim()"), destination);
+          await renderer(`document.querySelector('.overwrite-modal ${replace ? '[data-action=replace]' : '[autofocus]'}').click()`);
+          for (let i = 0; i < 100; i++) {
+            if (await renderer("!document.querySelector('.export-status')")) break; await wait(50);
+          }
+          const content = await fs.readFile(destination, 'utf8');
+          if (replace) assert.match(JSON.parse(content).text, /country/i);
+          else assert.equal(content, 'keep existing JSON');
+        }
+        console.log('Linux packaged overwrite cancellation, immediate retry and replacement passed through the real IPC bridge.');
+      }
       console.log('Packaged TXT/SRT/VTT/JSON exports and folder/name reuse passed with a GTK-style wrong suffix.');
     }
     assert.equal(preferenceAfter, preferenceBefore, 'Transcription unexpectedly changed the saved model');

@@ -62,7 +62,7 @@ function transcribe(event) {
 ipcMain.handle('transcribe-recording', transcribe);
 ipcMain.handle('transcribe-audio', transcribe);
 app.whenReady().then(async () => {
-  const watchdog = setTimeout(() => { console.error('Visual review timed out'); app.exit(1); }, 120000);
+  const watchdog = setTimeout(() => { console.error('Visual review timed out'); app.exit(1); }, 180000);
   const win = new BrowserWindow({ width: 1100, height: 820, show: false, webPreferences: {
     offscreen: true, backgroundThrottling: false, preload: path.join(root, 'dist/electron/preload.js'),
   } });
@@ -118,12 +118,18 @@ app.whenReady().then(async () => {
     if (!await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(selector)}).${horizontal ? 'scrollLeft' : 'scrollTop'} > 0`)) throw new Error('Native keyboard scrolling failed: ' + selector);
   };
   const click = async selector => {
-    const point = await win.webContents.executeJavaScript(`(() => {
+    await win.webContents.executeJavaScript(`(() => {
       const el = ${JSON.stringify(selector)}.split(' >>> ').reduce((root, part, i) => (i ? root.shadowRoot : root).querySelector(part), document);
       el.scrollIntoView({ block: 'nearest' });
+    })()`);
+    // Scroll/resize delivery and compositor hit testing are asynchronous.
+    await wait(100);
+    const point = await win.webContents.executeJavaScript(`(() => {
+      const el = ${JSON.stringify(selector)}.split(' >>> ').reduce((root, part, i) => (i ? root.shadowRoot : root).querySelector(part), document);
       const rect = el.getBoundingClientRect();
       return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
     })()`);
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point });
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point });
   };
@@ -194,7 +200,7 @@ app.whenReady().then(async () => {
         if (icon.maskImage === 'none' || parseFloat(icon.width) !== parseFloat(getComputedStyle(label).fontSize)) throw new Error('Disclosure icon is absent or incorrectly sized');
         colourPairs.push({ selector: host.classList.contains('timing-details') ? 'timing help mask' : 'settings gear mask', foreground: icon.backgroundColor, background: resolvedBackground(host), nonText: true });
       }
-      for (const selector of ['.export-controls label', '.file-name', '.file-size', '.model-name', '.transcript-metadata dt', '.transcript-metadata dd', '.model-repository a', '.sort-header', '.models-page .info-alert a', '.spectrum-placeholder-label', '.spectrum-live-label', '.action-reason', '#history-refresh-status', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
+      for (const selector of ['.overwrite-modal p', '.export-controls label', '.file-name', '.file-size', '.model-name', '.transcript-metadata dt', '.transcript-metadata dd', '.model-repository a', '.sort-header', '.models-page .info-alert a', '.spectrum-placeholder-label', '.spectrum-live-label', '.action-reason', '#history-refresh-status', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
         for (const el of document.querySelectorAll(selector)) {
           if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
@@ -448,6 +454,35 @@ app.whenReady().then(async () => {
     await click('[data-action=save]'); await wait(200);
     if (savedFormats.at(-1) !== 'srt') throw new Error('Selected export format did not reach IPC');
     await capture('export-saved');
+    // Use the production preload bridge and Candor alert dialog for overwrite decisions.
+    const askOverwrite = async (name) => {
+      await win.webContents.executeJavaScript("document.querySelector('[data-action=save]').focus()");
+      const response = new Promise(resolve => ipcMain.once('transcript-overwrite-response', (_event, id, replace) => resolve({ id, replace })));
+      win.webContents.send('transcript-overwrite-request', { requestId: name, filePath: '/home/tester/Documents/interview recordings/long folder name/answer.json' });
+      await wait(180);
+      return { response };
+    };
+    let overwrite = await askOverwrite('cancel');
+    await capture('overwrite-dark');
+    if (!await win.webContents.executeJavaScript("document.querySelector('.overwrite-modal').shadowRoot.querySelector('dialog[role=alertdialog]').matches(':modal') && document.activeElement.textContent.trim() === 'Cancel'")) throw new Error('Overwrite dialog lacks modal semantics or safe initial focus');
+    await win.webContents.debugger.sendCommand('Accessibility.enable');
+    const ax = await win.webContents.debugger.sendCommand('Accessibility.getFullAXTree');
+    if (!ax.nodes.some(node => node.role?.value === 'alertdialog' && node.name?.value === 'Replace existing transcript?')) throw new Error('Overwrite prompt missing from accessibility tree');
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+    if ((await overwrite.response).replace !== false) throw new Error('Escape did not cancel replacement');
+    await wait(100);
+    if (!await win.webContents.executeJavaScript("document.activeElement.matches('[data-action=save]')")) throw new Error('Overwrite dialog did not restore Save focus');
+    await resize(428, 620); nativeTheme.themeSource = 'light';
+    overwrite = await askOverwrite('replace'); await capture('overwrite-small-light');
+    await click('[data-action=replace]');
+    if ((await overwrite.response).replace !== true) throw new Error('Replace did not reach main process');
+    nativeTheme.themeSource = 'dark'; await resize(1100, 820);
+    for (let index = 0; index < 6; index++) { await click('[data-action=save]'); await wait(80); }
+    await resize(428, 620); await capture('export-notifications-428');
+    if (!await win.webContents.executeJavaScript("(() => { const dock = document.querySelector('.toast-container').getBoundingClientRect(); const content = document.querySelector('.app-container').getBoundingClientRect(); const header = document.querySelector('.app-header').getBoundingClientRect(); return dock.top >= header.bottom - 1 && dock.bottom <= content.top + 1 && dock.height <= innerHeight * .25 + 1 && document.documentElement.scrollWidth <= innerWidth; })()")) throw new Error('Notifications overlap the workflow or header at 428px');
+    await resize(360, 360); await capture('export-notifications-short');
+    if (!await win.webContents.executeJavaScript("getComputedStyle(document.body).overflow === 'hidden' && document.querySelector('.app-header').getBoundingClientRect().top === 0")) throw new Error('Short window moved the header into a competing document scroller');
+    await resize(1100, 820);
     await win.webContents.executeJavaScript("Promise.all([...document.querySelectorAll('candor-toast')].map(async el => { await el.updateComplete; el.shadowRoot.querySelector('[aria-label=Dismiss]')?.click(); }))");
     win.webContents.send('transcription-completed', { ...fixture, alignmentWarning: 'Some word boundaries could not be aligned precisely.', speechDetectionWarning: 'Speech detection was unavailable for this recording.' });
     await win.webContents.executeJavaScript("document.querySelector('.result-section').scrollIntoView({ block: 'start' })"); await capture('transcript-warnings');
@@ -746,7 +781,6 @@ app.whenReady().then(async () => {
     nativeTheme.themeSource = 'dark'; await wait(350); await capture('theme-system-dark');
     if (await pageColour() !== explicitDark) throw new Error('System did not follow the dark OS theme');
     if (!await win.webContents.executeJavaScript("!document.documentElement.hasAttribute('data-theme') && document.querySelector('#theme-control').getAttribute('aria-labelledby') === 'theme-legend' && document.querySelector('#theme-legend').textContent === 'Theme'")) throw new Error('System/theme accessible name contract failed');
-    await win.webContents.debugger.sendCommand('Accessibility.enable');
     const accessibility = await win.webContents.debugger.sendCommand('Accessibility.getFullAXTree');
     const themeRadios = accessibility.nodes.filter(node => !node.ignored && node.role?.value === 'radio');
     const themeGroup = accessibility.nodes.find(node => !node.ignored && node.role?.value === 'radiogroup' && node.name?.value === 'Theme');

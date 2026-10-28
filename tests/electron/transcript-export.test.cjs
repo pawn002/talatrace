@@ -15,6 +15,7 @@ test('export uses the chosen format despite GTK missing/wrong suffixes and remem
     file = path.join(destination, 'answer.txt');
     const srt = await exporter.save(data, 'srt');
     assert.equal(calls[0].defaultPath, path.join(root, 'transcript.srt'));
+    assert.equal(calls[0].title, 'Save transcript');
     assert.deepEqual(calls[0].filters, [{ name: 'SRT subtitles', extensions: ['srt'] }]);
     assert.equal(srt, path.join(destination, 'answer.srt'));
     assert.match(await fs.readFile(srt, 'utf8'), /00:00:01,250 --> 00:00:02,500/);
@@ -32,5 +33,29 @@ test('export uses the chosen format despite GTK missing/wrong suffixes and remem
     await assert.rejects(exporter.save(data, '../bad'), /Unsupported/);
     assert.equal(exportPath(path.join(root, 'answer.v1'), 'srt'), path.join(root, 'answer.v1.srt'));
     assert.equal(exportPath(path.join(root, 'answer.SRT'), 'srt'), path.join(root, 'answer.SRT'));
+  } finally { await fs.rm(root, { recursive: true, force: true }); }
+});
+
+test('Linux confirms only the final destination, including exact names, and preserves both files on cancel', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'talatrace-linux-export-'));
+  const selected = path.join(root, 'answer.srt');
+  const destination = path.join(root, 'answer.json');
+  const prompts = []; let replace = false; let chosen = selected;
+  const exporter = new TranscriptExporter({ directory: () => root,
+    choose: async options => { assert.deepEqual(options.properties, []); return { canceled: false, filePath: chosen }; },
+    confirmOverwrite: async file => { prompts.push(file); return replace; },
+  }, 'linux');
+  try {
+    await fs.writeFile(selected, 'original subtitles'); await fs.writeFile(destination, 'original JSON');
+    assert.equal(await exporter.save({ text: 'New' }, 'json'), null);
+    assert.deepEqual(prompts, [destination]);
+    assert.equal(await fs.readFile(selected, 'utf8'), 'original subtitles');
+    assert.equal(await fs.readFile(destination, 'utf8'), 'original JSON');
+    replace = true;
+    assert.equal(await exporter.save({ text: 'New' }, 'json'), destination);
+    assert.deepEqual(JSON.parse(await fs.readFile(destination, 'utf8')), { text: 'New' });
+    chosen = destination; replace = false;
+    assert.equal(await exporter.save({ text: 'Another' }, 'json'), null);
+    assert.equal(prompts.length, 3);
   } finally { await fs.rm(root, { recursive: true, force: true }); }
 });

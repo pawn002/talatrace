@@ -29,6 +29,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
   saveTranscript: (resultData: any, format: 'txt' | 'srt' | 'vtt' | 'json' = 'txt') =>
     ipcRenderer.invoke("save-transcript", resultData, format),
 
+  onTranscriptOverwrite: (callback: (requestId: string, filePath: string) => void) => {
+    ipcRenderer.removeAllListeners('transcript-overwrite-request');
+    ipcRenderer.on('transcript-overwrite-request', (_event, request) => callback(request.requestId, request.filePath));
+  },
+  respondTranscriptOverwrite: (requestId: string, replace: boolean) =>
+    ipcRenderer.send('transcript-overwrite-response', requestId, replace === true),
+
   getAvailableModels: () => ipcRenderer.invoke("get-available-models"),
 
   downloadModel: (modelName: string) =>
@@ -89,6 +96,8 @@ declare global {
       transcribeAudio: (audioPath: string, options: any) => Promise<any>;
       transcribeRecording: (bytes: Uint8Array, options: any) => Promise<any>;
       saveTranscript: (resultData: any, format?: 'txt' | 'srt' | 'vtt' | 'json') => Promise<string | null>;
+      onTranscriptOverwrite: (callback: (requestId: string, filePath: string) => void) => void;
+      respondTranscriptOverwrite: (requestId: string, replace: boolean) => void;
       getAvailableModels: () => Promise<any[]>;
       downloadModel: (modelName: string) => Promise<any>;
       deleteModel: (modelName: string) => Promise<any>;

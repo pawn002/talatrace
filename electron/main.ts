@@ -7,6 +7,7 @@ import { TranscriptionService } from './services/transcription.service';
 import { storeRecording, removeStaleRecordings } from './services/recording-storage';
 import { pathToFileURL } from 'url';
 import { TranscriptExporter } from './services/transcript-export';
+import { randomUUID } from 'crypto';
 
 // Import package.json for app version
 const packageJson = require(path.join(__dirname, '../../package.json'));
@@ -26,6 +27,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    minWidth: 360,
+    minHeight: 360,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -188,15 +191,51 @@ ipcMain.handle('transcribe-recording', async (event, bytes: unknown, options: an
 
 const transcriptExporter = new TranscriptExporter({
   directory: () => app.getPath('documents'),
-  choose: options => mainWindow ? dialog.showSaveDialog(mainWindow, options) : dialog.showSaveDialog(options),
+  choose: async options => {
+    try { return await (mainWindow ? dialog.showSaveDialog(mainWindow, options) : dialog.showSaveDialog(options)); }
+    finally { mainWindow?.focus(); mainWindow?.webContents.focus(); }
+  },
   confirmOverwrite: async filePath => {
+    if (process.platform === 'linux') return confirmTranscriptOverwrite(filePath);
     const options = { type: 'warning' as const, buttons: ['Cancel', 'Replace'], defaultId: 0, cancelId: 0,
       message: 'Replace existing transcript?', detail: filePath };
     const result = mainWindow ? await dialog.showMessageBox(mainWindow, options) : await dialog.showMessageBox(options);
     return result.response === 1;
   },
 });
-ipcMain.handle('save-transcript', (_event, resultData: any, format: unknown = 'txt') => transcriptExporter.save(resultData, format));
+// The renderer can answer only the current request from its own window. The
+// destination/content remain in the main process, never accepted from a reply.
+function confirmTranscriptOverwrite(filePath: string): Promise<boolean> {
+  const window = mainWindow;
+  if (!window || window.isDestroyed()) return Promise.resolve(false);
+  const contents = window.webContents;
+  const requestId = randomUUID();
+  return new Promise(resolve => {
+    const finish = (replace: boolean) => {
+      ipcMain.removeListener('transcript-overwrite-response', reply);
+      contents.removeListener('destroyed', cancel);
+      contents.removeListener('render-process-gone', cancel);
+      contents.removeListener('did-start-navigation', cancel);
+      resolve(replace);
+    };
+    const cancel = () => finish(false);
+    const reply = (event: Electron.IpcMainEvent, id: unknown, replace: unknown) => {
+      if (event.sender === contents && id === requestId) finish(replace === true);
+    };
+    ipcMain.on('transcript-overwrite-response', reply);
+    contents.once('destroyed', cancel);
+    contents.once('render-process-gone', cancel);
+    contents.once('did-start-navigation', cancel);
+    contents.send('transcript-overwrite-request', { requestId, filePath });
+  });
+}
+let exportPending = false;
+ipcMain.handle('save-transcript', async (_event, resultData: any, format: unknown = 'txt') => {
+  if (exportPending) return null;
+  exportPending = true;
+  try { return await transcriptExporter.save(resultData, format); }
+  finally { exportPending = false; }
+});
 
 ipcMain.handle('get-available-models', async () => {
   try {

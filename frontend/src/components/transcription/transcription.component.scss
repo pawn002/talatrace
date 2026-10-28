@@ -35,6 +35,7 @@
 .export-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--spacing-xs); max-width: 100%; }
 .export-controls label { font: var(--font-size-md)/var(--line-height-normal) var(--font-family-accessible); color: var(--color-text-default); }
 .export-controls .select-control { width: 104px; max-width: 100%; }
+.export-status { font-size: var(--font-size-md); color: var(--color-text-default); }
 .export-controls .select-caret { color: var(--color-border-control); }
 .export-controls .select-control:focus-within .select-caret { color: var(--color-focus); }
 .workflow-options { display: flex; align-items: center; flex-wrap: wrap; gap: var(--spacing-sm); margin-left: auto; }
@@ -62,6 +63,7 @@ candor-disclosure::part(panel) { overflow: visible; }
 @media (max-width: 640px) {
   .export-controls { display: grid; grid-template-columns: 104px minmax(0, 1fr); width: 100%; align-items: stretch; }
   .export-controls label { grid-column: 1 / -1; }
+  .export-status { grid-column: 1 / -1; }
   .export-controls .button { padding-inline: var(--spacing-xs); white-space: normal; min-width: 0; }
   .disclosure--subtle { margin-left: 0; }
   .transcription-page .page-heading { align-items: flex-start; flex-direction: column; gap: var(--spacing-sm); }
@@ -75,6 +77,11 @@ candor-disclosure::part(panel) { overflow: visible; }
   .workflow-connector { left: calc(var(--spacing-xs) + 12px); top: calc(100% + var(--spacing-sm) / 2 + 1px); transform: translate(-50%, -50%) rotate(90deg); }
   .workflow-options { margin-left: 0; }
   .options-section { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 380px) {
+  .export-controls { grid-template-columns: 1fr; }
+  .export-controls .select-control { width: 100%; }
 }
 
 .transcript-view:focus-visible, .copy-option:has(:focus-visible) { outline: var(--focus-ring-width) solid var(--color-focus); outline-offset: var(--focus-ring-offset); }

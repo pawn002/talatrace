@@ -27,21 +27,24 @@ export class TranscriptExporter {
     directory: () => string;
     choose: (options: SaveDialogOptions) => Promise<SaveDialogReturnValue>;
     confirmOverwrite: (file: string) => Promise<boolean>;
-  }) {}
+  }, private platform = process.platform) {}
 
   async save(data: any, requested: unknown = 'txt'): Promise<string | null> {
     if (typeof requested !== 'string' || !Object.prototype.hasOwnProperty.call(formats, requested)) throw new Error('Unsupported transcript format');
     const format = requested as TranscriptFormat;
     const result = await this.dialogs.choose({
+      title: 'Save transcript',
+      buttonLabel: 'Save transcript',
       defaultPath: path.join(this.lastDirectory || this.dialogs.directory(), this.lastStem + '.' + format),
       filters: [{ name: formats[format], extensions: [format] }],
-      properties: ['showOverwriteConfirmation'],
+      // Linux must confirm only the normalized destination, never a discarded suffix.
+      properties: this.platform === 'linux' ? [] : ['showOverwriteConfirmation'],
     });
     if (result.canceled || !result.filePath) return null;
     if (!path.isAbsolute(result.filePath)) throw new Error('Expected an absolute export path');
     const file = exportPath(result.filePath, format);
     const content = serializeTranscript(data, format);
-    if (file === result.filePath) {
+    if (file === result.filePath && this.platform !== 'linux') {
       // Native overwrite confirmation covers this exact name.
       await fs.writeFile(file, content, 'utf8');
     } else {

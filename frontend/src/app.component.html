@@ -17,6 +17,12 @@
   <span class="local-badge" [class.local-badge--recording]="!!transcription?.isRecording"><i class="ph-bold" [class.ph-record]="!!transcription?.isRecording" [class.ph-waveform]="!!transcription?.isTranscribing" [class.ph-shield-check]="!transcription?.isRecording && !transcription?.isTranscribing" aria-hidden="true"></i> {{ transcription?.isRecording ? 'Recording' : transcription?.isTranscribing ? 'Transcribing' : 'On device' }}</span>
 </header>
 
+<candor-toast-container class="toast-container" position="top-right" role="region" [attr.tabindex]="(toastService.toasts$ | async)?.length ? 0 : null" aria-label="Notifications">
+  @for (toast of toastService.toasts$ | async; track toast.id) {
+    <candor-toast [message]="toast.message" [variant]="toast.variant" [dismissible]="true" (dismiss)="toastService.dismiss(toast.id)"></candor-toast>
+  }
+</candor-toast-container>
+
 <div class="app-container">
   <div class="tabs">
     <div class="tabs__list" role="tablist" aria-label="Main navigation">
@@ -71,8 +77,11 @@
   </div>
 </div>
 
-<candor-toast-container class="toast-container" position="top-right">
-  @for (toast of toastService.toasts$ | async; track toast.id) {
-    <candor-toast [message]="toast.message" [variant]="toast.variant" [dismissible]="true" (dismiss)="toastService.dismiss(toast.id)"></candor-toast>
-  }
-</candor-toast-container>
+<candor-modal class="overwrite-modal" heading="Replace existing transcript?" size="sm" [alert]="true" [open]="!!overwriteRequest" (close)="finishOverwrite()" (keydown)="onOverwriteKeydown($event)">
+  <p>The following file already exists. Replacing it will overwrite its contents.</p>
+  <p class="overwrite-path">{{ overwriteRequest?.filePath }}</p>
+  <div slot="footer" class="overwrite-actions">
+    <button type="button" class="button button--ghost button--small" autofocus (click)="finishOverwrite()">Cancel</button>
+    <button type="button" data-action="replace" class="button button--destructive button--small" (click)="finishOverwrite(true)">Replace</button>
+  </div>
+</candor-modal>

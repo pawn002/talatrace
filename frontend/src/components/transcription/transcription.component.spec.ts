@@ -26,6 +26,20 @@ describe('TranscriptionComponent', () => {
   let component: TranscriptionComponent;
   let fixture: ComponentFixture<TranscriptionComponent>;
 
+  it('guards duplicate saves and permits a fresh save immediately after cancellation', async () => {
+    component.transcriptionResult = { text: 'An answer.' };
+    let cancel!: (path: null) => void;
+    electronStub.saveTranscript.mockImplementationOnce(() => new Promise(resolve => { cancel = resolve; }));
+    const first = component.saveTranscript();
+    await component.saveTranscript();
+    expect(electronStub.saveTranscript).toHaveBeenCalledTimes(1);
+    cancel(null); await first;
+    expect(component.isSaving).toBe(false);
+    electronStub.saveTranscript.mockResolvedValueOnce('/answer.txt');
+    await component.saveTranscript();
+    expect(electronStub.saveTranscript).toHaveBeenCalledTimes(2);
+  });
+
   it('reports comparable processing time and audio duration from the completed result', () => {
     component.transcriptionResult = { duration: 38.52, processingTimeMs: 6420, modelName: 'Parakeet' };
     expect(component.performanceSummary).toBe('Parakeet · 38.52 s audio · 6.42 s processing (6.0× real time)');
