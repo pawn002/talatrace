@@ -50,6 +50,10 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
       callFrameId: breakpoint.callFrames[0].callFrameId,
       expression: `(() => {
         const e = require('electron'); globalThis.__releaseElectron = e;
+        // require is module-scoped, not available to later Runtime.evaluate calls.
+        if (process.env.TALATRACE_EXPECT_APPARMOR === '1') {
+          globalThis.__releaseAppArmor = require('node:fs').readFileSync('/proc/self/attr/current', 'utf8').trim();
+        }
         e.app.setPath('appData', ${JSON.stringify(appData)});
         e.app.on('browser-window-created', (_event, win) => {
           win.hide(); win.webContents.setBackgroundThrottling(false);
@@ -77,7 +81,7 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
     assert.equal(identity.packaged, true); assert.equal(identity.name, 'TalaTrace'); assert.equal(identity.profile, expectedProfile);
     if (process.env.TALATRACE_EXPECT_APPARMOR === '1') {
       assert.equal(process.platform, 'linux');
-      const label = await evaluate("require('node:fs').readFileSync('/proc/self/attr/current','utf8').trim()");
+      const label = await evaluate('globalThis.__releaseAppArmor');
       assert.match(label, /^talatrace(?:\s|$)/, 'Installed app is not running under its shipped AppArmor profile: ' + label);
       console.log('Installed AppArmor profile:', label);
     }
