@@ -20,7 +20,11 @@ export class AppComponent implements OnInit {
 
   openNotificationPreferences(): void { this.toastService.pauseAll('preferences'); this.notificationPreferencesOpen = true; }
   closeNotificationPreferences(): void { this.notificationPreferencesOpen = false; this.toastService.resumeAll('preferences'); }
-  onNotificationTimeout(event: Event): void { this.toastService.setTimeoutSeconds(Number((event.target as HTMLSelectElement).value)); }
+  onNotificationTimeout(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    if (!['0', '5', '10', '30'].includes(select.value)) { select.value = String(this.toastService.timeoutSeconds); return; }
+    this.toastService.setTimeoutSeconds(Number(select.value));
+  }
   onToastFocusOut(id: string, event: FocusEvent): void {
     if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) this.toastService.resume(id, 'focus');
   }
