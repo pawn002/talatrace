@@ -25,6 +25,8 @@ Close the app, back up its profile, then install over the existing installation.
 
 History belongs to the current session; save transcripts before closing. Neither the rename nor installation makes session history persistent.
 
+The 1.2.0 → 1.3.0 NSIS upgrade also passed with a fresh verified backup, all four model hashes retained, the same uninstall identity/shortcut targets and installed offline Tiny/Parakeet recognition. See [1.3.0 notes](releases/1.3.0.md). Fresh NSIS installation, uninstall and rollback remain untested.
+
 ## Profile and model storage
 
 The internal package name stays `whisper-electron-app` for compatibility. On Windows the usual profile is `%APPDATA%\whisper-electron-app`; weights are in its `models` subdirectory. A packaged installation with an existing `%APPDATA%\Whisper Transcription` profile keeps that directory instead. Inspect the Models directory reported by the app's startup log when locating a particular installation.

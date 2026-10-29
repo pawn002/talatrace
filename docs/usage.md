@@ -1,6 +1,6 @@
 # Use TalaTrace
 
-These instructions describe 1.2.0 on Windows. Audio recognition runs locally. Initial model downloads need a network connection; the released app does not send audio to a cloud transcription service.
+These instructions describe 1.3.0 on Windows; Linux availability is experimental (see the Linux guide). Audio recognition runs locally. Initial model downloads need a network connection; the released app does not send audio to a cloud transcription service.
 
 ## First use
 
@@ -36,9 +36,9 @@ The transcript is a read-only output, not an editor. Edit the copied or saved te
 
 **Include timing and pauses** controls Copy and TXT content. With it enabled, available speech timestamps and pause metadata are formatted as a readable timeline; with it disabled, Copy/TXT contain the recognized words. **Save transcript…** opens the system save dialog:
 
-In the development/Linux testing build, first choose **File format** beside **Save transcript…**. The app supplies that extension and remembers the last successful export folder/name for the current session. An explicitly typed TXT/SRT/VTT/JSON extension takes precedence and selects that format. If the suffix is missing, the app appends the selected extension and confirms before replacing an existing file at that changed destination. Unchanged names rely on the native picker's confirmation. Empty subtitle exports are blocked; useful TXT timing context and JSON diagnostics remain available. Released Windows 1.2.0 uses the earlier filename-based selection.
+First choose **File format** beside **Save transcript…**. The app supplies that extension and remembers the last successful export folder/name for the current session. An explicitly typed TXT/SRT/VTT/JSON extension takes precedence and selects that format. If the suffix is missing, the app appends the selected extension and confirms before replacing an existing file at that changed destination. Unchanged names rely on the native picker's confirmation. Empty subtitle exports are blocked; useful TXT timing context and JSON diagnostics remain available.
 
-The development/Linux testing build also provides **Notification preferences** through the header gear: success/info messages dismiss after 5, 10 (default) or 30 seconds, or **Never**. Timers pause on hover/focus, while preferences are open and while the app is inactive. Warnings/errors stay until dismissed. The preference is saved locally. Ctrl+/Ctrl−/Ctrl+0 enlarge, reduce and reset the interface; the native desktop scale is independent of this zoom.
+The header gear opens **Notification preferences**: success/info messages dismiss after 5, 10 (default) or 30 seconds, or **Never**. Timers pause on hover/focus, while preferences are open and while the app is inactive. Warnings/errors stay until dismissed. The preference is saved locally. Ctrl+/Ctrl−/Ctrl+0 enlarge, reduce and reset the interface; the native desktop scale is independent of this zoom.
 
 | Format | Content |
 | --- | --- |

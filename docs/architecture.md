@@ -1,6 +1,6 @@
 # Architecture
 
-This describes TalaTrace 1.2.0. Use [Development](development.md) for commands and [Models](models.md) for the model catalog/measurement caveats; do not duplicate those lists here.
+This describes TalaTrace 1.3.0. Use [Development](development.md) for commands and [Models](models.md) for the model catalog/measurement caveats; do not duplicate those lists here.
 
 ## Processes and engines
 

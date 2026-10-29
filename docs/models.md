@@ -1,6 +1,6 @@
 # Speech models
 
-TalaTrace 1.2.0 supports local Whisper and Parakeet transcription. All recognition stays on the device. Downloads require a connection; installed models work offline with the packaged runtimes.
+TalaTrace 1.3.0 supports local Whisper and Parakeet transcription. All recognition stays on the device. Downloads require a connection; installed models work offline with the packaged runtimes.
 
 ## Available models
 

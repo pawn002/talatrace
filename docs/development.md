@@ -1,6 +1,6 @@
 # Development
 
-Read [AGENTS.md](../AGENTS.md) before changes. Current behavior is described in [Architecture](architecture.md); UI construction requirements and adaptations live in the [Candor inventory](candor-widget-review.md). Windows x64 is the validated 1.2.0 environment. The [Linux candidate guide](linux.md) covers Ubuntu 24.04 x86_64 build/test work and outstanding desktop validation; macOS packaging is unverified.
+Read [AGENTS.md](../AGENTS.md) before changes. Current behavior is described in [Architecture](architecture.md); UI construction requirements and adaptations live in the [Candor inventory](candor-widget-review.md). Windows x64 is the stable 1.3.0 target. The [Linux candidate guide](linux.md) covers Ubuntu 24.04 x86_64 build/test work and outstanding desktop validation; macOS packaging is unverified.
 
 ## Dependencies and native setup
 
