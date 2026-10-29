@@ -2,6 +2,31 @@
 
 Tracked in [#24](https://github.com/pawn002/talatrace/issues/24). Released 1.2.0 downloads remain Windows-only. Linux changes are candidates under validation, not a published support claim.
 
+## Experimental support status
+
+On 29 October 2026 the maintainer accepted candidate 5 as the experimental Linux baseline and ended the current personal desktop-testing cycle. The remaining validation is follow-up work, not a request for more testing from the maintainer or a prerequisite for an explicitly labelled experimental prerelease. Full Linux support remains tracked in #24. The download currently remains a draft; this decision does not itself publish it or merge PR #26.
+
+Recommended experimental scope: **x86_64 CPU recognition, deb package**. Ubuntu 24.04 is the build/CI baseline. Candidate 5 was tested on Ubuntu 26.04.1, XFCE/X11, PipeWire, at 150% display scale. Other distributions, Wayland, ARM64 and GPU acceleration are unvalidated.
+
+Verified evidence:
+
+- Candidate 5 desktop testing passed launch/sandbox setup, human-speech recording and file import with Whisper Tiny and Parakeet, Copy, all four export formats, replacement/cancellation, model/preferences retention, keyboard zoom and narrow layouts.
+- Notification timeout choices, hover/focus/inactivity pauses, explicit error dismissal and restart retention passed desktop testing. The overwrite explanation is exposed through AT-SPI.
+- [CI for the packaged revision](https://github.com/pawn002/talatrace/actions/runs/40793838206) passed 193 tests, installed/unpacked package checks, both engines with HTTP(S) blocked during recognition, recording fixtures and package checksums. Automated offline checks do not establish an actually disconnected desktop run.
+- [The complete desktop report](https://github.com/pawn002/talatrace/issues/24#issuecomment-6495189236) records the exact package hash and environment. Its apparent empty Parakeet result from the earlier synthesized speaker-to-mic setup was resolved by ordinary human-speech testing.
+
+Known limitations and follow-up work:
+
+- SRT/VTT formatting can floor a timestamp by 1 ms; preview/TXT/JSON use rounded values.
+- TXT Save can be unavailable for an empty transcript despite the hint mentioning diagnostics. JSON diagnostics remain available; empty subtitle files are prevented.
+- Identical errors can accumulate as duplicate toasts; the stack can clip a message at its lower edge. Toasts float over content while visible. Their timeout can be changed or set to Never.
+- Theme tooltips can remain visible after AT-SPI activation until the pointer moves. Very narrow/high-zoom layouts retain a known overflow fixture; the tested maximized 200% desktop layout remained keyboard reachable.
+- Pause-marker differences between separate recordings are inconclusive because background voices/audio preprocessing differed. They do not establish a model-specific defect; timing and pauses remain approximate context.
+- AppImage FUSE mounting passed, but launch under Ubuntu's namespace policy remains unresolved. **Use the deb; do not disable Chromium's sandbox or system-wide restrictions as a workaround.**
+- Real disconnected desktop use, Wayland, the clean install/upgrade/remove/data-retention matrix and Orca announcements remain untested. Reinstalling over earlier same-version candidates and retaining that profile passed; this is not the complete lifecycle matrix.
+
+An experimental prerelease must prominently link this status, identify the exact tested source/checksums, recommend the deb and avoid implying Linux/Windows support parity or accessibility certification. The existing stable-release acceptance criteria remain open until their evidence is available.
+
 ## Initial target and build
 
 Start with Ubuntu 24.04 LTS x86_64 and CPU recognition for both engines. Other distributions, ARM64 and Linux GPU acceleration need separate validation. Native libraries linked against the build host's glibc/libstdc++ set a compatibility floor; an Ubuntu 24.04 build does not establish compatibility with older distributions. `GGML_NATIVE=OFF` avoids host-specific tuning but is not a complete CPU instruction-set compatibility test.

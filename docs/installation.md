@@ -37,6 +37,8 @@ Back up the complete profile while the app is closed if preserving preferences a
 
 Linux support is [open work in #24](https://github.com/pawn002/talatrace/issues/24). The repository declares AppImage/deb and macOS targets, but 1.2.0 publishes only verified Windows x64 artifacts. Do not treat the target names or old platform instructions as tested installation support.
 
+Candidate 5 is the accepted **experimental Linux x86_64 CPU deb** baseline. Core workflows passed on Ubuntu 26.04.1/XFCE/X11/PipeWire, alongside Ubuntu 24.04 CI. Read the [tested scope, known issues and remaining validation](linux.md#experimental-support-status). The Linux download currently remains a testing draft. Prefer the deb; AppImage launch under Ubuntu's namespace policy remains unresolved. This does not establish macOS support.
+
 ## Build from source
 
 Contributors should follow [Development](development.md), including its native-runtime path checks and current setup-script limitations. Source setup is separate from installing the Windows release.
