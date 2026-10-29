@@ -15,11 +15,12 @@
     </fieldset>
   </div>
   <span class="local-badge" [class.local-badge--recording]="!!transcription?.isRecording"><i class="ph-bold" [class.ph-record]="!!transcription?.isRecording" [class.ph-waveform]="!!transcription?.isTranscribing" [class.ph-shield-check]="!transcription?.isRecording && !transcription?.isTranscribing" aria-hidden="true"></i> {{ transcription?.isRecording ? 'Recording' : transcription?.isTranscribing ? 'Transcribing' : 'On device' }}</span>
+  <candor-tooltip class="preferences-trigger" text="Notification preferences" position="left"><button class="button button--ghost button--small button--icon" type="button" data-action="notification-preferences" aria-label="Notification preferences" aria-haspopup="dialog" aria-controls="notification-preferences" (click)="openNotificationPreferences()"><i class="ph-fill ph-gear" aria-hidden="true"></i></button></candor-tooltip>
 </header>
 
 <candor-toast-container class="toast-container" position="top-right" role="region" [attr.tabindex]="(toastService.toasts$ | async)?.length ? 0 : null" aria-label="Notifications">
   @for (toast of toastService.toasts$ | async; track toast.id) {
-    <candor-toast [message]="toast.message" [variant]="toast.variant" [dismissible]="true" (dismiss)="toastService.dismiss(toast.id)"></candor-toast>
+    <candor-toast [message]="toast.message" [variant]="toast.variant" [dismissible]="true" (dismiss)="toastService.dismiss(toast.id)" (pointerenter)="toastService.pause(toast.id, 'hover')" (pointerleave)="toastService.resume(toast.id, 'hover')" (focusin)="toastService.pause(toast.id, 'focus')" (focusout)="onToastFocusOut(toast.id, $event)"></candor-toast>
   }
 </candor-toast-container>
 
@@ -77,11 +78,18 @@
   </div>
 </div>
 
-<candor-modal class="overwrite-modal" heading="Replace existing transcript?" size="sm" [alert]="true" [open]="!!overwriteRequest" (close)="finishOverwrite()" (keydown)="onOverwriteKeydown($event)">
+<candor-modal #overwriteModal class="overwrite-modal" heading="Replace existing transcript?" size="sm" [alert]="true" [open]="!!overwriteRequest" (close)="finishOverwrite()" (keydown)="onOverwriteKeydown($event)">
   <p>The following file already exists. Replacing it will overwrite its contents.</p>
   <p class="overwrite-path">{{ overwriteRequest?.filePath }}</p>
   <div slot="footer" class="overwrite-actions">
     <button type="button" class="button button--ghost button--small" autofocus (click)="finishOverwrite()">Cancel</button>
     <button type="button" data-action="replace" class="button button--destructive button--small" (click)="finishOverwrite(true)">Replace</button>
   </div>
+</candor-modal>
+
+<candor-modal id="notification-preferences" class="notification-modal" heading="Notification preferences" size="sm" [open]="notificationPreferencesOpen" (close)="closeNotificationPreferences()" (keydown)="onOverwriteKeydown($event)">
+  <label class="input-label" for="notification-timeout">Dismiss success and info messages after</label>
+  <div class="select-control"><select id="notification-timeout" class="input" autofocus [value]="toastService.timeoutSeconds" (change)="onNotificationTimeout($event)"><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="30">30 seconds</option><option value="0">Never</option></select><i class="ph-bold ph-caret-down select-caret" aria-hidden="true"></i></div>
+  <p>Timers pause while you hover, focus a message, use these preferences, or leave the app. Warnings and errors stay until dismissed.</p>
+  <div slot="footer"><button type="button" class="button button--primary button--small" (click)="closeNotificationPreferences()">Done</button></div>
 </candor-modal>

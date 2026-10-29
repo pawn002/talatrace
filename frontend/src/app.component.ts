@@ -1,5 +1,5 @@
 import { readThemePreference, saveThemePreference } from './theme';
-import { Component, OnInit, ViewChild } from "@angular/core";
+import { Component, OnInit, ViewChild, ElementRef } from "@angular/core";
 import { TranscriptionComponent } from "./components/transcription/transcription.component";
 import { ElectronService } from "./services/electron.service";
 import { ToastService } from "./services/toast.service";
@@ -15,6 +15,28 @@ export class AppComponent implements OnInit {
   systemInfo: any = null;
   activeTab = 0;
   overwriteRequest?: { filePath: string; respond: (replace: boolean) => void };
+  @ViewChild('overwriteModal', { static: true }) overwriteModal!: ElementRef<HTMLElement & { updateComplete: Promise<unknown> }>;
+  notificationPreferencesOpen = false;
+
+  openNotificationPreferences(): void { this.toastService.pauseAll('preferences'); this.notificationPreferencesOpen = true; }
+  closeNotificationPreferences(): void { this.notificationPreferencesOpen = false; this.toastService.resumeAll('preferences'); }
+  onNotificationTimeout(event: Event): void { this.toastService.setTimeoutSeconds(Number((event.target as HTMLSelectElement).value)); }
+  onToastFocusOut(id: string, event: FocusEvent): void {
+    if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) this.toastService.resume(id, 'focus');
+  }
+
+  private async describeOverwrite(): Promise<void> {
+    const modal = this.overwriteModal.nativeElement;
+    await modal.updateComplete;
+    const dialog = modal.shadowRoot?.querySelector('dialog');
+    if (!dialog) return;
+    // Candor 6 has no description slot/property. Keep the IDREF in the same
+    // shadow root as its native dialog; a light-DOM ID cannot cross that boundary.
+    let description = dialog.querySelector<HTMLElement>('#overwrite-description');
+    if (!description) { description = document.createElement('span'); description.id = 'overwrite-description'; description.hidden = true; dialog.append(description); }
+    description.textContent = 'The following file already exists. Replacing it will overwrite its contents. ' + (this.overwriteRequest?.filePath || '');
+    dialog.setAttribute('aria-describedby', description.id);
+  }
 
   finishOverwrite(replace = false): void {
     const request = this.overwriteRequest;
@@ -26,7 +48,8 @@ export class AppComponent implements OnInit {
     if (event.key !== 'Tab') return;
     const modal = event.currentTarget as HTMLElement;
     const first = modal.shadowRoot?.querySelector<HTMLButtonElement>('dialog button');
-    const last = modal.querySelector<HTMLButtonElement>('[data-action=replace]');
+    const buttons = modal.querySelectorAll<HTMLButtonElement>('[slot=footer] button');
+    const last = buttons[buttons.length - 1];
     if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     else if (event.shiftKey && modal.shadowRoot?.activeElement === first) { event.preventDefault(); last?.focus(); }
   }
@@ -67,7 +90,7 @@ export class AppComponent implements OnInit {
   ) {}
 
   async ngOnInit() {
-    this.electronService.overwriteRequested.subscribe(request => { this.overwriteRequest = request; });
+    this.electronService.overwriteRequested.subscribe(request => { this.overwriteRequest = request; void this.describeOverwrite(); });
     try {
       this.systemInfo = await this.electronService.getSystemInfo();
       console.log("System Info:", this.systemInfo);

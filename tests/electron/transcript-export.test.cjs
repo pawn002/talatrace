@@ -3,59 +3,45 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
-const { TranscriptExporter, exportPath } = require('../../dist/electron/services/transcript-export');
-
-test('export uses the chosen format despite GTK missing/wrong suffixes and remembers the last successful folder/name', async () => {
+const { TranscriptExporter, exportPath, serializeTranscript } = require('../../dist/electron/services/transcript-export');
+const data = { text: 'Hello.', timestampedText: 'Timing: Hello.', segments: [{ start: 1.25, end: 2.5, text: 'Hello.' }] };
+test('explicit supported suffix chooses the format and unchanged destinations rely only on native confirmation', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'talatrace-export-'));
-  const destination = path.join(root, 'chosen'); await fs.mkdir(destination);
-  const calls = []; let file, canceled = false, replace = false;
-  const exporter = new TranscriptExporter({ directory: () => root, choose: async options => { calls.push(options); return { canceled, filePath: file }; }, confirmOverwrite: async () => replace });
-  const data = { text: 'Hello.', timestampedText: 'Timing context: Hello.', segments: [{ start: 1.25, end: 2.5, text: 'Hello.' }] };
+  const calls = [], prompts = []; let selected = path.join(root, 'answer.srt');
+  const exporter = new TranscriptExporter({ directory: () => root,
+    choose: async options => { calls.push(options); return { canceled: false, filePath: selected }; },
+    confirmOverwrite: async file => { prompts.push(file); return true; },
+  });
   try {
-    file = path.join(destination, 'answer.txt');
-    const srt = await exporter.save(data, 'srt');
-    assert.equal(calls[0].defaultPath, path.join(root, 'transcript.srt'));
-    assert.equal(calls[0].title, 'Save transcript');
-    assert.deepEqual(calls[0].filters, [{ name: 'SRT subtitles', extensions: ['srt'] }]);
-    assert.equal(srt, path.join(destination, 'answer.srt'));
-    assert.match(await fs.readFile(srt, 'utf8'), /00:00:01,250 --> 00:00:02,500/);
-    file = path.join(destination, 'answer');
-    const json = await exporter.save(data, 'json');
-    assert.equal(calls[1].defaultPath, path.join(destination, 'answer.json'));
-    assert.deepEqual(JSON.parse(await fs.readFile(json, 'utf8')), data);
-    const txt = await exporter.save(data, 'txt'); assert.equal(await fs.readFile(txt, 'utf8'), data.timestampedText);
-    const vtt = await exporter.save(data, 'vtt'); assert.match(await fs.readFile(vtt, 'utf8'), /^WEBVTT\n\n00:00:01\.250 --> 00:00:02\.500/);
-    await fs.writeFile(vtt, 'keep-existing');
-    assert.equal(await exporter.save(data, 'vtt'), null); assert.equal(await fs.readFile(vtt, 'utf8'), 'keep-existing');
-    replace = true; await exporter.save(data, 'vtt'); assert.match(await fs.readFile(vtt, 'utf8'), /^WEBVTT/);
-    canceled = true; file = path.join(root, 'canceled.json'); assert.equal(await exporter.save(data, 'json'), null);
-    assert.equal(calls.at(-1).defaultPath, path.join(destination, 'answer.json'));
-    await assert.rejects(exporter.save(data, '../bad'), /Unsupported/);
+    await fs.writeFile(selected, 'original SRT'); await exporter.save(data, 'json');
+    assert.match(await fs.readFile(selected, 'utf8'), /00:00:01,250 --> 00:00:02,500/);
+    assert.deepEqual(prompts, []); assert.equal(calls[0].title, 'Save transcript');
+    assert.deepEqual(calls[0].properties, ['showOverwriteConfirmation']);
+    selected = path.join(root, 'answer.JSON'); await exporter.save(data, 'srt');
+    assert.deepEqual(JSON.parse(await fs.readFile(selected, 'utf8')), data);
+    assert.equal(calls[1].defaultPath, path.join(root, 'answer.srt'));
     assert.equal(exportPath(path.join(root, 'answer.v1'), 'srt'), path.join(root, 'answer.v1.srt'));
-    assert.equal(exportPath(path.join(root, 'answer.SRT'), 'srt'), path.join(root, 'answer.SRT'));
   } finally { await fs.rm(root, { recursive: true, force: true }); }
 });
-
-test('Linux confirms only the final destination, including exact names, and preserves both files on cancel', async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'talatrace-linux-export-'));
-  const selected = path.join(root, 'answer.srt');
-  const destination = path.join(root, 'answer.json');
-  const prompts = []; let replace = false; let chosen = selected;
+test('missing extensions confirm the final destination once, preserve cancellation and reuse the successful folder/stem', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'talatrace-export-'));
+  const folder = path.join(root, 'chosen'); await fs.mkdir(folder);
+  const destination = path.join(folder, 'answer.json');
+  const prompts = [], calls = []; let canceled = false, replace = false;
   const exporter = new TranscriptExporter({ directory: () => root,
-    choose: async options => { assert.deepEqual(options.properties, []); return { canceled: false, filePath: chosen }; },
+    choose: async options => { calls.push(options); return { canceled, filePath: path.join(folder, 'answer') }; },
     confirmOverwrite: async file => { prompts.push(file); return replace; },
-  }, 'linux');
+  });
   try {
-    await fs.writeFile(selected, 'original subtitles'); await fs.writeFile(destination, 'original JSON');
-    assert.equal(await exporter.save({ text: 'New' }, 'json'), null);
-    assert.deepEqual(prompts, [destination]);
-    assert.equal(await fs.readFile(selected, 'utf8'), 'original subtitles');
-    assert.equal(await fs.readFile(destination, 'utf8'), 'original JSON');
-    replace = true;
-    assert.equal(await exporter.save({ text: 'New' }, 'json'), destination);
-    assert.deepEqual(JSON.parse(await fs.readFile(destination, 'utf8')), { text: 'New' });
-    chosen = destination; replace = false;
-    assert.equal(await exporter.save({ text: 'Another' }, 'json'), null);
-    assert.equal(prompts.length, 3);
+    await fs.writeFile(destination, 'keep'); assert.equal(await exporter.save(data, 'json'), null);
+    assert.equal(await fs.readFile(destination, 'utf8'), 'keep');
+    replace = true; assert.equal(await exporter.save(data, 'json'), destination);
+    assert.deepEqual(prompts, [destination, destination]);
+    canceled = true; await exporter.save(data, 'vtt');
+    assert.equal(calls.at(-1).defaultPath, path.join(folder, 'answer.vtt'));
+    await assert.rejects(exporter.save(data, ''), /Unsupported/);
+    await assert.rejects(exporter.save({ text: '', segments: [] }, 'srt'), /No speech text/);
+    await assert.rejects(exporter.save({ text: '  ' }, 'vtt'), /No speech text/);
+    assert.equal(serializeTranscript({ text: '' }, 'vtt'), 'WEBVTT\n\n');
   } finally { await fs.rm(root, { recursive: true, force: true }); }
 });

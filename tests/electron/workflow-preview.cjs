@@ -200,7 +200,7 @@ app.whenReady().then(async () => {
         if (icon.maskImage === 'none' || parseFloat(icon.width) !== parseFloat(getComputedStyle(label).fontSize)) throw new Error('Disclosure icon is absent or incorrectly sized');
         colourPairs.push({ selector: host.classList.contains('timing-details') ? 'timing help mask' : 'settings gear mask', foreground: icon.backgroundColor, background: resolvedBackground(host), nonText: true });
       }
-      for (const selector of ['.overwrite-modal p', '.export-controls label', '.file-name', '.file-size', '.model-name', '.transcript-metadata dt', '.transcript-metadata dd', '.model-repository a', '.sort-header', '.models-page .info-alert a', '.spectrum-placeholder-label', '.spectrum-live-label', '.action-reason', '#history-refresh-status', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
+      for (const selector of ['.notification-modal p', '.notification-modal label', '.export-format-hint', '.overwrite-modal p', '.export-controls label', '.file-name', '.file-size', '.model-name', '.transcript-metadata dt', '.transcript-metadata dd', '.model-repository a', '.sort-header', '.models-page .info-alert a', '.spectrum-placeholder-label', '.spectrum-live-label', '.action-reason', '#history-refresh-status', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
         for (const el of document.querySelectorAll(selector)) {
           if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
@@ -467,7 +467,7 @@ app.whenReady().then(async () => {
     if (!await win.webContents.executeJavaScript("document.querySelector('.overwrite-modal').shadowRoot.querySelector('dialog[role=alertdialog]').matches(':modal') && document.activeElement.textContent.trim() === 'Cancel'")) throw new Error('Overwrite dialog lacks modal semantics or safe initial focus');
     await win.webContents.debugger.sendCommand('Accessibility.enable');
     const ax = await win.webContents.debugger.sendCommand('Accessibility.getFullAXTree');
-    if (!ax.nodes.some(node => node.role?.value === 'alertdialog' && node.name?.value === 'Replace existing transcript?')) throw new Error('Overwrite prompt missing from accessibility tree');
+    if (!ax.nodes.some(node => node.role?.value === 'alertdialog' && node.name?.value === 'Replace existing transcript?' && node.description?.value?.includes('overwrite its contents'))) throw new Error('Overwrite prompt missing its name/description in the accessibility tree');
     await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
     if ((await overwrite.response).replace !== false) throw new Error('Escape did not cancel replacement');
     await wait(100);
@@ -479,11 +479,17 @@ app.whenReady().then(async () => {
     nativeTheme.themeSource = 'dark'; await resize(1100, 820);
     for (let index = 0; index < 6; index++) { await click('[data-action=save]'); await wait(80); }
     await resize(428, 620); await capture('export-notifications-428');
-    if (!await win.webContents.executeJavaScript("(() => { const dock = document.querySelector('.toast-container').getBoundingClientRect(); const content = document.querySelector('.app-container').getBoundingClientRect(); const header = document.querySelector('.app-header').getBoundingClientRect(); return dock.top >= header.bottom - 1 && dock.bottom <= content.top + 1 && dock.height <= innerHeight * .25 + 1 && document.documentElement.scrollWidth <= innerWidth; })()")) throw new Error('Notifications overlap the workflow or header at 428px');
+    if (!await win.webContents.executeJavaScript("(() => { const dock = document.querySelector('.toast-container').getBoundingClientRect(); const content = document.querySelector('.app-container').getBoundingClientRect(); const header = document.querySelector('.app-header').getBoundingClientRect(); return dock.top >= header.bottom - 1 && Math.abs(content.top - header.bottom) < 2 && getComputedStyle(document.querySelector('.toast-container')).position === 'fixed' && document.documentElement.scrollWidth <= innerWidth; })()")) throw new Error('Notifications consume layout space or overflow at 428px');
     await resize(360, 360); await capture('export-notifications-short');
     if (!await win.webContents.executeJavaScript("getComputedStyle(document.body).overflow === 'hidden' && document.querySelector('.app-header').getBoundingClientRect().top === 0")) throw new Error('Short window moved the header into a competing document scroller');
     await resize(1100, 820);
     await win.webContents.executeJavaScript("Promise.all([...document.querySelectorAll('candor-toast')].map(async el => { await el.updateComplete; el.shadowRoot.querySelector('[aria-label=Dismiss]')?.click(); }))");
+    await click('[data-action=notification-preferences]'); await capture('notification-preferences-dark');
+    await win.webContents.executeJavaScript("const timeout = document.querySelector('#notification-timeout'); timeout.value='0'; timeout.dispatchEvent(new Event('change',{bubbles:true}));");
+    await resize(360, 520); nativeTheme.themeSource = 'light'; await capture('notification-preferences-small-light');
+    await click('.notification-modal [slot=footer] button');
+    if (!await win.webContents.executeJavaScript("document.activeElement.matches('[data-action=notification-preferences]') && localStorage.getItem('talatrace.toastTimeout')==='0'")) throw new Error('Notification preference/focus was not saved');
+    await resize(1100, 820); nativeTheme.themeSource = 'dark';
     win.webContents.send('transcription-completed', { ...fixture, alignmentWarning: 'Some word boundaries could not be aligned precisely.', speechDetectionWarning: 'Speech detection was unavailable for this recording.' });
     await win.webContents.executeJavaScript("document.querySelector('.result-section').scrollIntoView({ block: 'start' })"); await capture('transcript-warnings');
     if (!await win.webContents.executeJavaScript("!document.querySelector('.timing-details').open && [...document.querySelectorAll('.transcript-content [role=status]')].filter(el => el.checkVisibility()).length === 2")) throw new Error('Warnings are hidden behind transcript details');
@@ -806,8 +812,9 @@ app.whenReady().then(async () => {
     await themeKey(' ', 32); await expectTheme('dark');
     await themeKey('End', 35); await expectTheme('system');
     await themeKey('Tab', 9);
-    if (!await win.webContents.executeJavaScript("document.activeElement.id === 'app-tab-transcription'")) throw new Error('Theme radio group adds extra Tab stops');
-    await themeKey('Tab', 9); // Return focus below the group before refocusing for a keyboard-visible ring.
+    if (!await win.webContents.executeJavaScript("document.activeElement.matches('[data-action=notification-preferences]')")) throw new Error('Theme group did not reach notification preferences as its next tab stop');
+    await themeKey('Tab', 9);
+    if (!await win.webContents.executeJavaScript("document.activeElement.id === 'app-tab-transcription'")) throw new Error('Header keyboard order did not reach main navigation');
     await win.webContents.executeJavaScript("document.querySelector('#theme-control input:checked').focus()");
     await capture('theme-keyboard-focus');
     const themeBubbleVisible = () => win.webContents.executeJavaScript("document.querySelector('#theme-control input[value=system]').closest('candor-tooltip').shadowRoot.querySelector('.tooltip__bubble').matches(':popover-open')");

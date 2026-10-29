@@ -47,6 +47,13 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
   exportFormat: 'txt' | 'srt' | 'vtt' | 'json' = 'txt';
   isSaving = false;
 
+  onExportFormatChange(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    if (['txt', 'srt', 'vtt', 'json'].includes(select.value)) return;
+    select.value = 'txt'; this.exportFormat = 'txt';
+    this.toastService.show('Choose a file format, then save again. TXT is selected.', 'warning');
+  }
+
   openSettings(): void {
     if (!this.busy && this.hasInstalledModel) this.settingsOpen = true;
   }
@@ -274,6 +281,15 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
       this.toastService.show('No transcript to save', 'info');
       return;
     }
+    if (!['txt', 'srt', 'vtt', 'json'].includes(this.exportFormat)) {
+      this.exportFormat = 'txt';
+      this.toastService.show('Choose a file format, then save again. TXT is selected.', 'warning');
+      return;
+    }
+    if (!this.canSaveTranscript) {
+      this.toastService.show('No speech text to export. Use JSON for diagnostics, or record again.', 'warning');
+      return;
+    }
 
     this.isSaving = true;
     try {
@@ -287,7 +303,7 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
         this.toastService.show(`Saved to: ${savedPath}`, 'success');
       }
     } catch (error) {
-      this.toastService.show('Failed to save transcript', 'error');
+      this.toastService.show(String(error).includes('No speech text') ? 'No speech text to export. Use JSON for diagnostics, or record again.' : 'Failed to save transcript', 'error');
     } finally {
       this.isSaving = false;
     }
@@ -295,6 +311,17 @@ export class TranscriptionComponent implements OnInit, OnDestroy {
 
   get busy(): boolean {
     return this.isRecording || this.isStartingRecording || this.isStoppingRecording || this.isTranscribing || this.isSelectingFile;
+  }
+
+  get hasTranscriptText(): boolean {
+    const result = this.transcriptionResult;
+    return Boolean((typeof result?.text === 'string' && result.text.trim()) || result?.segments?.some((segment: any) => typeof segment?.text === 'string' && segment.text.trim()));
+  }
+
+  get canSaveTranscript(): boolean {
+    if (!this.transcriptionResult) return false;
+    if (this.exportFormat === 'json') return true;
+    return this.exportFormat === 'txt' ? Boolean(this.getTranscriptText().trim()) : this.hasTranscriptText;
   }
 
   switchWorkflow(mode: 'record' | 'file'): void {

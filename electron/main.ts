@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, dialog, screen } from 'electron';
 import * as path from 'path';
 import isDev from 'electron-is-dev';
 import * as fs from 'fs/promises';
@@ -24,11 +24,12 @@ let transcriptionService: TranscriptionService | null = null;
 
 function createWindow() {
   Menu.setApplicationMenu(null);
+  const workArea = screen.getPrimaryDisplay().workAreaSize;
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 360,
-    minHeight: 360,
+    width: Math.min(1200, workArea.width),
+    height: Math.min(800, workArea.height),
+    minWidth: Math.min(360, workArea.width),
+    minHeight: Math.min(320, workArea.height),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -37,6 +38,15 @@ function createWindow() {
     },
     title: 'TalaTrace',
     backgroundColor: '#303030',
+  });
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || !(input.control || input.meta) || input.alt) return;
+    const delta = ['+', '='].includes(input.key) || input.code === 'NumpadAdd' ? 1
+      : ['-', '_'].includes(input.key) || input.code === 'NumpadSubtract' ? -1 : 0;
+    if (!delta && input.key !== '0' && input.code !== 'Numpad0') return;
+    event.preventDefault();
+    const contents = mainWindow?.webContents;
+    if (contents) contents.setZoomLevel(delta ? Math.max(-3, Math.min(6, contents.getZoomLevel() + delta)) : 0);
   });
 
   // Grant only app-origin microphone capture and the existing Copy action.

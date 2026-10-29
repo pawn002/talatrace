@@ -8,7 +8,7 @@ const formats = { txt: 'Text', srt: 'SRT subtitles', vtt: 'WebVTT subtitles', js
 export function exportPath(selected: string, format: TranscriptFormat): string {
   const ext = path.extname(selected).toLowerCase();
   if (ext === '.' + format) return selected;
-  if (Object.prototype.hasOwnProperty.call(formats, ext.slice(1))) return selected.slice(0, -ext.length) + '.' + format;
+  if (Object.prototype.hasOwnProperty.call(formats, ext.slice(1))) return selected;
   return selected.replace(/\.+$/, '') + '.' + format;
 }
 
@@ -27,24 +27,26 @@ export class TranscriptExporter {
     directory: () => string;
     choose: (options: SaveDialogOptions) => Promise<SaveDialogReturnValue>;
     confirmOverwrite: (file: string) => Promise<boolean>;
-  }, private platform = process.platform) {}
+  }) {}
 
   async save(data: any, requested: unknown = 'txt'): Promise<string | null> {
     if (typeof requested !== 'string' || !Object.prototype.hasOwnProperty.call(formats, requested)) throw new Error('Unsupported transcript format');
+    validateExport(data, requested as TranscriptFormat);
     const format = requested as TranscriptFormat;
     const result = await this.dialogs.choose({
       title: 'Save transcript',
       buttonLabel: 'Save transcript',
       defaultPath: path.join(this.lastDirectory || this.dialogs.directory(), this.lastStem + '.' + format),
       filters: [{ name: formats[format], extensions: [format] }],
-      // Linux must confirm only the normalized destination, never a discarded suffix.
-      properties: this.platform === 'linux' ? [] : ['showOverwriteConfirmation'],
+      properties: ['showOverwriteConfirmation'],
     });
     if (result.canceled || !result.filePath) return null;
     if (!path.isAbsolute(result.filePath)) throw new Error('Expected an absolute export path');
     const file = exportPath(result.filePath, format);
-    const content = serializeTranscript(data, format);
-    if (file === result.filePath && this.platform !== 'linux') {
+    const suffix = path.extname(file).slice(1).toLowerCase();
+    validateExport(data, suffix as TranscriptFormat);
+    const content = serializeTranscript(data, suffix as TranscriptFormat);
+    if (file === result.filePath) {
       // Native overwrite confirmation covers this exact name.
       await fs.writeFile(file, content, 'utf8');
     } else {
@@ -60,6 +62,17 @@ export class TranscriptExporter {
     this.lastDirectory = path.dirname(file);
     this.lastStem = path.basename(file, path.extname(file));
     return file;
+  }
+}
+
+export function hasTranscriptText(data: any): boolean {
+  return Boolean((typeof data?.text === 'string' && data.text.trim()) ||
+    data?.segments?.some((segment: any) => typeof segment?.text === 'string' && segment.text.trim()));
+}
+
+function validateExport(data: any, format: TranscriptFormat): void {
+  if ((format === 'srt' || format === 'vtt') && !hasTranscriptText(data) || format === 'txt' && !serializeTranscript(data, 'txt').trim()) {
+    throw new Error('No speech text to export. Use JSON for diagnostics, or record again.');
   }
 }
 
@@ -157,6 +170,6 @@ function convertToVTT(text: string): string {
     }
   }
 
-  return vttContent === 'WEBVTT\n\n' ? text : vttContent; // Fallback to original if no matches
+  return vttContent === 'WEBVTT\n\n' && text.trim() ? text : vttContent;
 }
 

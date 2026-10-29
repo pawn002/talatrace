@@ -11,7 +11,7 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function launch(appData, expectedProfile, recognize = false, preferencesExist = false, options = {}) {
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
-  const child = spawn(executable, ['--inspect-brk=127.0.0.1:0'], { windowsHide: true, env });
+  const child = spawn(executable, ['--inspect-brk=127.0.0.1:0', ...(process.platform === 'linux' ? ['--force-device-scale-factor=1.5'] : [])], { windowsHide: true, env });
   let diagnostics = '';
   child.stdout.on('data', () => {});
   let socket;
@@ -102,6 +102,13 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
       return document.querySelector('h1, .app-title').textContent;
     })()`);
     const preferenceBefore = await renderer("localStorage.getItem('talatrace.model')");
+    if (recognize && !options.keepPreference) {
+      await renderer("document.querySelector('[data-action=notification-preferences]').click()");
+      await wait(100);
+      await renderer("const timeout=document.querySelector('#notification-timeout'); timeout.value='30'; timeout.dispatchEvent(new Event('change',{bubbles:true})); document.querySelector('.notification-modal [slot=footer] button').click()");
+    } else if (preferencesExist && !options.keepPreference) {
+      assert.equal(await renderer("document.querySelector('#notification-timeout').value"), '30', 'Notification timeout preference lost on restart');
+    }
     const results = [];
     if(recognize) for(const model of recognitionModels) {
       const result = await renderer(`(async () => await new Promise((resolve,reject)=>{
@@ -123,8 +130,8 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
         globalThis.__exportDefaults = [];
         globalThis.__releaseElectron.dialog.showSaveDialog = async (_window, options) => {
           globalThis.__exportDefaults.push(options.defaultPath);
-          // Simulate GTK retaining .txt even after another format was chosen.
-          return { canceled: false, filePath: ${JSON.stringify(path.join(exportsDirectory, 'answer.txt'))} };
+          // Missing suffix: the app must append the chosen format.
+          return { canceled: false, filePath: ${JSON.stringify(path.join(exportsDirectory, 'answer'))} };
         };
       })()`);
       for (const format of ['txt', 'srt', 'vtt', 'json']) {
@@ -165,7 +172,7 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
           assert.equal(await renderer("document.querySelector('.overwrite-modal .overwrite-path').textContent.trim()"), destination);
           await renderer(`document.querySelector('.overwrite-modal ${replace ? '[data-action=replace]' : '[autofocus]'}').click()`);
           for (let i = 0; i < 100; i++) {
-            if (await renderer("!document.querySelector('.export-status')")) break; await wait(50);
+            if (await renderer("!document.querySelector('.export-status[role=status]')")) break; await wait(50);
           }
           const content = await fs.readFile(destination, 'utf8');
           if (replace) assert.match(JSON.parse(content).text, /country/i);
@@ -173,8 +180,25 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
         }
         console.log('Linux packaged overwrite cancellation, immediate retry and replacement passed through the real IPC bridge.');
       }
-      console.log('Packaged TXT/SRT/VTT/JSON exports and folder/name reuse passed with a GTK-style wrong suffix.');
+      const jsonBefore = await fs.readFile(path.join(exportsDirectory, 'answer.json'), 'utf8');
+      await evaluate(`globalThis.__releaseElectron.dialog.showSaveDialog = async () => ({ canceled: false, filePath: ${JSON.stringify(path.join(exportsDirectory, 'answer.srt'))} })`);
+      await renderer("document.querySelector('[data-action=save]').click()");
+      await wait(200);
+      assert.equal(await renderer("document.querySelector('.overwrite-modal').shadowRoot.querySelector('dialog').open"), false);
+      assert.match(await fs.readFile(path.join(exportsDirectory, 'answer.srt'), 'utf8'), /\d\d:\d\d:\d\d,\d{3} -->/);
+      assert.equal(await fs.readFile(path.join(exportsDirectory, 'answer.json'), 'utf8'), jsonBefore);
+      console.log('Packaged export format/suffix handling passed; typed SRT overrides JSON without an extra app prompt.');
     }
+    console.log('Packaged zoom and minimum geometry:', await evaluate(`(async () => {
+      const win=globalThis.__releaseElectron.BrowserWindow.getAllWindows()[0], wc=win.webContents;
+      const key=async keyCode=>{wc.sendInputEvent({type:'keyDown',keyCode,modifiers:['control']});wc.sendInputEvent({type:'keyUp',keyCode,modifiers:['control']});await new Promise(r=>setTimeout(r,100));};
+      await key('0'); await key('='); const enlarged=wc.getZoomFactor(); if(enlarged<=1) throw new Error('Ctrl+ did not zoom');
+      await key('-'); if(wc.getZoomFactor()>=enlarged) throw new Error('Ctrl- did not zoom out'); await key('0');
+      if(wc.getZoomFactor()!==1) throw new Error('Ctrl+0 did not reset');
+      const minimum=win.getMinimumSize(); if(minimum[0]>360 || minimum[1]>320) throw new Error('Window minimum exceeds short-window target');
+      return {minimum,bounds:win.getBounds(),enlarged};
+    })()`));
+    console.log('Renderer geometry:', await renderer('({dpr:devicePixelRatio,width:innerWidth,height:innerHeight})'));
     assert.equal(preferenceAfter, preferenceBefore, 'Transcription unexpectedly changed the saved model');
     if(options.screenshot) {
       await renderer("(async () => { document.querySelector('#app-tab-models').click(); await document.fonts.ready; await new Promise(r=>setTimeout(r,350)); })()");
