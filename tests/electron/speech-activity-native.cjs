@@ -8,8 +8,9 @@ const { parseSpeechActivity } = require('../../dist/electron/services/speech-act
 const { parseQuietIntervals } = require('../../dist/electron/services/quiet-intervals');
 const root = path.resolve(__dirname, '../..');
 const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'whisper-vad-check-'));
-const ffmpeg = path.join(root, 'ffmpeg/bin/ffmpeg.exe');
-const vad = path.join(root, 'whisper.cpp/build-vulkan/bin/whisper-vad-speech-segments.exe');
+const ffmpeg = path.join(root, 'ffmpeg/bin', process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+const { nativePaths } = require('../../dist/electron/services/native-paths');
+const vad = path.join(nativePaths(root, false).whisperBinDir, process.platform === 'win32' ? 'whisper-vad-speech-segments.exe' : 'whisper-vad-speech-segments');
 const model = path.join(root, 'models/ggml-silero-v5.1.2.bin');
 function run(binary, args) {
   const result = spawnSync(binary, args, { encoding: 'utf8', windowsHide: true });

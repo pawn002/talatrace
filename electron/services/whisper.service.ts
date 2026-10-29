@@ -10,6 +10,7 @@ import { alignmentPreset, parseWhisperTranscript } from './speech-alignment';
 import { parseSpeechActivity } from './speech-activity';
 import { app } from 'electron';
 import { TranscriptionOptions, TranscriptionResult } from './types';
+import { nativePaths } from './native-paths';
 
 export class WhisperService implements RecognitionEngine {
   private whisperPath: string;
@@ -31,30 +32,11 @@ export class WhisperService implements RecognitionEngine {
     console.log('[WhisperService] Environment:', isDev ? 'development' : 'production');
     console.log('[WhisperService] Base path:', basePath);
 
-    // Platform-specific binary paths — prefer Vulkan variant when available
-    if (process.platform === 'win32') {
-      const vulkanBinDir = path.join(basePath, 'whisper.cpp', 'build-vulkan', 'bin');
-      const vulkanBin = path.join(vulkanBinDir, 'whisper-cli.exe');
-      const baselineBinDir = path.join(basePath, 'whisper.cpp', 'build', 'bin', 'Release');
-      const baselineBin = path.join(baselineBinDir, 'whisper-cli.exe');
-
-      const vulkanExists = require('fs').existsSync(vulkanBin);
-      if (vulkanExists) {
-        this.whisperPath = vulkanBin;
-        this.whisperBinDir = vulkanBinDir;
-        console.log('[WhisperService] Vulkan backend selected');
-      } else {
-        this.whisperPath = baselineBin;
-        this.whisperBinDir = baselineBinDir;
-        console.log('[WhisperService] Baseline (CPU) backend selected');
-      }
-
-      this.ffmpegPath = path.join(basePath, 'ffmpeg', 'bin', 'ffmpeg.exe');
-    } else {
-      this.whisperPath = path.join(basePath, 'whisper.cpp', 'main');
-      this.whisperBinDir = path.dirname(this.whisperPath);
-      this.ffmpegPath = path.join(basePath, 'ffmpeg', 'bin', 'ffmpeg');
-    }
+    const runtime = nativePaths(basePath, app.isPackaged);
+    this.whisperPath = runtime.whisperPath;
+    this.whisperBinDir = runtime.whisperBinDir;
+    this.ffmpegPath = runtime.ffmpegPath;
+    console.log(`[WhisperService] ${runtime.backend} backend selected`);
 
     // Models stored in user data directory (writable location)
     this.modelsPath = path.join(app.getPath('userData'), 'models');

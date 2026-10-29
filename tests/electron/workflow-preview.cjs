@@ -7,7 +7,7 @@ const root = path.resolve(__dirname, '../..');
 const output = path.join(os.tmpdir(), 'whisper-visual-review', process.env.WHISPER_VISUAL_PASS || 'current');
 const profile = require('node:fs').mkdtempSync(path.join(os.tmpdir(), 'whisper-visual-profile-'));
 app.setPath('userData', profile);
-app.commandLine.appendSwitch('force-device-scale-factor', '1');
+app.commandLine.appendSwitch('force-device-scale-factor', process.env.WHISPER_VISUAL_SCALE || '1');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.disableHardwareAcceleration();
 nativeTheme.themeSource = 'dark';
@@ -48,6 +48,8 @@ ipcMain.handle('get-transcription-history', async () => { if (historyDelay) awai
 let filename = 'interview-answer.wav';
 let failPicker = false;
 ipcMain.handle('select-audio-file', () => { if (failPicker) { failPicker = false; throw new Error('File picker unavailable'); } return { path: `C:/Audio/${filename}`, size: 5 * 1024 * 1024 }; });
+const savedFormats = [];
+ipcMain.handle('save-transcript', (_event, _data, format) => { savedFormats.push(format); return `C:/Exports/transcript.${format}`; });
 let failNext = false;
 function transcribe(event) {
   const fail = failNext;
@@ -60,12 +62,18 @@ function transcribe(event) {
 ipcMain.handle('transcribe-recording', transcribe);
 ipcMain.handle('transcribe-audio', transcribe);
 app.whenReady().then(async () => {
-  const watchdog = setTimeout(() => { console.error('Visual review timed out'); app.exit(1); }, 120000);
+  const watchdog = setTimeout(() => { console.error('Visual review timed out'); app.exit(1); }, 180000);
   const win = new BrowserWindow({ width: 1100, height: 820, show: false, webPreferences: {
     offscreen: true, backgroundThrottling: false, preload: path.join(root, 'dist/electron/preload.js'),
   } });
   const metrics = [];
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const resize = async (width, height) => {
+    win.setSize(width, height);
+    // Native Linux resize delivery is asynchronous; settle before hit testing.
+    await wait(120);
+    await win.webContents.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+  };
   // Exercise native scrollbars through their transparent grab area, not DOM scroll assignments.
   const checkScrollbar = async (selector, horizontal = false) => {
     await win.webContents.executeJavaScript(`(() => {
@@ -96,6 +104,7 @@ app.whenReady().then(async () => {
         : { x: r.right - parseFloat(s.borderRightWidth || 0) - 21, y: r.top + center };
     })()`);
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point });
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', button: 'left', buttons: 1, x: point.x + (horizontal ? 70 : 0), y: point.y + (horizontal ? 0 : 70) });
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, x: point.x + (horizontal ? 70 : 0), y: point.y + (horizontal ? 0 : 70) });
@@ -109,12 +118,18 @@ app.whenReady().then(async () => {
     if (!await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(selector)}).${horizontal ? 'scrollLeft' : 'scrollTop'} > 0`)) throw new Error('Native keyboard scrolling failed: ' + selector);
   };
   const click = async selector => {
-    const point = await win.webContents.executeJavaScript(`(() => {
+    await win.webContents.executeJavaScript(`(() => {
       const el = ${JSON.stringify(selector)}.split(' >>> ').reduce((root, part, i) => (i ? root.shadowRoot : root).querySelector(part), document);
       el.scrollIntoView({ block: 'nearest' });
+    })()`);
+    // Scroll/resize delivery and compositor hit testing are asynchronous.
+    await wait(100);
+    const point = await win.webContents.executeJavaScript(`(() => {
+      const el = ${JSON.stringify(selector)}.split(' >>> ').reduce((root, part, i) => (i ? root.shadowRoot : root).querySelector(part), document);
       const rect = el.getBoundingClientRect();
       return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
     })()`);
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point });
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point });
   };
@@ -185,7 +200,7 @@ app.whenReady().then(async () => {
         if (icon.maskImage === 'none' || parseFloat(icon.width) !== parseFloat(getComputedStyle(label).fontSize)) throw new Error('Disclosure icon is absent or incorrectly sized');
         colourPairs.push({ selector: host.classList.contains('timing-details') ? 'timing help mask' : 'settings gear mask', foreground: icon.backgroundColor, background: resolvedBackground(host), nonText: true });
       }
-      for (const selector of ['.file-name', '.file-size', '.model-name', '.transcript-metadata dt', '.transcript-metadata dd', '.model-repository a', '.sort-header', '.models-page .info-alert a', '.spectrum-placeholder-label', '.spectrum-live-label', '.action-reason', '#history-refresh-status', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
+      for (const selector of ['.notification-modal p', '.notification-modal label', '.export-format-hint', '.overwrite-modal p', '.export-controls label', '.file-name', '.file-size', '.model-name', '.transcript-metadata dt', '.transcript-metadata dd', '.model-repository a', '.sort-header', '.models-page .info-alert a', '.spectrum-placeholder-label', '.spectrum-live-label', '.action-reason', '#history-refresh-status', '.spectrum-fallback', '.disclosure > summary', '.workflow-number', '.tabs__tab[aria-selected=true]', '.copy-option', '.record-hint', '.explanation-prose', '.segment__time', '.segment__text', '.record-error', '.status-text', '.badge', '.table-host th', '.table-host td', '.button:not(:disabled)', '.input', '.alert__message', '.toast__message', '.local-badge']) {
         for (const el of document.querySelectorAll(selector)) {
           if (!el.checkVisibility({ checkVisibilityCSS: true })) continue;
           const style = getComputedStyle(el);
@@ -255,7 +270,7 @@ app.whenReady().then(async () => {
     await win.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true });
     await capture('models-checking');
     if (!await win.webContents.executeJavaScript(`document.querySelector('.workflow-status').textContent.includes('Checking local models') && !document.querySelector('.workflow-panel').textContent.includes('Download a model')`)) throw new Error('Pending discovery incorrectly offers a download');
-    win.setSize(360, 780); await capture('models-checking-small'); win.setSize(1100, 820);
+    await resize(360, 780); await capture('models-checking-small'); await resize(1100, 820);
     nativeTheme.themeSource = 'light'; await wait(250); await capture('models-checking-light'); nativeTheme.themeSource = 'dark';
     await click('#app-tab-models'); await capture('models-initial-loading');
     finishDiscovery(); await wait(300);
@@ -275,7 +290,7 @@ app.whenReady().then(async () => {
       const realNow = performance.now.bind(performance); let offset = 0;
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); // Offscreen fixture represents a foreground recorder.
       const readFrequency = AnalyserNode.prototype.getByteFrequencyData;
-      AnalyserNode.prototype.getByteFrequencyData = function(data) { readFrequency.call(this, data); window.previewFftPeak = Math.max(...data); window.previewFftState = this.context.state; window.previewFftTime = this.context.currentTime; };
+      AnalyserNode.prototype.getByteFrequencyData = function(data) { readFrequency.call(this, data); if (window.previewFullBand) data.fill(220); window.previewFftPeak = Math.max(...data); window.previewFftState = this.context.state; window.previewFftTime = this.context.currentTime; };
       Object.defineProperty(performance, 'now', { value: () => realNow() + offset });
       window.advancePreviewClock = () => { offset += 38000; };
       Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => {} } });
@@ -295,7 +310,7 @@ app.whenReady().then(async () => {
     })()`);
     await capture('ready');
     if (process.env.WHISPER_SCROLLBAR_TABLE_ONLY) {
-      await click('#app-tab-models'); win.setSize(360, 780); await wait(150);
+      await click('#app-tab-models'); await resize(360, 780); await wait(150);
       await checkScrollbar('#app-panel-models .table-container', true); await capture('scrollbar-models-smoke');
       console.log('Native table scrollbar drag and keyboard check passed.');
       clearTimeout(watchdog); app.quit(); return;
@@ -318,9 +333,9 @@ app.whenReady().then(async () => {
       clearTimeout(watchdog); app.quit(); return;
     }
     if (!await win.webContents.executeJavaScript("document.querySelector('.spectrum-placeholder-label').textContent === 'Audio spectrum' && getComputedStyle(document.querySelector('.spectrum-bars')).animationName === 'none' && !document.querySelector('#source-help')")) throw new Error('Idle spectrum placeholder or clean source switcher missing');
-    win.setSize(360, 780);
+    await resize(360, 780);
     await win.webContents.executeJavaScript("document.querySelector('.record-actions').scrollIntoView({ block: 'center' })"); await capture('workflow-options-small');
-    win.setSize(1100, 820); await win.webContents.executeJavaScript("document.querySelector('.app-container').scrollTop = 0");
+    await resize(1100, 820); await win.webContents.executeJavaScript("document.querySelector('.app-container').scrollTop = 0");
     nativeTheme.themeSource = 'light'; await wait(350); await capture('ready-light');
     if (!await placeholderMatches()) throw new Error('Light placeholder text and marks have different colours');
     nativeTheme.themeSource = 'dark'; await wait(350);
@@ -331,19 +346,34 @@ app.whenReady().then(async () => {
         && actions.querySelector('[data-action=settings]').textContent.includes('Transcription settings');
     })()`)) throw new Error('Ready secondary actions are not simplified');
 
-    win.setSize(1024, 500); await wait(150);
+    await resize(1024, 500); await wait(150);
     await checkScrollbar('.app-container'); await capture('scrollbar-page-dark');
     nativeTheme.themeSource = 'light'; await wait(350); await checkScrollbar('.app-container'); await capture('scrollbar-page-light');
     await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'forced-colors', value: 'active' }] });
     await capture('scrollbar-forced-colours');
     await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
     nativeTheme.themeSource = 'dark';
-    win.setSize(1024, 680); await capture('ready-short'); win.setSize(1100, 820); await wait(150);
+    await resize(1024, 680); await capture('ready-short'); await resize(1100, 820); await wait(150);
     await win.webContents.executeJavaScript("document.querySelector('.app-container').scrollTop = 0");
     const stopPosition = () => win.webContents.executeJavaScript("(() => { const r = document.querySelector('[data-action=stop]').getBoundingClientRect(); return JSON.stringify([r.x,r.y,r.width,r.height]); })()");
     const readyStopPosition = await stopPosition();
     await click('[data-action="record"]'); await capture('starting'); await waitForRecording();
     await wait(1000);
+    await win.webContents.executeJavaScript('window.previewFullBand = true'); await wait(500);
+    await capture('recording-full-band');
+    const spectrumGeometry = await win.webContents.executeJavaScript(`(() => {
+      const canvas = document.querySelector('app-audio-spectrum canvas');
+      const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      let left = canvas.width, right = -1, bars = 0, inside = false;
+      for (let x = 0; x < canvas.width; x++) {
+        let filled = false; for (let y = 0; y < canvas.height; y++) if (data[(y * canvas.width + x) * 4 + 3]) filled = true;
+        if (filled) { left = Math.min(left, x); right = Math.max(right, x); if (!inside) bars++; } inside = filled;
+      }
+      return { dpr: devicePixelRatio, cssWidth: canvas.clientWidth, backingWidth: canvas.width, left, right, bars };
+    })()`);
+    await fs.writeFile(path.join(output, 'spectrum-geometry.json'), JSON.stringify(spectrumGeometry, null, 2));
+    if (spectrumGeometry.bars !== 14 || spectrumGeometry.right < spectrumGeometry.backingWidth - 3 || spectrumGeometry.left > 2) throw new Error('Full-band spectrum does not span its canvas: ' + JSON.stringify(spectrumGeometry));
+    await win.webContents.executeJavaScript('window.previewFullBand = false'); await wait(500);
     const bandCenter = async () => win.webContents.executeJavaScript(`(() => {
       const canvas = document.querySelector('app-audio-spectrum canvas');
       const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
@@ -379,14 +409,14 @@ app.whenReady().then(async () => {
     })()`);
     await wait(1500); await capture('recording-speech');
     nativeTheme.themeSource = 'light'; await capture('recording-speech-light');
-    win.setSize(360, 780); await capture('recording-speech-small'); win.setSize(1100, 820); nativeTheme.themeSource = 'dark';
+    await resize(360, 780); await capture('recording-speech-small'); await resize(1100, 820); nativeTheme.themeSource = 'dark';
     await win.webContents.executeJavaScript("document.querySelector('.app-container').scrollTop = 0");
     await win.webContents.executeJavaScript("window.previewSpeech.stop(); window.previewSpeech.disconnect(); window.previewTone.connect(window.previewGain); window.previewGain.gain.value = 0.2;");
     }
     await win.webContents.executeJavaScript('window.advancePreviewClock()'); await wait(300);
     await capture('recording');
     if (await stopPosition() !== readyStopPosition) throw new Error('Stop moved when recording started: ' + readyStopPosition + ' -> ' + await stopPosition());
-    win.setSize(360, 780); await capture('recording-small'); win.setSize(1100, 820);
+    await resize(360, 780); await capture('recording-small'); await resize(1100, 820);
     nativeTheme.themeSource = 'light'; await wait(200); await capture('recording-light'); nativeTheme.themeSource = 'dark';
     await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
     await wait(300); await capture('recording-reduced-motion');
@@ -416,6 +446,50 @@ app.whenReady().then(async () => {
     await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
     await wait(1000);
     await capture('result');
+    await click('label[for=export-format]');
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 });
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 });
+    await capture('export-format-focus');
+    if (await win.webContents.executeJavaScript("document.querySelector('#export-format').value") !== 'srt') throw new Error('Keyboard format selection failed');
+    await click('[data-action=save]'); await wait(200);
+    if (savedFormats.at(-1) !== 'srt') throw new Error('Selected export format did not reach IPC');
+    await capture('export-saved');
+    // Use the production preload bridge and Candor alert dialog for overwrite decisions.
+    const askOverwrite = async (name) => {
+      await win.webContents.executeJavaScript("document.querySelector('[data-action=save]').focus()");
+      const response = new Promise(resolve => ipcMain.once('transcript-overwrite-response', (_event, id, replace) => resolve({ id, replace })));
+      win.webContents.send('transcript-overwrite-request', { requestId: name, filePath: '/home/tester/Documents/interview recordings/long folder name/answer.json' });
+      await wait(180);
+      return { response };
+    };
+    let overwrite = await askOverwrite('cancel');
+    await capture('overwrite-dark');
+    if (!await win.webContents.executeJavaScript("document.querySelector('.overwrite-modal').shadowRoot.querySelector('dialog[role=alertdialog]').matches(':modal') && document.activeElement.textContent.trim() === 'Cancel'")) throw new Error('Overwrite dialog lacks modal semantics or safe initial focus');
+    await win.webContents.debugger.sendCommand('Accessibility.enable');
+    const ax = await win.webContents.debugger.sendCommand('Accessibility.getFullAXTree');
+    if (!ax.nodes.some(node => node.role?.value === 'alertdialog' && node.name?.value === 'Replace existing transcript?' && node.description?.value?.includes('overwrite its contents'))) throw new Error('Overwrite prompt missing its name/description in the accessibility tree');
+    await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+    if ((await overwrite.response).replace !== false) throw new Error('Escape did not cancel replacement');
+    await wait(100);
+    if (!await win.webContents.executeJavaScript("document.activeElement.matches('[data-action=save]')")) throw new Error('Overwrite dialog did not restore Save focus');
+    await resize(428, 620); nativeTheme.themeSource = 'light';
+    overwrite = await askOverwrite('replace'); await capture('overwrite-small-light');
+    await click('[data-action=replace]');
+    if ((await overwrite.response).replace !== true) throw new Error('Replace did not reach main process');
+    nativeTheme.themeSource = 'dark'; await resize(1100, 820);
+    for (let index = 0; index < 6; index++) { await click('[data-action=save]'); await wait(80); }
+    await resize(428, 620); await capture('export-notifications-428');
+    if (!await win.webContents.executeJavaScript("(() => { const dock = document.querySelector('.toast-container').getBoundingClientRect(); const content = document.querySelector('.app-container').getBoundingClientRect(); const header = document.querySelector('.app-header').getBoundingClientRect(); return dock.top >= header.bottom - 1 && Math.abs(content.top - header.bottom) < 2 && getComputedStyle(document.querySelector('.toast-container')).position === 'fixed' && document.documentElement.scrollWidth <= innerWidth; })()")) throw new Error('Notifications consume layout space or overflow at 428px');
+    await resize(360, 360); await capture('export-notifications-short');
+    if (!await win.webContents.executeJavaScript("getComputedStyle(document.body).overflow === 'hidden' && document.querySelector('.app-header').getBoundingClientRect().top === 0")) throw new Error('Short window moved the header into a competing document scroller');
+    await resize(1100, 820);
+    await win.webContents.executeJavaScript("Promise.all([...document.querySelectorAll('candor-toast')].map(async el => { await el.updateComplete; el.shadowRoot.querySelector('[aria-label=Dismiss]')?.click(); }))");
+    await click('[data-action=notification-preferences]'); await capture('notification-preferences-dark');
+    await win.webContents.executeJavaScript("const timeout = document.querySelector('#notification-timeout'); timeout.value='0'; timeout.dispatchEvent(new Event('change',{bubbles:true}));");
+    await resize(360, 520); nativeTheme.themeSource = 'light'; await capture('notification-preferences-small-light');
+    await click('.notification-modal [slot=footer] button');
+    if (!await win.webContents.executeJavaScript("document.activeElement.matches('[data-action=notification-preferences]') && localStorage.getItem('talatrace.toastTimeout')==='0'")) throw new Error('Notification preference/focus was not saved');
+    await resize(1100, 820); nativeTheme.themeSource = 'dark';
     win.webContents.send('transcription-completed', { ...fixture, alignmentWarning: 'Some word boundaries could not be aligned precisely.', speechDetectionWarning: 'Speech detection was unavailable for this recording.' });
     await win.webContents.executeJavaScript("document.querySelector('.result-section').scrollIntoView({ block: 'start' })"); await capture('transcript-warnings');
     if (!await win.webContents.executeJavaScript("!document.querySelector('.timing-details').open && [...document.querySelectorAll('.transcript-content [role=status]')].filter(el => el.checkVisibility()).length === 2")) throw new Error('Warnings are hidden behind transcript details');
@@ -435,8 +509,8 @@ app.whenReady().then(async () => {
     await click('[data-action="copy"]'); await capture('copy-error');
     await win.webContents.executeJavaScript('navigator.clipboard.writeText = async () => {}; void 0');
     await click('[data-action="copy"]');
-    win.setSize(480, 820); await capture('result-narrow');
-    win.setSize(360, 780); await capture('result-small');
+    await resize(480, 820); await capture('result-narrow');
+    await resize(360, 780); await capture('result-small');
     win.webContents.send('transcription-completed', { ...fixture, segments: Array.from({ length: 60 }, (_, i) => ({ start: i * 2, end: i * 2 + 1, text: 'A longer transcript exercises native scrolling and focus.' })) });
     await wait(100); await checkScrollbar('.transcript-view'); await capture('scrollbar-transcript-dark');
     nativeTheme.themeSource = 'light'; await wait(350); await checkScrollbar('.transcript-view'); await capture('scrollbar-transcript-light');
@@ -446,7 +520,7 @@ app.whenReady().then(async () => {
     await win.webContents.executeJavaScript("document.querySelector('.transcript-metadata').scrollIntoView({ block: 'center' })");
     await capture('transcript-details-small');
     await click('.timing-details >>> button');
-    win.setSize(1100, 820);
+    await resize(1100, 820);
     await win.webContents.executeJavaScript("document.querySelector('.disclosure--inline').shadowRoot.querySelector('button').focus(); document.querySelector('.disclosure--inline').scrollIntoView({ block: 'center' })");
     if (!await win.webContents.executeJavaScript("!!document.querySelector('.transcript-output').shadowRoot.querySelector('.card__footer:not([hidden])') && document.querySelector('.disclosure--inline').parentElement.slot === 'footer'")) throw new Error('Timing disclosure is not in the Card footer');
     await capture('timing-disclosure-focus');
@@ -459,13 +533,13 @@ app.whenReady().then(async () => {
     nativeTheme.themeSource = 'dark';
     await win.webContents.executeJavaScript("document.querySelectorAll('.quiet-details').forEach(el => el.open = true); document.querySelector('.quiet-details').scrollIntoView({ block: 'start' })");
     await capture('nested-diagnostics');
-    win.setSize(360, 780);
+    await resize(360, 780);
     await wait(150);
     await win.webContents.executeJavaScript("document.querySelector('.quiet-details').scrollIntoView({ block: 'start' })");
     await capture('nested-diagnostics-small');
     await win.webContents.executeJavaScript("document.querySelector('.disclosure--subtle').scrollIntoView({ block: 'start' })");
     await capture('nested-rows-small');
-    win.setSize(1100, 820); nativeTheme.themeSource = 'light'; await wait(350); await capture('nested-diagnostics-light');
+    await resize(1100, 820); nativeTheme.themeSource = 'light'; await wait(350); await capture('nested-diagnostics-light');
     nativeTheme.themeSource = 'dark'; await wait(350);
     // Candor child activation must leave the standalone parent disclosure open.
     await click('.disclosure--subtle >>> summary'); await wait(80); // Native details toggle synchronizes the host asynchronously.
@@ -491,14 +565,14 @@ app.whenReady().then(async () => {
     await win.webContents.executeJavaScript("document.querySelector('#model-select').classList.add('input--error'); document.querySelector('#model-select').focus()");
     await capture('input-error-focus');
     await win.webContents.executeJavaScript("document.querySelector('#model-select').classList.remove('input--error')");
-    win.setSize(360, 780);
+    await resize(360, 780);
     await win.webContents.executeJavaScript("document.querySelector('.settings-modal .options-section').scrollIntoView({ block: 'center' })");
     await capture('settings-small');
-    win.setSize(480, 420); await capture('settings-short');
+    await resize(480, 420); await capture('settings-short');
     win.webContents.setZoomFactor(2); await capture('settings-zoom');
     if (!await win.webContents.executeJavaScript("(() => { const r = document.querySelector('.settings-modal [slot=footer] button').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && r.right <= innerWidth; })()")) throw new Error('Zoom clips the modal closing action');
     win.webContents.setZoomFactor(1);
-    win.setSize(1100, 820);
+    await resize(1100, 820);
     await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
     await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
     await wait(80);
@@ -509,7 +583,7 @@ app.whenReady().then(async () => {
     await win.webContents.executeJavaScript("window.RealAudioContext = window.AudioContext; window.AudioContext = class extends window.RealAudioContext { createMediaStreamSource() { throw new Error('Fixture analysis failure'); } }; void 0");
     await click('[data-action="record"]'); await capture('starting-again'); await waitForRecording();
     await capture('recording-display-unavailable');
-    win.setSize(360, 780); await capture('recording-display-unavailable-small'); win.setSize(1100, 820);
+    await resize(360, 780); await capture('recording-display-unavailable-small'); await resize(1100, 820);
     if (!await win.webContents.executeJavaScript("!!document.querySelector('.spectrum-fallback') && !document.querySelector('[data-action=stop]').disabled")) throw new Error('Display failure interrupted recording');
     await win.webContents.executeJavaScript("window.AudioContext = window.RealAudioContext; void 0");
     failNext = true;
@@ -524,17 +598,17 @@ app.whenReady().then(async () => {
     nativeTheme.themeSource = 'light'; await wait(250); await capture('file-empty-light'); nativeTheme.themeSource = 'dark';
     failPicker = true; await click('[data-action="choose-file"]'); await wait(100); await capture('candor-toast');
     if (!await win.webContents.executeJavaScript("document.querySelector('candor-toast-container').shadowRoot.querySelector('.live--assertive').textContent.includes('Failed to select file')")) throw new Error('Toast was not added to the persistent assertive region');
-    win.setSize(360, 780); await capture('candor-toast-small'); win.setSize(1100, 820);
+    await resize(360, 780); await capture('candor-toast-small'); await resize(1100, 820);
     nativeTheme.themeSource = 'light'; await wait(350); await capture('candor-toast-light'); nativeTheme.themeSource = 'dark'; await wait(350);
     await win.webContents.executeJavaScript("document.querySelector('candor-toast').shadowRoot.querySelector('[aria-label=Dismiss]').click()");
     if (await win.webContents.executeJavaScript("!!document.querySelector('candor-toast')")) throw new Error('Dismiss did not remove the toast');
     await click('[data-action="choose-file"]'); await wait(100); await capture('file-selected');
     if (!await win.webContents.executeJavaScript("document.querySelector('[data-action=choose-file]').closest('.step-card').querySelector('.file-name').textContent === 'interview-answer.wav' && document.querySelector('.file-info').textContent.includes('5 MB') && !document.querySelector('.record-actions .file-info')")) throw new Error('Selected file is not grouped with its Choose action');
     nativeTheme.themeSource = 'light'; await wait(250); await capture('file-selected-light'); nativeTheme.themeSource = 'dark';
-    win.setSize(360, 780); await capture('file-selected-small'); win.setSize(1100, 820);
+    await resize(360, 780); await capture('file-selected-small'); await resize(1100, 820);
     filename = 'Research-interview-session-about-complex-decisions-and-unclear-expectations-with-detailed-follow-up-notes-2026-10-24.wav';
     await click('[data-action="choose-file"]'); await wait(100);
-    win.setSize(360, 780); await capture('file-long-name'); win.setSize(1100, 820);
+    await resize(360, 780); await capture('file-long-name'); await resize(1100, 820);
     nativeTheme.themeSource = 'light'; await wait(250); await capture('file-long-name-light'); nativeTheme.themeSource = 'dark';
     await click('[data-action="transcribe"]'); await capture('file-processing'); await wait(1000);
     if (!await win.webContents.executeJavaScript("document.querySelector('[data-action=choose-file]').closest('.step-card').querySelector('.file-name').textContent.includes('Research-interview')")) throw new Error('Transcription lost selected-file context');
@@ -610,14 +684,14 @@ app.whenReady().then(async () => {
     await capture('models-download-active-dark');
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 10, y: 200 });
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, x: 10, y: 200 });
-    win.setSize(360, 780); await capture('models-small');
+    await resize(360, 780); await capture('models-small');
     await checkScrollbar('#app-panel-models .table-container', true); await capture('scrollbar-models-dark');
     await win.webContents.executeJavaScript("document.querySelector('#app-panel-models .table-container').scrollLeft = 300");
     await capture('models-metrics-small');
     await win.webContents.executeJavaScript("document.querySelector('#app-panel-models .table-container').scrollLeft = 0");
     await win.webContents.executeJavaScript("document.querySelector('.models-page .info-alert').scrollIntoView({ block: 'end' })");
     await capture('models-guidance-small');
-    win.setSize(480, 780);
+    await resize(480, 780);
     await win.webContents.executeJavaScript("document.querySelector('.app-container').scrollTop = 0");
     await capture('models-narrow');
     await win.webContents.executeJavaScript("[...document.querySelectorAll('#app-panel-models .button')].at(-1).focus()");
@@ -626,7 +700,7 @@ app.whenReady().then(async () => {
     if (!await win.webContents.executeJavaScript("document.activeElement === document.querySelector('#model-benchmark-context a') && document.activeElement.matches(':focus-visible') && parseFloat(getComputedStyle(document.activeElement).outlineWidth) > 0")) throw new Error('Benchmark source link lacks visible keyboard focus');
     await capture('models-benchmark-focus');
     if (!await win.webContents.executeJavaScript("document.querySelector('#app-panel-models .table-container').tabIndex === 0")) throw new Error('Overflowing table is not keyboard reachable');
-    win.setSize(1100, 820); await wait(150);
+    await resize(1100, 820); await wait(150);
     if (await win.webContents.executeJavaScript("document.querySelector('#app-panel-models .table-container').hasAttribute('tabindex')")) throw new Error('Fitting table adds an unnecessary tab stop');
     await click('#app-panel-models [data-model=tiny] .button'); await capture('model-download');
     if (!await win.webContents.executeJavaScript("document.querySelector('#app-panel-models [role=progressbar]').getAttribute('aria-label').includes('tiny')")) throw new Error('Download progress lacks a model label');
@@ -664,12 +738,12 @@ app.whenReady().then(async () => {
     await win.webContents.executeJavaScript("document.querySelector('#app-panel-history tbody tr:last-child').scrollIntoView({ block: 'nearest' })");
     await capture('history-outcome-shapes');
     await win.webContents.executeJavaScript("document.querySelector('#app-panel-history').scrollIntoView({ block: 'start' })");
-    win.setSize(360, 780); await capture('history-unavailable-small');
+    await resize(360, 780); await capture('history-unavailable-small');
     await wait(150);
     await win.webContents.executeJavaScript("const historyScroll = document.querySelector('#app-panel-history .table-container'); historyScroll.scrollLeft = historyScroll.scrollWidth; void 0");
     await capture('history-actions-small');
     nativeTheme.themeSource = 'light'; await wait(250); await capture('history-actions-small-light');
-    nativeTheme.themeSource = 'dark'; win.setSize(1100, 820);
+    nativeTheme.themeSource = 'dark'; await resize(1100, 820);
     await win.webContents.executeJavaScript("document.querySelector('#app-panel-history .table-container').scrollLeft = 0");
     await win.webContents.executeJavaScript("document.querySelector('#app-tab-history').focus(); document.querySelector('#app-panel-history [aria-label=\"Refresh history\"]').focus()");
     await capture('candor-tooltip-focus');
@@ -689,10 +763,10 @@ app.whenReady().then(async () => {
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 10, y: 10 });
     nativeTheme.themeSource = 'light'; await wait(350); await capture('history-light');
     nativeTheme.themeSource = 'dark'; await wait(350);
-    win.setSize(360, 780); await capture('history-small');
+    await resize(360, 780); await capture('history-small');
     await checkScrollbar('#app-panel-history .table-container', true); await capture('scrollbar-history-dark');
     // A build without the alternate runtime loads its own initial capability catalog.
-    alternateReady = false; win.setSize(1100, 820); nativeTheme.themeSource = 'dark';
+    alternateReady = false; await resize(1100, 820); nativeTheme.themeSource = 'dark';
     await new Promise(resolve => { win.webContents.once('did-finish-load', resolve); win.webContents.reload(); });
     await wait(500); await click('#app-tab-models');
     await win.webContents.executeJavaScript("document.querySelector('.models-page [data-model=\"parakeet-tdt-0.6b-v3\"]').scrollIntoView({ block: 'center' })");
@@ -713,7 +787,6 @@ app.whenReady().then(async () => {
     nativeTheme.themeSource = 'dark'; await wait(350); await capture('theme-system-dark');
     if (await pageColour() !== explicitDark) throw new Error('System did not follow the dark OS theme');
     if (!await win.webContents.executeJavaScript("!document.documentElement.hasAttribute('data-theme') && document.querySelector('#theme-control').getAttribute('aria-labelledby') === 'theme-legend' && document.querySelector('#theme-legend').textContent === 'Theme'")) throw new Error('System/theme accessible name contract failed');
-    await win.webContents.debugger.sendCommand('Accessibility.enable');
     const accessibility = await win.webContents.debugger.sendCommand('Accessibility.getFullAXTree');
     const themeRadios = accessibility.nodes.filter(node => !node.ignored && node.role?.value === 'radio');
     const themeGroup = accessibility.nodes.find(node => !node.ignored && node.role?.value === 'radiogroup' && node.name?.value === 'Theme');
@@ -739,15 +812,16 @@ app.whenReady().then(async () => {
     await themeKey(' ', 32); await expectTheme('dark');
     await themeKey('End', 35); await expectTheme('system');
     await themeKey('Tab', 9);
-    if (!await win.webContents.executeJavaScript("document.activeElement.id === 'app-tab-transcription'")) throw new Error('Theme radio group adds extra Tab stops');
-    await themeKey('Tab', 9); // Return focus below the group before refocusing for a keyboard-visible ring.
+    if (!await win.webContents.executeJavaScript("document.activeElement.matches('[data-action=notification-preferences]')")) throw new Error('Theme group did not reach notification preferences as its next tab stop');
+    await themeKey('Tab', 9);
+    if (!await win.webContents.executeJavaScript("document.activeElement.id === 'app-tab-transcription'")) throw new Error('Header keyboard order did not reach main navigation');
     await win.webContents.executeJavaScript("document.querySelector('#theme-control input:checked').focus()");
     await capture('theme-keyboard-focus');
     const themeBubbleVisible = () => win.webContents.executeJavaScript("document.querySelector('#theme-control input[value=system]').closest('candor-tooltip').shadowRoot.querySelector('.tooltip__bubble').matches(':popover-open')");
     if (!await themeBubbleVisible()) throw new Error('Theme tooltip is unavailable on radio focus');
     await themeKey('Escape', 27);
     if (await themeBubbleVisible()) throw new Error('Escape did not dismiss theme tooltip');
-    win.setSize(360, 780); await capture('theme-small');
+    await resize(360, 780); await capture('theme-small');
     await win.webContents.executeJavaScript("document.querySelector('#app-tab-transcription').focus()");
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 10, y: 200 }); await wait(100);
     const themePoint = await win.webContents.executeJavaScript("(() => { const r = document.querySelector('#theme-control input[value=system]').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()");
@@ -757,7 +831,7 @@ app.whenReady().then(async () => {
     const themeBubblePoint = await win.webContents.executeJavaScript("(() => { const bubble = document.querySelector('#theme-control input[value=system]').closest('candor-tooltip').shadowRoot.querySelector('.tooltip__bubble'); const r=bubble.getBoundingClientRect(); if (bubble.getAttribute('aria-hidden') !== 'true' || r.left<0 || r.right>innerWidth || r.top<0 || r.bottom>innerHeight || document.querySelector('#theme-control input[value=system]').hasAttribute('aria-describedby')) throw new Error('Theme tooltip contract/placement failed'); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()");
     await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', ...themeBubblePoint }); await wait(100);
     if (!await themeBubbleVisible()) throw new Error('Theme tooltip disappears on pointer entry');
-    win.setSize(1100, 820); alternateReady = true;
+    await resize(1100, 820); alternateReady = true;
     await click('#app-tab-models');
     await click('[data-model=base] [data-model-action]'); await capture('model-deleting');
     await wait(600); await capture('model-deleted');
@@ -775,7 +849,7 @@ app.whenReady().then(async () => {
     await new Promise(resolve => { win.webContents.once('did-finish-load', resolve); win.webContents.reload(); }); await wait(350);
     await click('#app-tab-models'); await capture('model-delete-blocked');
     if (!await win.webContents.executeJavaScript("document.querySelector('[data-model=\"parakeet-tdt-0.6b-v3\"] [data-model-action]').disabled && document.getElementById('model-action-status').textContent.includes('Finish transcription')")) throw new Error('Blocked deletion lacks a visible reason');
-    nativeTheme.themeSource = 'light'; await wait(250); win.setSize(360, 780);
+    nativeTheme.themeSource = 'light'; await wait(250); await resize(360, 780);
     await win.webContents.executeJavaScript("const scroller = document.querySelector('.models-page .table-container'); scroller.scrollLeft = scroller.scrollWidth;");
     await capture('model-delete-blocked-small-light');
     await fs.writeFile(path.join(output, 'metrics.json'), JSON.stringify(metrics, null, 2));

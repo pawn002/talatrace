@@ -26,6 +26,46 @@ describe('TranscriptionComponent', () => {
   let component: TranscriptionComponent;
   let fixture: ComponentFixture<TranscriptionComponent>;
 
+  it('repairs an AT-cleared format with a visible explanation instead of silently saving', async () => {
+    component.transcriptionResult = { text: 'Answer.' };
+    component.exportFormat = null as any;
+    await component.saveTranscript();
+    expect(electronStub.saveTranscript).not.toHaveBeenCalled();
+    expect(component.exportFormat).toBe('txt');
+    expect(toastStub.show).toHaveBeenCalledWith(expect.stringContaining('Choose a file format'), 'warning');
+  });
+
+  it('restores the native format selection immediately after a deselection event', () => {
+    const select = fixture.nativeElement.querySelector('#export-format') as HTMLSelectElement;
+    select.selectedIndex = -1; select.dispatchEvent(new Event('change')); fixture.detectChanges();
+    expect(select.value).toBe('txt'); expect(component.exportFormat).toBe('txt');
+    expect(toastStub.show).toHaveBeenCalledWith(expect.stringContaining('Choose a file format'), 'warning');
+  });
+
+  it('blocks empty subtitles while preserving JSON diagnostics', async () => {
+    component.transcriptionResult = { text: '', segments: [], noSpeechIntervals: [{ start: 0, end: 5 }] };
+    component.exportFormat = 'vtt'; fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-action=save]').disabled).toBe(true);
+    expect(fixture.nativeElement.querySelector('#empty-export-reason').textContent).toContain('Subtitle exports need speech text');
+    await component.saveTranscript(); expect(electronStub.saveTranscript).not.toHaveBeenCalled();
+    component.exportFormat = 'json'; await component.saveTranscript();
+    expect(electronStub.saveTranscript).toHaveBeenCalledWith(expect.objectContaining({ noSpeechIntervals: [{ start: 0, end: 5 }] }), 'json');
+  });
+
+  it('guards duplicate saves and permits a fresh save immediately after cancellation', async () => {
+    component.transcriptionResult = { text: 'An answer.' };
+    let cancel!: (path: null) => void;
+    electronStub.saveTranscript.mockImplementationOnce(() => new Promise(resolve => { cancel = resolve; }));
+    const first = component.saveTranscript();
+    await component.saveTranscript();
+    expect(electronStub.saveTranscript).toHaveBeenCalledTimes(1);
+    cancel(null); await first;
+    expect(component.isSaving).toBe(false);
+    electronStub.saveTranscript.mockResolvedValueOnce('/answer.txt');
+    await component.saveTranscript();
+    expect(electronStub.saveTranscript).toHaveBeenCalledTimes(2);
+  });
+
   it('reports comparable processing time and audio duration from the completed result', () => {
     component.transcriptionResult = { duration: 38.52, processingTimeMs: 6420, modelName: 'Parakeet' };
     expect(component.performanceSummary).toBe('Parakeet · 38.52 s audio · 6.42 s processing (6.0× real time)');
@@ -520,7 +560,7 @@ describe('TranscriptionComponent', () => {
       await component.saveTranscript();
       expect(electronStub.saveTranscript).toHaveBeenCalledWith(expect.objectContaining({
         noSpeechIntervals: [{ start: 6, end: 36 }], quietIntervals: [{ start: 12, end: 14 }],
-      }));
+      }), 'txt');
     });
 
     it('copies the detector warning when only quiet measurements are available', () => {
@@ -562,7 +602,7 @@ describe('TranscriptionComponent', () => {
       await component.saveTranscript();
       expect(electronStub.saveTranscript).toHaveBeenCalledWith(expect.objectContaining({
         timestampedText: '[00:00:02.000 → 00:00:04.000] Answer',
-      }));
+      }), 'txt');
     });
 
     it('copies audio-aligned times while retaining original recognition times in exports', async () => {
@@ -576,7 +616,7 @@ describe('TranscriptionComponent', () => {
       await component.saveTranscript();
       expect(electronStub.saveTranscript).toHaveBeenCalledWith(expect.objectContaining({
         originalSegments: [{ start: 59, end: 82, text: 'Resumed speech' }],
-      }));
+      }), 'txt');
     });
 
     it('blocks new file selection during a transcription', async () => {
@@ -623,6 +663,12 @@ describe('TranscriptionComponent', () => {
   });
 
   describe('saveTranscript()', () => {
+    it('passes the chosen file format alongside the full transcript', async () => {
+      component.transcriptionResult = { text: 'Answer', segments: [{ start: 1, end: 2, text: 'Answer' }] };
+      component.exportFormat = 'srt';
+      await component.saveTranscript();
+      expect(electronStub.saveTranscript).toHaveBeenCalledWith(expect.objectContaining({ text: 'Answer' }), 'srt');
+    });
     it('shows info toast and does not call electron when there is no result', async () => {
       component.transcriptionResult = null;
 

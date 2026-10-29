@@ -6,10 +6,16 @@ import { Subject } from 'rxjs';
 })
 export class ElectronService {
   readonly modelsChanged = new Subject<void>();
+  readonly overwriteRequested = new Subject<{ filePath: string; respond: (replace: boolean) => void }>();
   private electron: any;
 
   constructor(private zone: NgZone) {
     this.electron = (window as any).electronAPI;
+    this.electron?.onTranscriptOverwrite?.((requestId: string, filePath: string) => {
+      this.zone.run(() => this.overwriteRequested.next({ filePath,
+        respond: replace => this.electron.respondTranscriptOverwrite(requestId, replace),
+      }));
+    });
     this.electron?.onTranscriptionCompleted?.(() => this.zone.run(() => this.modelsChanged.next()));
     this.electron?.onTranscriptionError?.(() => this.zone.run(() => this.modelsChanged.next()));
   }
@@ -30,8 +36,8 @@ export class ElectronService {
     return result;
   }
 
-  async saveTranscript(resultData: any): Promise<string | null> {
-    return await this.electron.saveTranscript(resultData);
+  async saveTranscript(resultData: any, format: 'txt' | 'srt' | 'vtt' | 'json' = 'txt'): Promise<string | null> {
+    return await this.electron.saveTranscript(resultData, format);
   }
 
   async getAvailableModels(): Promise<any[]> {

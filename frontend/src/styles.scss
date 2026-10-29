@@ -16,6 +16,9 @@ html, body { height: 100%; }
 :root { color-scheme: light dark; }
 body {
   margin: 0;
+  // The workflow and notification dock own their scrolling. Avoid a second
+  // document scrollbar competing with them in short desktop windows.
+  overflow: hidden;
   // Fontsource registers 'Roboto Flex Variable'; override the Candor token to match
   --font-sans: 'Roboto Flex Variable', system-ui, -apple-system, sans-serif;
   --font-mono: 'Roboto Mono', 'SF Mono', Monaco, Consolas, monospace;

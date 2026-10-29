@@ -2,6 +2,17 @@ import { NgZone } from '@angular/core';
 import { ElectronService } from './electron.service';
 
 describe('model catalogue change notifications', () => {
+  it('keeps overwrite responses tied to their request and enters Angular for the dialog', () => {
+    let requested!: (id: string, path: string) => void;
+    const respond = jest.fn();
+    (window as any).electronAPI = { onTranscriptOverwrite: (callback: typeof requested) => requested = callback, respondTranscriptOverwrite: respond };
+    const run = jest.fn(callback => callback());
+    const service = new ElectronService({ run } as unknown as NgZone);
+    service.overwriteRequested.subscribe(request => { expect(request.filePath).toBe('/local/answer.json'); request.respond(true); });
+    requested('request-1', '/local/answer.json');
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(respond).toHaveBeenCalledWith('request-1', true);
+  });
   afterEach(() => { delete (window as any).electronAPI; });
   it('refreshes model consumers on transcription start and native completion/error', async () => {
     let complete!: () => void, fail!: () => void;

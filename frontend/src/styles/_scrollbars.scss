@@ -1,7 +1,7 @@
 // Candor 6.0.0 utils/scrollbar.ts construction for application-owned native scrollers.
 // The package does not expose its helper through a public export.
 @mixin app-scrollbars {
-  :where(html, .app-container, .transcript-view, .table-container) {
+  :where(html, .app-container, .transcript-view, .table-container, .toast-container) {
     --app-scrollbar-half: calc(var(--scrollbar-thumb-size) / 2);
     --app-scrollbar-inner: calc(var(--scrollbar-size) - var(--scrollbar-thumb-size) - var(--scrollbar-inset-outer));
 
@@ -33,10 +33,10 @@
   }
   // Setting scrollbar-color in Chromium would disable its wider grab-area rules.
   @supports not selector(::-webkit-scrollbar) {
-    :where(html, .app-container, .transcript-view, .table-container) { scrollbar-color: var(--color-border-control) transparent; }
+    :where(html, .app-container, .transcript-view, .table-container, .toast-container) { scrollbar-color: var(--color-border-control) transparent; }
   }
   @media (forced-colors: active) {
-    :where(html, .app-container, .transcript-view, .table-container)::-webkit-scrollbar-thumb {
+    :where(html, .app-container, .transcript-view, .table-container, .toast-container)::-webkit-scrollbar-thumb {
       // Only this mark opts out of colour substitution, using system colours exclusively.
       forced-color-adjust: none;
       background-color: CanvasText;

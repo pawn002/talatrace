@@ -6,12 +6,12 @@ const path = require('node:path');
 const os = require('node:os');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '../..');
-const executable = path.resolve(process.argv[2] || 'release/talatrace-rc1/win-unpacked/TalaTrace.exe');
+const executable = path.resolve(process.argv[2] || (process.platform === 'linux' ? 'release/linux-unpacked/whisper-electron-app' : 'release/talatrace-rc1/win-unpacked/TalaTrace.exe'));
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function launch(appData, expectedProfile, recognize = false, preferencesExist = false, options = {}) {
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
-  const child = spawn(executable, ['--inspect-brk=127.0.0.1:0'], { windowsHide: true, env });
+  const child = spawn(executable, ['--inspect-brk=127.0.0.1:0', ...(process.platform === 'linux' ? ['--force-device-scale-factor=1.5'] : [])], { windowsHide: true, env });
   let diagnostics = '';
   child.stdout.on('data', () => {});
   let socket;
@@ -50,6 +50,10 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
       callFrameId: breakpoint.callFrames[0].callFrameId,
       expression: `(() => {
         const e = require('electron'); globalThis.__releaseElectron = e;
+        // require is module-scoped, not available to later Runtime.evaluate calls.
+        if (process.env.TALATRACE_EXPECT_APPARMOR === '1') {
+          globalThis.__releaseAppArmor = require('node:fs').readFileSync('/proc/self/attr/current', 'utf8').trim();
+        }
         e.app.setPath('appData', ${JSON.stringify(appData)});
         e.app.on('browser-window-created', (_event, win) => {
           win.hide(); win.webContents.setBackgroundThrottling(false);
@@ -75,6 +79,12 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
     })()`);
     const identity = await evaluate(`(async () => { const {app}=globalThis.__releaseElectron; await app.whenReady(); return { packaged: app.isPackaged, name: app.getName(), version: app.getVersion(), profile: app.getPath('userData') }; })()`);
     assert.equal(identity.packaged, true); assert.equal(identity.name, 'TalaTrace'); assert.equal(identity.profile, expectedProfile);
+    if (process.env.TALATRACE_EXPECT_APPARMOR === '1') {
+      assert.equal(process.platform, 'linux');
+      const label = await evaluate('globalThis.__releaseAppArmor');
+      assert.match(label, /^talatrace(?:\s|$)/, 'Installed app is not running under its shipped AppArmor profile: ' + label);
+      console.log('Installed AppArmor profile:', label);
+    }
     const models = await renderer('window.electronAPI.getAvailableModels()');
     const recognitionModels = options.models || ['base', 'parakeet-tdt-0.6b-v3'];
     for(const model of recognitionModels) {
@@ -92,6 +102,13 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
       return document.querySelector('h1, .app-title').textContent;
     })()`);
     const preferenceBefore = await renderer("localStorage.getItem('talatrace.model')");
+    if (recognize && !options.keepPreference) {
+      await renderer("document.querySelector('[data-action=notification-preferences]').click()");
+      await wait(100);
+      await renderer("const timeout=document.querySelector('#notification-timeout'); timeout.value='30'; timeout.dispatchEvent(new Event('change',{bubbles:true})); document.querySelector('.notification-modal [slot=footer] button').click()");
+    } else if (preferencesExist && !options.keepPreference) {
+      assert.equal(await renderer("document.querySelector('#notification-timeout').value"), '30', 'Notification timeout preference lost on restart');
+    }
     const results = [];
     if(recognize) for(const model of recognitionModels) {
       const result = await renderer(`(async () => await new Promise((resolve,reject)=>{
@@ -105,6 +122,83 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
       results.push({ model, engine: result.engine, seconds: result.duration, processingMs: result.processingTimeMs, segments: result.segments.length });
     }
     const preferenceAfter = await renderer("localStorage.getItem('talatrace.model')");
+    if (recognize) {
+      // Also keep explicit --real-profile checks from placing test exports in
+      // the user's appData tree. This directory is owned by the test run.
+      const exportsDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'talatrace-export-smoke-'));
+      await evaluate(`(() => {
+        globalThis.__exportDefaults = [];
+        globalThis.__releaseElectron.dialog.showSaveDialog = async (_window, options) => {
+          globalThis.__exportDefaults.push(options.defaultPath);
+          // Missing suffix: the app must append the chosen format.
+          return { canceled: false, filePath: ${JSON.stringify(path.join(exportsDirectory, 'answer'))} };
+        };
+      })()`);
+      for (const format of ['txt', 'srt', 'vtt', 'json']) {
+        const output = path.join(exportsDirectory, 'answer.' + format);
+        await renderer(`(() => {
+          const select = document.querySelector('#export-format'); select.value = ${JSON.stringify(format)};
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          document.querySelector('[data-action=save]').click();
+        })()`);
+        let saved = false;
+        // Creation alone is insufficient: fs.writeFile can still be in flight.
+        // Wait for the UI's confirmation of the completed IPC/save operation.
+        for (let i = 0; i < 100; i++) {
+          saved = await renderer(`Array.from(document.querySelectorAll('candor-toast')).some(toast => toast.message === ${JSON.stringify('Saved to: ' + output)})`);
+          if (saved) break;
+          await wait(50);
+        }
+        assert.ok(saved, 'No save completion for ' + format);
+        const content = await fs.readFile(output, 'utf8');
+        if (format === 'json') assert.match(JSON.parse(content).text, /country/i);
+        else if (format === 'vtt') assert.match(content, /^WEBVTT\n/);
+        else if (format === 'srt') assert.match(content, /\d\d:\d\d:\d\d,\d{3} -->/);
+        else assert.match(content, /country/i);
+      }
+      const defaults = await evaluate('globalThis.__exportDefaults');
+      assert.deepEqual(defaults.slice(1), ['srt','vtt','json'].map(format => path.join(exportsDirectory, 'answer.' + format)));
+      if (process.platform === 'linux') {
+        const destination = path.join(exportsDirectory, 'answer.json');
+        await fs.writeFile(destination, 'keep existing JSON');
+        for (const replace of [false, true]) {
+          await renderer("document.querySelector('[data-action=save]').click()");
+          let opened = false;
+          for (let i = 0; i < 100; i++) {
+            opened = await renderer("document.querySelector('.overwrite-modal').shadowRoot.querySelector('dialog').open");
+            if (opened) break; await wait(50);
+          }
+          assert.ok(opened, 'Linux overwrite confirmation did not open, including immediately after cancellation');
+          assert.equal(await renderer("document.querySelector('.overwrite-modal .overwrite-path').textContent.trim()"), destination);
+          await renderer(`document.querySelector('.overwrite-modal ${replace ? '[data-action=replace]' : '[autofocus]'}').click()`);
+          for (let i = 0; i < 100; i++) {
+            if (await renderer("!document.querySelector('.export-status[role=status]')")) break; await wait(50);
+          }
+          const content = await fs.readFile(destination, 'utf8');
+          if (replace) assert.match(JSON.parse(content).text, /country/i);
+          else assert.equal(content, 'keep existing JSON');
+        }
+        console.log('Linux packaged overwrite cancellation, immediate retry and replacement passed through the real IPC bridge.');
+      }
+      const jsonBefore = await fs.readFile(path.join(exportsDirectory, 'answer.json'), 'utf8');
+      await evaluate(`globalThis.__releaseElectron.dialog.showSaveDialog = async () => ({ canceled: false, filePath: ${JSON.stringify(path.join(exportsDirectory, 'answer.srt'))} })`);
+      await renderer("document.querySelector('[data-action=save]').click()");
+      await wait(200);
+      assert.equal(await renderer("document.querySelector('.overwrite-modal').shadowRoot.querySelector('dialog').open"), false);
+      assert.match(await fs.readFile(path.join(exportsDirectory, 'answer.srt'), 'utf8'), /\d\d:\d\d:\d\d,\d{3} -->/);
+      assert.equal(await fs.readFile(path.join(exportsDirectory, 'answer.json'), 'utf8'), jsonBefore);
+      console.log('Packaged export format/suffix handling passed; typed SRT overrides JSON without an extra app prompt.');
+    }
+    console.log('Packaged zoom and minimum geometry:', await evaluate(`(async () => {
+      const win=globalThis.__releaseElectron.BrowserWindow.getAllWindows()[0], wc=win.webContents;
+      const key=async keyCode=>{wc.sendInputEvent({type:'keyDown',keyCode,modifiers:['control']});wc.sendInputEvent({type:'keyUp',keyCode,modifiers:['control']});await new Promise(r=>setTimeout(r,100));};
+      await key('0'); await key('='); const enlarged=wc.getZoomFactor(); if(enlarged<=1) throw new Error('Ctrl+ did not zoom');
+      await key('-'); if(wc.getZoomFactor()>=enlarged) throw new Error('Ctrl- did not zoom out'); await key('0');
+      if(wc.getZoomFactor()!==1) throw new Error('Ctrl+0 did not reset');
+      const minimum=win.getMinimumSize(); if(minimum[0]>360 || minimum[1]>320) throw new Error('Window minimum exceeds short-window target');
+      return {minimum,bounds:win.getBounds(),enlarged};
+    })()`));
+    console.log('Renderer geometry:', await renderer('({dpr:devicePixelRatio,width:innerWidth,height:innerHeight})'));
     assert.equal(preferenceAfter, preferenceBefore, 'Transcription unexpectedly changed the saved model');
     if(options.screenshot) {
       await renderer("(async () => { document.querySelector('#app-tab-models').click(); await document.fonts.ready; await new Promise(r=>setTimeout(r,350)); })()");
@@ -120,6 +214,7 @@ async function launch(appData, expectedProfile, recognize = false, preferencesEx
 
 (async () => {
   if(process.argv.includes('--real-profile')) {
+    assert.equal(process.platform, 'win32', 'Real-profile upgrade check currently supports Windows only.');
     // Explicit opt-in for a backed-up installed-app check. Keep existing preferences.
     const backup = (await fs.readFile(path.join(root,'.local-backups/active-upgrade-backup.txt'),'utf8')).trim();
     const manifest = JSON.parse(await fs.readFile(path.join(backup,'before.json'),'utf8'));
