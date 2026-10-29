@@ -56,7 +56,7 @@
             <option value="txt">TXT</option><option value="srt">SRT</option><option value="vtt">VTT</option><option value="json">JSON</option>
           </select><i class="ph-bold ph-caret-down select-caret" aria-hidden="true"></i></div>
           <button data-action="save" class="button button--ghost button--small" (click)="exportTranscript()" [disabled]="!canSaveTranscript || busy" [attr.aria-describedby]="transcriptionResult && !hasTranscriptText ? 'empty-export-reason' : 'workflow-help'"><i class="ph-fill ph-floppy-disk" aria-hidden="true"></i> Save transcript…</button>
-          <p class="export-status" id="empty-export-reason" *ngIf="transcriptionResult && !hasTranscriptText">No speech text was returned. Subtitle exports need speech text; TXT and JSON can retain available diagnostics.</p>
+          <p class="export-status" id="empty-export-reason" *ngIf="transcriptionResult && !hasTranscriptText">No speech text was returned. Subtitle exports need speech text. Use JSON for diagnostics; TXT is available when text or timeline context exists.</p>
           <p class="export-status export-format-hint" *ngIf="transcriptionResult && hasTranscriptText">A typed TXT, SRT, VTT or JSON filename extension chooses the saved format.</p>
           @if (isSaving) { <span role="status" class="export-status">Finish saving in the open dialog.</span> }
         </div>

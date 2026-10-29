@@ -26,6 +26,22 @@ describe('ToastService', () => {
     expect(toasts[0].variant).toBe('info');
   });
 
+  it('coalesces an identical active persistent condition without replacing its focused node identity', () => {
+    let toasts: any[] = []; service.toasts$.subscribe(value => toasts = value);
+    service.show('Could not export', 'error'); const id = toasts[0].id;
+    service.show('Could not export', 'error'); service.show('Could not export', 'error');
+    expect(toasts.length).toBe(1); expect(toasts[0].id).toBe(id);
+    service.show('Could not export', 'warning'); expect(toasts.length).toBe(2);
+    service.dismiss(id); service.show('Could not export', 'error');
+    expect(toasts.length).toBe(2); expect(toasts[1].id).not.toBe(id);
+  });
+
+  it('retains separate confirmations for repeated successful actions', () => {
+    service.show('Saved', 'success'); service.show('Saved', 'success');
+    let toasts: any[] = []; service.toasts$.subscribe(value => toasts = value);
+    expect(toasts.length).toBe(2);
+  });
+
   it('dismiss() removes the toast with the matching id', () => {
     service.show('A', 'success');
     service.show('B', 'error');

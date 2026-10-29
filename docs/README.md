@@ -2,7 +2,7 @@
 
 [Experimental Linux status](linux.md#experimental-support-status) records the accepted candidate 5 baseline, verified desktop scope, known bugs and remaining validation tracked by #24.
 
-Current guides describe the released **1.2.0** app. Windows x64 is the validated release target; [Linux support is tracked in #24](https://github.com/pawn002/talatrace/issues/24). Build-target declarations do not establish platform support.
+Current guides describe the **1.3.0** app. Windows x64 is the validated release target; [Linux support is tracked in #24](https://github.com/pawn002/talatrace/issues/24). Build-target declarations do not establish platform support.
 
 ## Using the app
 
@@ -23,6 +23,6 @@ Current guides describe the released **1.2.0** app. Windows x64 is the validated
 | [Candor widget inventory](candor-widget-review.md) | Current constructions and deliberate adaptations; read with [AGENTS.md](../AGENTS.md) before UI work |
 | [Speech evaluation](speech-model-evaluation.md) | Reproducible local quality/speed evaluation |
 
-[Release notes](releases/1.2.0.md) describe shipped changes. [Archived reviews](archive/README.md) preserve dated research, UI iterations and the completed repository migration; they are evidence, not setup instructions. The [documentation audit](../AUDIT_REPORT.md) records this cleanup and unresolved tooling findings.
+[Release notes](releases/1.3.0.md) describe shipped changes. [Archived reviews](archive/README.md) preserve dated research, UI iterations and the completed repository migration; they are evidence, not setup instructions. The [documentation audit](../AUDIT_REPORT.md) records this cleanup and unresolved tooling findings.
 
 Start at the [project README](../README.md). For help, check [troubleshooting](troubleshooting.md), then [existing issues](https://github.com/pawn002/talatrace/issues).

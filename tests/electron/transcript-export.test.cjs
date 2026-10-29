@@ -5,6 +5,14 @@ const path = require('node:path');
 const os = require('node:os');
 const { TranscriptExporter, exportPath, serializeTranscript } = require('../../dist/electron/services/transcript-export');
 const data = { text: 'Hello.', timestampedText: 'Timing: Hello.', segments: [{ start: 1.25, end: 2.5, text: 'Hello.' }] };
+
+test('subtitle timestamps round milliseconds consistently, including second/minute/hour carries', () => {
+  for (const [seconds, stamp] of [[3.36, '00:00:03.360'], [7.6, '00:00:07.600'], [59.9996, '00:01:00.000'], [3599.9996, '01:00:00.000']]) {
+    const result = { text: 'Speech', segments: [{ start: seconds, end: seconds + 1, text: 'Speech' }] };
+    assert.ok(serializeTranscript(result, 'vtt').includes(stamp + ' -->'));
+    assert.ok(serializeTranscript(result, 'srt').includes(stamp.replace('.', ',') + ' -->'));
+  }
+});
 test('explicit supported suffix chooses the format and unchanged destinations rely only on native confirmation', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'talatrace-export-'));
   const calls = [], prompts = []; let selected = path.join(root, 'answer.srt');

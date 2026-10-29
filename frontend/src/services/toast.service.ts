@@ -68,6 +68,9 @@ export class ToastService implements OnDestroy {
     message: string,
     variant: 'info' | 'success' | 'warning' | 'error' = 'info',
   ): void {
+    // Keep one active copy of a persistent condition. Reuse the existing DOM
+    // node so a focused dismiss control and its announcement are not replaced.
+    if ((variant === 'warning' || variant === 'error') && this.toastsSubject.value.some(toast => toast.variant === variant && toast.message === message)) return;
     const id = Date.now().toString() + Math.random().toString(36).slice(2);
     this.toastsSubject.next([...this.toastsSubject.value, { id, message, variant }]);
     if (variant === 'info' || variant === 'success') {

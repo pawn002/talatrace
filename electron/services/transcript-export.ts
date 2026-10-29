@@ -76,35 +76,19 @@ function validateExport(data: any, format: TranscriptFormat): void {
   }
 }
 
-// Helper function to format seconds to SRT timestamp (HH:MM:SS,mmm)
-function formatTimestampForSRT(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  const milliseconds = Math.floor((secs % 1) * 1000);
-
-  const hh = hours.toString().padStart(2, '0');
-  const mm = minutes.toString().padStart(2, '0');
-  const ss = Math.floor(secs).toString().padStart(2, '0');
-  const mmm = milliseconds.toString().padStart(3, '0');
-
-  return `${hh}:${mm}:${ss},${mmm}`;
+function formatSubtitleTimestamp(seconds: number, separator: ',' | '.'): string {
+  if (!Number.isFinite(seconds) || seconds < 0) throw new Error('Invalid subtitle timestamp');
+  // Round the full duration first so floating-point fractions and carries across
+  // a second/minute/hour use the same millisecond precision as the preview.
+  const total = Math.round(seconds * 1000);
+  const hh = Math.floor(total / 3600000).toString().padStart(2, '0');
+  const mm = Math.floor(total % 3600000 / 60000).toString().padStart(2, '0');
+  const ss = Math.floor(total % 60000 / 1000).toString().padStart(2, '0');
+  return `${hh}:${mm}:${ss}${separator}${(total % 1000).toString().padStart(3, '0')}`;
 }
 
-// Helper function to format seconds to VTT timestamp (HH:MM:SS.mmm)
-function formatTimestampForVTT(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  const milliseconds = Math.floor((secs % 1) * 1000);
-
-  const hh = hours.toString().padStart(2, '0');
-  const mm = minutes.toString().padStart(2, '0');
-  const ss = Math.floor(secs).toString().padStart(2, '0');
-  const mmm = milliseconds.toString().padStart(3, '0');
-
-  return `${hh}:${mm}:${ss}.${mmm}`;
-}
+function formatTimestampForSRT(seconds: number): string { return formatSubtitleTimestamp(seconds, ','); }
+function formatTimestampForVTT(seconds: number): string { return formatSubtitleTimestamp(seconds, '.'); }
 
 // Helper function to convert segments array to SRT format
 function convertSegmentsToSRT(segments: any[]): string {

@@ -1,12 +1,12 @@
 # Release TalaTrace
 
-This is the reusable maintainer procedure. [1.2.0 notes](releases/1.2.0.md) describe the shipped release; the [archived migration record](archive/talatrace-release-migration.md) contains its checkpoint, hashes, upgrade evidence and limitations. Do not replay the completed rename plan for a routine release.
+This is the reusable maintainer procedure. [1.3.0 notes](releases/1.3.0.md) describe the shipped release; the [archived migration record](archive/talatrace-release-migration.md) contains its checkpoint, hashes, upgrade evidence and limitations. Do not replay the completed rename plan for a routine release.
 
 ## Scope and version preparation
 
-Windows x64 NSIS/ZIP is the validated release path. [Linux #24](https://github.com/pawn002/talatrace/issues/24) remains open; macOS/Linux scripts need native and installer validation before publication. Signing is not configured for 1.2.0, so identify unsigned artifacts explicitly.
+Windows x64 NSIS/ZIP is the validated release path. [Linux #24](https://github.com/pawn002/talatrace/issues/24) remains open; macOS/Linux scripts need native and installer validation before publication. Signing is not configured for 1.3.0, so identify unsigned artifacts explicitly.
 
-**Experimental Linux exception, approved 29 October 2026:** candidate 5 may proceed to an explicitly labelled Linux-only experimental prerelease with the documented [support status and limitations](linux.md#experimental-support-status). Further personal Linux testing by the maintainer is not required for that prerelease. Preserve #24 as the full-support tracker; do not mark untested acceptance criteria complete. Recommend the x86_64 CPU deb, prominently disclose the AppImage launch-policy failure, identify exact source/package hashes and include the known bugs and untested desktop matrix. Keep the Linux prerelease separate from Latest/stable Windows 1.2.0. Publishing/merging remains a distinct action; the support-status decision alone does not perform either.
+**Experimental Linux exception, approved 29 October 2026:** candidate 5 may proceed to an explicitly labelled Linux-only experimental prerelease with the documented [support status and limitations](linux.md#experimental-support-status). Further personal Linux testing by the maintainer is not required for that prerelease. Preserve #24 as the full-support tracker; do not mark untested acceptance criteria complete. Recommend the x86_64 CPU deb, prominently disclose the AppImage launch-policy failure, identify exact source/package hashes and include the known bugs and untested desktop matrix. Keep the Linux prerelease separate from Latest/stable Windows 1.3.0. Publishing/merging remains a distinct action; the support-status decision alone does not perform either.
 
 Merge reviewed feature work before bumping the final version on main. Confirm a clean working tree, intended revision and previous release tag. Exclude checkpoint tags when finding a release baseline:
 

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-29
+
+### Added
+- Experimental Linux x86_64 CPU packages with local Whisper and Parakeet runtimes. Recommend the deb; AppImage launch remains restricted on the tested Ubuntu desktop. Linux is a separate experimental prerelease, with remaining validation tracked in #24.
+- Keyboard zoom on Windows and Linux: Ctrl/Cmd + plus/minus and Ctrl/Cmd + 0 to reset, independent of the removed application menu.
+- Persisted notification timeout choices (5, 10, 30 seconds or Never). Success/info timers pause on hover, focus, inactivity and while preferences are open; warnings/errors require dismissal.
+
+### Changed
+- Choose TXT, SRT, VTT or JSON before saving. An explicitly typed supported extension selects the format; successful exports reuse the folder and filename stem for the session.
+- Fit the initial window to the display work area and support a 360×320 DIP minimum with improved narrow export/header layouts.
+- Clarify empty transcript export availability: JSON diagnostics remain available, TXT requires text or timeline context, and subtitles require speech text.
+- Consolidate current project guides and archive completed reviews and migration records.
+
+### Fixed
+- Avoid duplicate overwrite prompts for unchanged native-picker destinations; confirm appended destinations accessibly in the app and preserve files on cancellation.
+- Round SRT/VTT timestamps to milliseconds before formatting, including carries into the next second, minute or hour.
+- Reuse an identical active warning/error notification without moving keyboard focus or creating duplicate announcements.
+- Preserve notification timeout preferences after assistive-technology deselection events.
+- Provision the Linux deb's executable-specific AppArmor namespace policy and Chromium sandbox helper without disabling the sandbox or system-wide restrictions.
+- Repair verified native setup and release preparation/version synchronization.
+
 ## [1.2.0] - 2026-10-26
 
 ### Added

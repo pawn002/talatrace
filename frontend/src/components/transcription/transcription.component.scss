@@ -35,7 +35,7 @@
 .export-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--spacing-xs); max-width: 100%; }
 .export-controls label { font: var(--font-size-md)/var(--line-height-normal) var(--font-family-accessible); color: var(--color-text-default); }
 .export-controls .select-control { width: 104px; max-width: 100%; }
-.export-status { font-size: var(--font-size-md); color: var(--color-text-default); }
+.export-status { max-inline-size: 65ch; font-size: var(--font-size-md); color: var(--color-text-default); }
 .export-format-hint { flex-basis: 100%; max-inline-size: 65ch; margin: 0; }
 .export-controls .select-caret { color: var(--color-border-control); }
 .export-controls .select-control:focus-within .select-caret { color: var(--color-focus); }

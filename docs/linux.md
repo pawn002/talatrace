@@ -1,10 +1,10 @@
 # Linux delivery work
 
-Tracked in [#24](https://github.com/pawn002/talatrace/issues/24). Released 1.2.0 downloads remain Windows-only. Linux changes are candidates under validation, not a published support claim.
+Tracked in [#24](https://github.com/pawn002/talatrace/issues/24). Windows 1.3.0 is the stable release; Linux packages are a separate experimental prerelease, not full platform support.
 
 ## Experimental support status
 
-On 29 October 2026 the maintainer accepted candidate 5 as the experimental Linux baseline and ended the current personal desktop-testing cycle. The remaining validation is follow-up work, not a request for more testing from the maintainer or a prerequisite for an explicitly labelled experimental prerelease. Full Linux support remains tracked in #24. The download currently remains a draft; this decision does not itself publish it or merge PR #26.
+On 29 October 2026 the maintainer accepted candidate 5 as the experimental Linux baseline and ended the current personal desktop-testing cycle. The remaining validation is follow-up work, not a request for more testing from the maintainer or a prerequisite for an explicitly labelled experimental prerelease. Full Linux support remains tracked in #24. The [1.3.0 Linux experimental prerelease](https://github.com/pawn002/talatrace/releases/tag/v1.3.0-linux-preview.1) builds on that baseline; see [release notes](releases/1.3.0.md) for changes and package checks. Its internal application version is 1.3.0.
 
 Recommended experimental scope: **x86_64 CPU recognition, deb package**. Ubuntu 24.04 is the build/CI baseline. Candidate 5 was tested on Ubuntu 26.04.1, XFCE/X11, PipeWire, at 150% display scale. Other distributions, Wayland, ARM64 and GPU acceleration are unvalidated.
 
@@ -17,15 +17,15 @@ Verified evidence:
 
 Known limitations and follow-up work:
 
-- SRT/VTT formatting can floor a timestamp by 1 ms; preview/TXT/JSON use rounded values.
-- TXT Save can be unavailable for an empty transcript despite the hint mentioning diagnostics. JSON diagnostics remain available; empty subtitle files are prevented.
-- Identical errors can accumulate as duplicate toasts; the stack can clip a message at its lower edge. Toasts float over content while visible. Their timeout can be changed or set to Never.
+- The notification stack can clip a message at its lower edge. Toasts float over content while visible. Their timeout can be changed or set to Never. Identical active warnings/errors are coalesced in 1.3.0.
 - Theme tooltips can remain visible after AT-SPI activation until the pointer moves. Very narrow/high-zoom layouts retain a known overflow fixture; the tested maximized 200% desktop layout remained keyboard reachable.
 - Pause-marker differences between separate recordings are inconclusive because background voices/audio preprocessing differed. They do not establish a model-specific defect; timing and pauses remain approximate context.
 - AppImage FUSE mounting passed, but launch under Ubuntu's namespace policy remains unresolved. **Use the deb; do not disable Chromium's sandbox or system-wide restrictions as a workaround.**
 - Real disconnected desktop use, Wayland, the clean install/upgrade/remove/data-retention matrix and Orca announcements remain untested. Reinstalling over earlier same-version candidates and retaining that profile passed; this is not the complete lifecycle matrix.
 
 An experimental prerelease must prominently link this status, identify the exact tested source/checksums, recommend the deb and avoid implying Linux/Windows support parity or accessibility certification. The existing stable-release acceptance criteria remain open until their evidence is available.
+
+The candidate 5 subtitle rounding and misleading empty-TXT hint are corrected in 1.3.0. JSON diagnostics remain available without recognized speech; TXT requires text or timeline context and subtitles require speech text.
 
 ## Initial target and build
 

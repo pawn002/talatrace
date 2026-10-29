@@ -2,9 +2,9 @@
 
 ## Windows release
 
-TalaTrace 1.2.0 provides an unsigned Windows x64 installer and ZIP on the [release page](https://github.com/pawn002/talatrace/releases/latest). End users do not need Node.js, Python, CMake or a compiler. The package includes the native Whisper/Parakeet engines, FFmpeg and the speech detector. Recognition model weights are selected and downloaded in the app.
+TalaTrace 1.3.0 provides an unsigned Windows x64 installer and ZIP on the [release page](https://github.com/pawn002/talatrace/releases/latest). End users do not need Node.js, Python, CMake or a compiler. The package includes the native Whisper/Parakeet engines, FFmpeg and the speech detector. Recognition model weights are selected and downloaded in the app.
 
-1. Download `TalaTrace-Setup-1.2.0.exe` or the ZIP, plus `SHA256SUMS.txt` if checking the download.
+1. Download `TalaTrace-Setup-1.3.0.exe` or the ZIP, plus `SHA256SUMS.txt` if checking the download.
 2. Close any existing TalaTrace/Whisper Transcription session after saving transcripts you need.
 3. Run the installer, then launch **TalaTrace** from the Desktop or Start Menu. For the ZIP, extract the complete archive before running `TalaTrace.exe`; its resources must stay beside it.
 4. Open **Models**, download a model, then select it in **Transcription settings**. See [Usage](usage.md) and [Models](models.md).
@@ -12,7 +12,7 @@ TalaTrace 1.2.0 provides an unsigned Windows x64 installer and ZIP on the [relea
 The release is unsigned; verify its source and checksum before deciding whether to run it. In PowerShell:
 
 ```powershell
-Get-FileHash -LiteralPath .\TalaTrace-Setup-1.2.0.exe -Algorithm SHA256
+Get-FileHash -LiteralPath .\TalaTrace-Setup-1.3.0.exe -Algorithm SHA256
 ```
 
 Compare the hash with the matching filename in `SHA256SUMS.txt`. Allow disk space for the app, downloaded weights and temporary audio; [Models](models.md) lists the actual model sizes. Model size alone is not a RAM requirement or a hardware performance guarantee.
@@ -35,9 +35,9 @@ Back up the complete profile while the app is closed if preserving preferences a
 
 ## Linux and macOS
 
-Linux support is [open work in #24](https://github.com/pawn002/talatrace/issues/24). The repository declares AppImage/deb and macOS targets, but 1.2.0 publishes only verified Windows x64 artifacts. Do not treat the target names or old platform instructions as tested installation support.
+Linux support is [open work in #24](https://github.com/pawn002/talatrace/issues/24). 1.3.0 provides a separate experimental Linux x86_64 CPU prerelease. macOS remains unvalidated.
 
-Candidate 5 is the accepted **experimental Linux x86_64 CPU deb** baseline. Core workflows passed on Ubuntu 26.04.1/XFCE/X11/PipeWire, alongside Ubuntu 24.04 CI. Read the [tested scope, known issues and remaining validation](linux.md#experimental-support-status). The Linux download currently remains a testing draft. Prefer the deb; AppImage launch under Ubuntu's namespace policy remains unresolved. This does not establish macOS support.
+Candidate 5 is the accepted **experimental Linux x86_64 CPU deb** baseline. Core workflows passed on Ubuntu 26.04.1/XFCE/X11/PipeWire, alongside Ubuntu 24.04 CI. Read the [tested scope, known issues and remaining validation](linux.md#experimental-support-status). Get the deb from the [experimental prerelease](https://github.com/pawn002/talatrace/releases/tag/v1.3.0-linux-preview.1), then install with `sudo apt install ./TalaTrace-1.3.0-linux-amd64.deb`. Prefer the deb; AppImage launch under Ubuntu's namespace policy remains unresolved. This does not establish macOS support.
 
 ## Build from source
 

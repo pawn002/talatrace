@@ -446,6 +446,15 @@ app.whenReady().then(async () => {
     await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
     await wait(1000);
     await capture('result');
+    win.webContents.send('transcription-completed', { text: '', segments: [], noSpeechIntervals: [], duration: 6 }); await wait(80);
+    await capture('empty-export');
+    await resize(360, 520); await capture('empty-export-small');
+    if (!await win.webContents.executeJavaScript("document.querySelector('[data-action=save]').disabled && document.querySelector('#empty-export-reason').textContent.includes('Use JSON for diagnostics')")) throw new Error('Empty TXT availability lacks an accurate adjacent explanation');
+    await win.webContents.executeJavaScript("document.querySelector('#export-format').value='json'; document.querySelector('#export-format').dispatchEvent(new Event('change',{bubbles:true}));");
+    if (!await win.webContents.executeJavaScript("!document.querySelector('[data-action=save]').disabled")) throw new Error('Empty transcript JSON diagnostics unavailable');
+    await capture('empty-json-export');
+    await win.webContents.executeJavaScript("document.querySelector('#export-format').value='txt'; document.querySelector('#export-format').dispatchEvent(new Event('change',{bubbles:true}));");
+    win.webContents.send('transcription-completed', fixture); await wait(80); await resize(1100, 820);
     await click('label[for=export-format]');
     await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 });
     await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 });
@@ -597,6 +606,10 @@ app.whenReady().then(async () => {
     await click('#audio-file-tab'); await capture('audio-file');
     nativeTheme.themeSource = 'light'; await wait(250); await capture('file-empty-light'); nativeTheme.themeSource = 'dark';
     failPicker = true; await click('[data-action="choose-file"]'); await wait(100); await capture('candor-toast');
+    await win.webContents.executeJavaScript("window.__persistentErrorToast=document.querySelector('candor-toast'); window.__persistentErrorToast.shadowRoot.querySelector('[aria-label=Dismiss]').focus()");
+    for(let repeat=0;repeat<2;repeat++){failPicker=true; await win.webContents.executeJavaScript("document.querySelector('[data-action=choose-file]').click()"); await wait(100);}
+    if (!await win.webContents.executeJavaScript("document.querySelectorAll('candor-toast').length===1 && document.querySelector('candor-toast')===window.__persistentErrorToast && window.__persistentErrorToast.shadowRoot.activeElement?.getAttribute('aria-label')==='Dismiss'")) throw new Error('Repeated error replaced its toast or dismiss focus');
+    await capture('coalesced-errors');
     if (!await win.webContents.executeJavaScript("document.querySelector('candor-toast-container').shadowRoot.querySelector('.live--assertive').textContent.includes('Failed to select file')")) throw new Error('Toast was not added to the persistent assertive region');
     await resize(360, 780); await capture('candor-toast-small'); await resize(1100, 820);
     nativeTheme.themeSource = 'light'; await wait(350); await capture('candor-toast-light'); nativeTheme.themeSource = 'dark'; await wait(350);

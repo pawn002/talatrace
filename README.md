@@ -8,9 +8,9 @@ Formerly **Whisper Transcription**. The existing repository is now [pawn002/tala
 
 Get the unsigned Windows x64 installer or ZIP and `SHA256SUMS.txt` from the [latest release](https://github.com/pawn002/talatrace/releases/latest). The Windows package includes both native recognition engines, FFmpeg and speech-detection resources; choose/download model weights in **Models**, then select the model in **Transcription settings**.
 
-Windows is the validated 1.2.0 release target. [Linux support is tracked in #24](https://github.com/pawn002/talatrace/issues/24); macOS/Linux build-target declarations are not verified releases. See [Installation](docs/installation.md) for upgrade/storage details and [1.2.0 notes](docs/releases/1.2.0.md) for tested limits.
+Windows is the stable 1.3.0 release target. See [Installation](docs/installation.md) for upgrade/storage details and [1.3.0 notes](docs/releases/1.3.0.md) for changes and tested limits. macOS is not a validated release target.
 
-**Experimental Linux support:** the x86_64 CPU deb has passed core desktop workflows on Ubuntu 26.04.1/XFCE/X11/PipeWire, with Ubuntu 24.04 native CI. Candidate 5 is the accepted experimental baseline; further personal desktop testing is not a prerequisite for an explicitly experimental prerelease. Prefer the deb: AppImage launch remains blocked by Ubuntu's namespace policy. See the [Linux support status and known issues](docs/linux.md#experimental-support-status) before installing. The current Linux download is still a testing draft; Windows 1.2.0 remains the public stable release.
+**Experimental Linux support:** a separate [Linux x86_64 CPU prerelease](https://github.com/pawn002/talatrace/releases/tag/v1.3.0-linux-preview.1) builds on candidate 5 desktop testing on Ubuntu 26.04.1/XFCE/X11/PipeWire and Ubuntu 24.04 native CI. Prefer the deb: AppImage launch remains blocked by Ubuntu's namespace policy. Read the [Linux support status and known issues](docs/linux.md#experimental-support-status) before installing. Full Linux support remains tracked in [#24](https://github.com/pawn002/talatrace/issues/24).
 
 <!-- Preserve the Getting started fragment in the original blog post. -->
 <a id="-quick-start"></a>
